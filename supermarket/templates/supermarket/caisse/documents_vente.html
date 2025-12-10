@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documents de Vente - Super Market</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #d74123 0%, #ff6b35 100%);
+            color: white;
+            padding: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header-content {
+            flex: 1;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px; 
+            font-weight: 300;
+        }
+        .header .subtitle {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        .header-actions {
+            display: flex;
+            gap: 15px;
+        }
+        .btn-dashboard {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 12px 24px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-dashboard:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+            color: white;
+            text-decoration: none;
+        }
+        .content { padding: 40px; }
+        
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+            border: 1px solid #f0f0f0;
+            text-align: center;
+        }
+        .stat-card .icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+            opacity: 0.7;
+        }
+        .stat-card .label {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .stat-card .value {
+            color: #2c3e50;
+            font-weight: 700;
+            font-size: 1.5em;
+        }
+        
+        .controls {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+            margin-bottom: 30px;
+        }
+        .controls-row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+            position: relative;
+        }
+        .search-input {
+            width: 100%;
+            padding: 12px 40px 12px 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        .search-input:focus {
+            outline: none;
+            border-color: #d74123;
+        }
+        .search-icon {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #666;
+        }
+        .filter-select {
+            padding: 12px 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+            min-width: 150px;
+        }
+        .refresh-button {
+            background: #d74123;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.3s;
+        }
+        .refresh-button:hover {
+            background: #b8351e;
+        }
+        
+        .table-container {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+            margin-bottom: 30px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            padding: 15px 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 0.9em;
+        }
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+        .document-date {
+            font-weight: bold;
+            color: #d74123;
+        }
+        .total-amount {
+            font-weight: bold;
+            color: #28a745;
+        }
+        .invoice-count {
+            color: #007bff;
+            font-weight: 500;
+        }
+        .view-details-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8em;
+            transition: background 0.3s;
+        }
+        .view-details-btn:hover {
+            background: #0056b3;
+        }
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 1.1em;
+        }
+        .no-data i {
+            font-size: 3em;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+        
+        .actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            min-width: 150px;
+            justify-content: center;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #d74123, #ff6b35);
+            color: white;
+        }
+        .btn-secondary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 900px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+        .modal-header {
+            background: linear-gradient(135deg, #d74123 0%, #ff6b35 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px 15px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-title {
+            margin: 0;
+            font-size: 1.3em;
+        }
+        .close {
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            background: none;
+            border: none;
+        }
+        .close:hover {
+            opacity: 0.7;
+        }
+        .modal-body {
+            padding: 20px;
+        }
+        .document-summary {
+            margin-bottom: 20px;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #d74123;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .detail-label {
+            font-weight: bold;
+            color: #333;
+        }
+        .detail-value {
+            color: #666;
+        }
+        .invoices-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        .invoices-table th,
+        .invoices-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #e1e5e9;
+        }
+        .invoices-table th {
+            background: #f8f9fa;
+            font-weight: bold;
+            color: #333;
+        }
+        .invoices-table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        @media (max-width: 768px) {
+            .stats-bar { grid-template-columns: 1fr; }
+            .actions { flex-direction: column; }
+            .btn { width: 100%; }
+            .header { 
+                flex-direction: column; 
+                text-align: center; 
+                gap: 20px;
+            }
+            .header h1 { font-size: 2em; }
+            .header-actions {
+                justify-content: center;
+            }
+            .btn-dashboard {
+                padding: 10px 20px;
+                font-size: 0.9em;
+            }
+            .content { padding: 20px; }
+            .controls-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .search-box {
+                min-width: auto;
+            }
+            table { font-size: 0.9em; }
+            th, td { padding: 10px 8px; }
+            .modal-content {
+                width: 95%;
+                margin: 10% auto;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Messages Django -->
+{% if messages %}
+    <div style="position: fixed; top: 20px; right: 20px; z-index: 1000; max-width: 400px;">
+        {% for message in messages %}
+            {% if message.tags == 'error' %}
+                <div style="margin: 5px 0; padding: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;">
+                    <i class="fas fa-exclamation-triangle"></i> {{ message }}
+                </div>
+            {% elif message.tags == 'warning' %}
+                <div style="margin: 5px 0; padding: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7;">
+                    <i class="fas fa-exclamation-circle"></i> {{ message }}
+                </div>
+            {% elif message.tags == 'success' %}
+                <div style="margin: 5px 0; padding: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;">
+                    <i class="fas fa-check-circle"></i> {{ message }}
+                </div>
+            {% else %}
+                <div style="margin: 5px 0; padding: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb;">
+                    <i class="fas fa-info-circle"></i> {{ message }}
+                </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+{% endif %}
+
+<div class="container">
+    <div class="header">
+        <div class="header-content">
+            <h1><i class="fas fa-file-alt"></i> Documents de Vente</h1>
+            <div class="subtitle">Archives des ventes journalières - Documents générés lors de la fermeture de caisse</div>
+        </div>
+        <div class="header-actions">
+            <a href="{% url 'dashboard_caisse' %}" class="btn-dashboard">
+                <i class="fas fa-tachometer-alt"></i>
+                Retour au Dashboard
+            </a>
+        </div>
+    </div>
+    
+    <div class="content">
+        <div class="stats-bar">
+            <div class="stat-card">
+                <div class="icon"><i class="fas fa-calendar-alt"></i></div>
+                <div class="label">Documents Archivés</div>
+                <div class="value">{{ total_documents }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="icon"><i class="fas fa-money-bill-wave"></i></div>
+                <div class="label">Chiffre d'Affaires Total</div>
+                <div class="value">{{ chiffre_affaires_total|floatformat:2 }} FCFA</div>
+            </div>
+            <div class="stat-card">
+                <div class="icon"><i class="fas fa-receipt"></i></div>
+                <div class="label">Total Factures</div>
+                <div class="value">{{ total_factures }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="icon"><i class="fas fa-clock"></i></div>
+                <div class="label">Dernier Archivage</div>
+                <div class="value">
+                    {% if dernier_archivage %}
+                        {{ dernier_archivage|date:"d/m/Y H:i" }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="controls-row">
+                <div class="search-box">
+                    <input type="text" id="searchInput" class="search-input" placeholder="Rechercher par date, vendeuse..." value="{{ search_query }}">
+                    <i class="fas fa-search search-icon"></i>
+                </div>
+                <select id="dateFilter" class="filter-select">
+                    <option value="all" {% if date_filter == 'all' %}selected{% endif %}>Toutes les dates</option>
+                    <option value="today" {% if date_filter == 'today' %}selected{% endif %}>Aujourd'hui</option>
+                    <option value="week" {% if date_filter == 'week' %}selected{% endif %}>Cette semaine</option>
+                    <option value="month" {% if date_filter == 'month' %}selected{% endif %}>Ce mois</option>
+                    <option value="year" {% if date_filter == 'year' %}selected{% endif %}>Cette année</option>
+                </select>
+                <button class="refresh-button" onclick="location.reload()">
+                    <i class="fas fa-sync-alt"></i>
+                    Actualiser
+                </button>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <h3 style="margin-bottom: 20px; color: #2c3e50;"><i class="fas fa-archive"></i> Documents de Vente Archivés</h3>
+            
+            {% if documents %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th><i class="fas fa-calendar"></i> Date</th>
+                            <th><i class="fas fa-user"></i> Vendeuse</th>
+                            <th><i class="fas fa-receipt"></i> Factures</th>
+                            <th><i class="fas fa-money-bill"></i> Chiffre d'Affaires</th>
+                            <th><i class="fas fa-clock"></i> Heure Fermeture</th>
+                            <th><i class="fas fa-cog"></i> Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for document in documents %}
+                            <tr>
+                                <td><span class="document-date">{{ document.date|date:"d/m/Y" }}</span></td>
+                                <td>{{ document.vendeuse_nom }}</td>
+                                <td><span class="invoice-count">{{ document.nombre_factures }} facture{{ document.nombre_factures|pluralize }}</span></td>
+                                <td><span class="total-amount">{{ document.chiffre_affaires|floatformat:2 }} FCFA</span></td>
+                                <td>{{ document.heure_fermeture|date:"H:i" }}</td>
+                                <td>
+                                    <button class="view-details-btn" onclick="viewDocumentDetails('{{ document.id }}')">
+                                        <i class="fas fa-eye"></i> Voir détails
+                                    </button>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="no-data">
+                    <i class="fas fa-archive"></i>
+                    <div>Aucun document archivé</div>
+                    <p>Les documents de vente apparaîtront ici après la fermeture de caisse.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="actions">
+            <a href="{% url 'dashboard_caisse' %}" class="btn btn-secondary">
+                <i class="fas fa-home"></i> Retour au Dashboard
+            </a>
+            <button class="btn btn-primary" onclick="window.print()">
+                <i class="fas fa-print"></i> Imprimer
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal pour afficher les détails d'un document -->
+<div id="documentModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title">Détails du Document de Vente</h2>
+            <button class="close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody">
+            <!-- Le contenu sera chargé dynamiquement -->
+        </div>
+    </div>
+</div>
+
+<script>
+function viewDocumentDetails(documentId) {
+    // Rediriger vers la page de détails
+    window.location.href = `/caisse/document-details/${documentId}/`;
+}
+
+function closeModal() {
+    document.getElementById('documentModal').style.display = 'none';
+}
+
+// Fermer le modal en cliquant à l'extérieur
+window.onclick = function(event) {
+    const modal = document.getElementById('documentModal');
+    if (event.target === modal) {
+        closeModal();
+    }
+}
+
+// Auto-hide messages after 5 seconds
+document.addEventListener('DOMContentLoaded', function() {
+    const messages = document.querySelectorAll('[style*="position: fixed"] > div');
+    messages.forEach(function(message) {
+        setTimeout(function() {
+            message.style.opacity = '0';
+            message.style.transition = 'opacity 0.5s ease';
+            setTimeout(function() {
+                message.remove();
+            }, 500);
+        }, 5000);
+    });
+});
+</script>
+
+</body>
+</html>

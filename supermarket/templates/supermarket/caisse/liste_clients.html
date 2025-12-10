@@ -1,0 +1,328 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liste des Clients</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* Styles généraux */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); /* Dégradé bleu-violet */
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.95); /* Fond blanc semi-transparent */
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+            padding: 30px;
+        }
+        .header-section {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%); /* Dégradé vert */
+            color: white;
+            padding: 25px 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            text-align: center;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .header-section h1 {
+            font-size: 2.8em;
+            margin-bottom: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+        .header-section p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        /* Statistiques */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 35px rgba(0,0,0,0.15);
+        }
+        .stat-card .icon {
+            font-size: 2.5em;
+            color: #28a745;
+            margin-bottom: 15px;
+        }
+        .stat-card h3 {
+            font-size: 1.2em;
+            color: #555;
+            margin-bottom: 10px;
+        }
+        .stat-card .value {
+            font-size: 2.2em;
+            font-weight: 700;
+            color: #333;
+        }
+
+        /* Barre de recherche */
+        .search-bar {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            background: white;
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+        .search-bar input[type="text"] {
+            flex-grow: 1;
+            padding: 12px 18px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            font-size: 1em;
+            transition: border-color 0.3s ease;
+        }
+        .search-bar input[type="text"]:focus {
+            border-color: #28a745;
+            outline: none;
+        }
+        .search-bar button {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+        .search-bar button.btn-primary {
+            background-color: #28a745;
+            color: white;
+        }
+        .search-bar button.btn-primary:hover {
+            background-color: #218838;
+            transform: translateY(-2px);
+        }
+        .search-bar button.btn-secondary {
+            background-color: #f0f0f0;
+            color: #555;
+        }
+        .search-bar button.btn-secondary:hover {
+            background-color: #e0e0e0;
+            transform: translateY(-2px);
+        }
+
+        /* Tableau des clients */
+        .clients-table-container {
+            overflow-x: auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            padding: 20px;
+        }
+        .clients-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 10px; /* Espace entre les lignes */
+            text-align: left;
+        }
+        .clients-table th, .clients-table td {
+            padding: 15px;
+            vertical-align: middle;
+        }
+        .clients-table th {
+            background-color: #f8f9fa;
+            color: #555;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.9em;
+            border-bottom: 2px solid #eee;
+        }
+        .clients-table td {
+            background-color: #fff;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .clients-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        .clients-table tbody tr {
+            transition: background-color 0.2s ease;
+        }
+        .clients-table tbody tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        /* Badges de statut */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.85em;
+            color: white;
+        }
+        .status-badge i {
+            margin-right: 7px;
+        }
+        .status-active { background-color: #28a745; } /* Vert */
+        .status-inactive { background-color: #6c757d; }  /* Gris */
+
+        /* Bouton retour */
+        .back-btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+            color: white;
+            text-decoration: none;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            margin-bottom: 20px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .back-btn:hover {
+            color: white;
+            text-decoration: none;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            .search-bar {
+                flex-direction: column;
+            }
+            .search-bar button {
+                width: 100%;
+            }
+            .clients-table th, .clients-table td {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="{% url 'dashboard_caisse' %}" class="back-btn">
+            <i class="fas fa-arrow-left"></i> Retour au Dashboard
+        </a>
+        
+        <div class="header-section">
+            <h1><i class="fas fa-users"></i> Gestion des Clients</h1>
+            <p>Consultez, recherchez et gérez tous vos clients.</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <i class="fas fa-users icon"></i>
+                <h3>Total Clients</h3>
+                <div class="value">{{ total_clients }}</div>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-envelope icon" style="color: #17a2b8;"></i>
+                <h3>Avec Email</h3>
+                <div class="value">{{ clients_avec_email }}</div>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-shopping-cart icon" style="color: #ffc107;"></i>
+                <h3>Clients Actifs</h3>
+                <div class="value">{{ clients_avec_achats }}</div>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-exclamation-triangle icon" style="color: #dc3545;"></i>
+                <h3>Sans Email</h3>
+                <div class="value">{{ clients_sans_email }}</div>
+            </div>
+        </div>
+
+        <div class="search-bar">
+            <form method="GET" action="{% url 'liste_clients' %}" style="display: flex; width: 100%; gap: 15px;">
+                <input type="text" name="search" placeholder="Rechercher par nom, téléphone, email ou adresse..." value="{{ search_query }}">
+                <button type="submit" class="btn-primary"><i class="fas fa-search"></i> Rechercher</button>
+                {% if search_query %}
+                    <button type="button" class="btn-secondary" onclick="window.location.href='{% url 'liste_clients' %}'"><i class="fas fa-times"></i> Effacer</button>
+                {% endif %}
+            </form>
+        </div>
+
+        <div class="clients-table-container">
+            <table class="clients-table">
+                <thead>
+                    <tr>
+                        <th>Nom/Raison Sociale</th>
+                        <th>Téléphone</th>
+                        <th>Email</th>
+                        <th>Adresse</th>
+                        <th>Statut</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for client in clients %}
+                        <tr>
+                            <td>
+                                <strong>{{ client.intitule|default:"-" }}</strong>
+                            </td>
+                            <td>
+                                <i class="fas fa-phone" style="color: #28a745; margin-right: 5px;"></i>
+                                {{ client.telephone|default:"-" }}
+                            </td>
+                            <td>
+                                {% if client.email %}
+                                    <i class="fas fa-envelope" style="color: #17a2b8; margin-right: 5px;"></i>
+                                    {{ client.email }}
+                                {% else %}
+                                    <span style="color: #999;">Pas d'email</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <i class="fas fa-map-marker-alt" style="color: #dc3545; margin-right: 5px;"></i>
+                                {{ client.adresse|truncatechars:50|default:"-" }}
+                            </td>
+                            <td>
+                                {% if client.email %}
+                                    <span class="status-badge status-active">
+                                        <i class="fas fa-check-circle"></i> Complet
+                                    </span>
+                                {% else %}
+                                    <span class="status-badge status-inactive">
+                                        <i class="fas fa-exclamation-triangle"></i> Incomplet
+                                    </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 20px;">
+                                <i class="fas fa-search" style="font-size: 2em; color: #ccc; margin-bottom: 10px;"></i>
+                                <br>Aucun client trouvé.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

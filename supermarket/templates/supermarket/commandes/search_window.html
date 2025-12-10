@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recherche d'Articles - Commandes</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 1.8em;
+            margin: 0;
+        }
+        .content {
+            padding: 30px;
+        }
+        .search-box {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+        }
+        .search-box input {
+            flex: 1;
+            padding: 12px 20px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+        .search-box input:focus {
+            outline: none;
+            border-color: #06beb6;
+            box-shadow: 0 0 0 3px rgba(6, 190, 182, 0.1);
+        }
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e1e8ed;
+        }
+        th {
+            background-color: #f8f9fa;
+            color: #2c3e50;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85em;
+        }
+        tr:hover {
+            background-color: #f8f9fa;
+            cursor: pointer;
+        }
+        .btn-select {
+            background: #28a745;
+            color: white;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .btn-select:hover {
+            background: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-search"></i> Recherche d'Articles</h1>
+            <button class="btn btn-danger" onclick="window.close()">
+                <i class="fas fa-times"></i> Fermer
+            </button>
+        </div>
+        <div class="content">
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="Rechercher un article..." onkeyup="filterArticles()">
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Référence</th>
+                        <th>Désignation</th>
+                        <th>Prix de vente</th>
+                        <th>Stock</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="articles-table">
+                    {% for article in articles %}
+                    <tr data-designation="{{ article.designation|lower }}" data-reference="{{ article.reference_article|lower|default:'' }}">
+                        <td>{{ article.reference_article|default:"-" }}</td>
+                        <td>{{ article.designation }}</td>
+                        <td>{{ article.prix_vente|floatformat:0 }} FCFA</td>
+                        <td>{{ article.stock_actuel|floatformat:2 }}</td>
+                        <td>
+                            <button class="btn-select" onclick="selectArticle({{ article.id }}, '{{ article.designation|escapejs }}', '{{ article.reference_article|default:""|escapejs }}', {{ article.prix_vente }})">
+                                <i class="fas fa-plus"></i> Sélectionner
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 40px;">
+                            <i class="fas fa-box-open" style="font-size: 3em; color: #6c757d; margin-bottom: 10px;"></i>
+                            <p style="color: #6c757d;">Aucun article trouvé</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+        function filterArticles() {
+            const search = document.getElementById('search-input').value.toLowerCase();
+            const rows = document.querySelectorAll('#articles-table tr');
+            rows.forEach(row => {
+                const designation = row.dataset.designation || '';
+                const reference = row.dataset.reference || '';
+                if (designation.includes(search) || reference.includes(search)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+        function selectArticle(articleId, designation, reference, prixVente) {
+            if (window.opener) {
+                window.opener.addArticleFromSearch(articleId, designation, reference, prixVente);
+                window.close();
+            } else {
+                alert('Article sélectionné: ' + designation);
+            }
+        }
+    </script>
+</body>
+</html>
+

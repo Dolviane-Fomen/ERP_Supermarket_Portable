@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Définir État de Livraison</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { font-size: 1.8em; margin: 0; }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .btn-primary { background: #28a745; color: white; }
+        .btn-primary:hover { background: #218838; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover { background: #5a6268; }
+        .content { padding: 30px; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e1e8ed;
+        }
+        th {
+            background-color: #f8f9fa;
+            color: #2c3e50;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85em;
+        }
+        tr:hover { background-color: #f8f9fa; }
+        .badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            color: white;
+        }
+        .badge-success { background: #28a745; }
+        .badge-danger { background: #dc3545; }
+        .badge-info { background: #17a2b8; }
+        .badge-warning { background: #ffc107; color: #212529; }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        .empty-state i { font-size: 3em; margin-bottom: 10px; }
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-tasks"></i> Définir État de Livraison</h1>
+            <a href="{% url 'dashboard_commandes' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Retour
+            </a>
+        </div>
+        <div class="content">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <h2 style="margin-bottom: 20px; color: #2c3e50;">
+                <i class="fas fa-truck"></i> Livraisons Confirmées - Définir État Final
+            </h2>
+            <p style="color: #6c757d; margin-bottom: 20px;">
+                Les livraisons ci-dessous ont été confirmées par le livreur. Veuillez définir leur état final (Livré, Livré partiellement, ou Pas livré).
+            </p>
+
+            {% if livraisons_avec_details %}
+                {% for item in livraisons_avec_details %}
+                <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 20px; border-left: 4px solid #06beb6;">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
+                        <div>
+                            <h3 style="margin: 0; color: #2c3e50;">
+                                Livraison #{{ item.livraison.id }} - {{ item.livraison.commande.client.intitule }}
+                            </h3>
+                            <span class="badge badge-success" style="margin-top: 5px; display: inline-block;">
+                                {{ item.livraison.get_etat_livraison_display }}
+                            </span>
+                        </div>
+                        <a href="{% url 'definir_etat_final_livraison' item.livraison.id %}" class="btn btn-primary">
+                            <i class="fas fa-edit"></i> Définir État
+                        </a>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px;">
+                        <div>
+                            <span style="font-size: 0.85em; color: #6c757d;">Date de Livraison</span>
+                            <div style="font-weight: 600; color: #2c3e50;">{{ item.livraison.date_livraison|date:"d/m/Y" }}</div>
+                        </div>
+                        <div>
+                            <span style="font-size: 0.85em; color: #6c757d;">Heure de Départ</span>
+                            <div style="font-weight: 600; color: #2c3e50;">{% if item.livraison.heure_depart %}{{ item.livraison.heure_depart|time:"H:i" }}{% else %}-{% endif %}</div>
+                        </div>
+                        <div>
+                            <span style="font-size: 0.85em; color: #6c757d;">Heure d'Arrivée</span>
+                            <div style="font-weight: 600; color: #2c3e50;">{% if item.livraison.heure_arrivee %}{{ item.livraison.heure_arrivee|time:"H:i" }}{% else %}-{% endif %}</div>
+                        </div>
+                        <div>
+                            <span style="font-size: 0.85em; color: #6c757d;">Heure de Livraison</span>
+                            <div style="font-weight: 600; color: #2c3e50;">{% if item.livraison.heure_livraison %}{{ item.livraison.heure_livraison|time:"H:i" }}{% else %}-{% endif %}</div>
+                        </div>
+                        <div>
+                            <span style="font-size: 0.85em; color: #6c757d;">Livreur</span>
+                            <div style="font-weight: 600; color: #2c3e50;">{% if item.livraison.livreur %}{{ item.livraison.livreur.nom }} {{ item.livraison.livreur.prenom }}{% else %}-{% endif %}</div>
+                        </div>
+                        <div>
+                            <span style="font-size: 0.85em; color: #6c757d;">Zone</span>
+                            <div style="font-weight: 600; color: #2c3e50;">{{ item.livraison.zone|default:"-" }}</div>
+                        </div>
+                        <div>
+                            <span style="font-size: 0.85em; color: #6c757d;">Nombre d'Articles</span>
+                            <div style="font-weight: 600; color: #2c3e50;">{{ item.nombre_articles }}</div>
+                        </div>
+                        <div>
+                            <span style="font-size: 0.85em; color: #6c757d;">Quantité Totale</span>
+                            <div style="font-weight: 600; color: #2c3e50;">{{ item.quantite_totale|floatformat:3 }}</div>
+                        </div>
+                        <div>
+                            <span style="font-size: 0.85em; color: #6c757d;">Prix Total</span>
+                            <div style="font-weight: 600; color: #2c3e50;">{{ item.prix_total|floatformat:0 }} FCFA</div>
+                        </div>
+                    </div>
+
+                    {% if item.livraison.commande.client.adresse %}
+                    <div style="margin-bottom: 15px;">
+                        <span style="font-size: 0.85em; color: #6c757d;">Adresse Client</span>
+                        <div style="font-weight: 600; color: #2c3e50;">{{ item.livraison.commande.client.adresse }}</div>
+                    </div>
+                    {% endif %}
+
+                    {% if item.livraison.commande.client.telephone %}
+                    <div style="margin-bottom: 15px;">
+                        <span style="font-size: 0.85em; color: #6c757d;">Téléphone Client</span>
+                        <div style="font-weight: 600; color: #2c3e50;">{{ item.livraison.commande.client.telephone }}</div>
+                    </div>
+                    {% endif %}
+
+                    {% if item.livraison.notes %}
+                    <div style="margin-top: 15px; padding: 10px; background: #fff; border-radius: 5px;">
+                        <strong><i class="fas fa-sticky-note"></i> Notes:</strong> {{ item.livraison.notes }}
+                    </div>
+                    {% endif %}
+
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e1e8ed;">
+                        <strong><i class="fas fa-list"></i> Articles de la Commande:</strong>
+                        <table style="margin-top: 10px; font-size: 0.9em;">
+                            <thead>
+                                <tr>
+                                    <th>Article</th>
+                                    <th>Référence</th>
+                                    <th>Quantité</th>
+                                    <th>Prix Unitaire</th>
+                                    <th>Prix Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for cmd in item.commandes_groupe %}
+                                <tr>
+                                    <td>{{ cmd.article.designation }}</td>
+                                    <td>{{ cmd.article.reference_article|default:"-" }}</td>
+                                    <td>{{ cmd.quantite|floatformat:3 }}</td>
+                                    <td>{{ cmd.article.prix_vente|floatformat:0 }} FCFA</td>
+                                    <td>{{ cmd.prix_total|floatformat:0 }} FCFA</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-check-circle"></i>
+                <p>Aucune livraison confirmée en attente de définition d'état</p>
+                <p style="margin-top: 10px; font-size: 0.9em; color: #6c757d;">
+                    Les livraisons confirmées par le livreur apparaîtront ici pour que vous puissiez définir leur état final.
+                </p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
+

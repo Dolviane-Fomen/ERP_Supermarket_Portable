@@ -1,0 +1,2773 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion des Ventes et Stocks</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<style>
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: #f8f9fa;
+        line-height: 1.6;
+    }
+    
+    .container {
+        background: white;
+        padding: 20px;
+        border-radius: 0 0 5px 5px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        margin: 0 auto 20px;
+        max-width: 1200px;
+        box-sizing: border-box;
+    }
+    
+    
+    h2 {
+        color: #333;
+        font-size: 1.8em;
+        margin-bottom: 25px;
+        font-weight: 600;
+        border-bottom: 3px solid #d74123;
+        padding-bottom: 10px;
+    }
+    
+    h3 {
+        color: #555;
+        font-size: 1.4em;
+        margin: 25px 0 15px 0;
+        font-weight: 600;
+    }
+    
+    .form-group {
+        margin-bottom: 20px;
+    }
+    
+    label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: #555;
+    }
+    
+    input, select {
+        width: 100%;
+        padding: 12px;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+        box-sizing: border-box;
+    }
+    
+    input:focus, select:focus {
+        outline: none;
+        border-color: #d74123;
+        box-shadow: 0 0 0 3px rgba(215, 65, 35, 0.1);
+    }
+    
+    select {
+        cursor: pointer;
+        appearance: none;
+        background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 12px center;
+        background-size: 16px;
+        padding-right: 40px;
+    }
+    
+    .client-selection {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .client-mode-toggle {
+        display: flex;
+        gap: 5px;
+        margin-bottom: 5px;
+    }
+    
+    .mode-btn {
+        padding: 8px 16px;
+        border: 2px solid #e9ecef;
+        background: white;
+        color: #6c757d;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.3s ease;
+        flex: 1;
+    }
+    
+    .mode-btn.active {
+        background: #d74123;
+        color: white;
+        border-color: #d74123;
+    }
+    
+    .mode-btn:hover:not(.active) {
+        border-color: #d74123;
+        color: #d74123;
+    }
+    
+    .client-input {
+        width: 100%;
+    }
+    
+    input[readonly] {
+        background-color: #f8f9fa;
+        color: #6c757d;
+    }
+    
+    button {
+        padding: 12px 20px;
+        border: none;
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        cursor: pointer;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 10px rgba(40, 167, 69, 0.3);
+    }
+    
+    button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
+    }
+    
+    .delete-button {
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        box-shadow: 0 2px 10px rgba(220, 53, 69, 0.3);
+    }
+    
+    .delete-button:hover {
+        box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);
+    }
+    
+    .dashboard-button {
+        background: linear-gradient(135deg, #6f42c1 0%, #5a2d91 100%) !important;
+        box-shadow: 0 2px 10px rgba(111, 66, 193, 0.3) !important;
+    }
+    
+    .dashboard-button:hover {
+        background: linear-gradient(135deg, #5a2d91 0%, #4a1f7a 100%) !important;
+        box-shadow: 0 4px 15px rgba(111, 66, 193, 0.4) !important;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        justify-content: center;
+        margin: 20px 0;
+        flex-wrap: wrap;
+    }
+    
+    .action-buttons .btn,
+    .action-buttons .dashboard-button {
+        flex: 1;
+        min-width: 180px;
+        max-width: 200px;
+        text-align: center;
+        white-space: nowrap;
+    }
+    
+    .button-group {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 20px;
+        gap: 10px;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 15px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+        max-width: 100%;
+        width: 100%;
+    }
+    
+    .action-buttons button {
+        margin-top: 0;
+        flex: 1;
+        min-width: 150px;
+    }
+    
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+        background-color: white;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+    
+    th, td {
+        padding: 15px 12px;
+        text-align: left;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    th {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        font-weight: 600;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    tr {
+        transition: all 0.3s ease;
+    }
+    
+    tr:hover {
+        background: linear-gradient(135deg, #f8f9ff 0%, #e3f2fd 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    .summary {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        padding: 20px;
+        border-radius: 10px;
+        margin-top: 25px;
+        border: 2px solid #e9ecef;
+        max-width: 100%;
+        width: calc(100% - 40px);
+        box-sizing: border-box;
+    }
+    
+    .total-input {
+        width: 200px;
+        text-align: center;
+        font-weight: bold;
+        font-size: 1.2em;
+        background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+        border: 2px solid #28a745;
+    }
+    
+    .right-align {
+        text-align: right;
+    }
+    
+    .alert {
+        margin: 15px 0;
+        padding: 15px;
+        border-radius: 8px;
+        font-weight: 500;
+        animation: slideIn 0.5s ease-out;
+    }
+    
+    .alert-error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    .alert-success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .alert-warning {
+        background-color: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+    }
+    
+    .alert-info {
+        background-color: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+    }
+    
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .container {
+            padding: 15px;
+            margin: 10px;
+        }
+        
+    .action-buttons {
+            flex-direction: column;
+        }
+        
+        .action-buttons button {
+            width: 100%;
+        }
+        
+        table {
+            font-size: 12px;
+        }
+        
+        th, td {
+            padding: 8px 6px;
+        }
+    }
+    
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateY(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .btn {
+        display: inline-block;
+        padding: 12px 20px;
+        color: white;
+        text-decoration: none;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        text-align: center;
+    }
+    
+    .btn:hover {
+        transform: translateY(-2px);
+        text-decoration: none;
+        color: white;
+    }
+    
+    .btn-info {
+        background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+        box-shadow: 0 2px 10px rgba(23, 162, 184, 0.3);
+    }
+    
+    .btn-info:hover {
+        box-shadow: 0 4px 15px rgba(23, 162, 184, 0.4);
+    }
+    
+    .btn-success {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        box-shadow: 0 2px 10px rgba(40, 167, 69, 0.3);
+    }
+    
+    .btn-success:hover {
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
+    }
+    
+    .btn-warning {
+        background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+        box-shadow: 0 2px 10px rgba(255, 193, 7, 0.3);
+    }
+    
+    .btn-warning:hover {
+        box-shadow: 0 4px 15px rgba(255, 193, 7, 0.4);
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+        box-shadow: 0 2px 10px rgba(111, 66, 193, 0.3);
+    }
+    
+    .btn-primary:hover {
+        box-shadow: 0 4px 15px rgba(111, 66, 193, 0.4);
+    }
+    
+    .quantity-input {
+        width: 60px;
+        text-align: center;
+        padding: 5px;
+        border: 2px solid #e9ecef;
+        border-radius: 5px;
+        font-weight: 600;
+        color: #28a745;
+    }
+    
+    .price-cell {
+        color: #dc3545;
+        font-weight: 600;
+    }
+    
+    .center-cell {
+        text-align: center;
+    }
+    
+    .type-vente-select {
+        width: 120px;
+        padding: 8px 12px;
+        border: 2px solid #e9ecef;
+        border-radius: 6px;
+        font-size: 13px;
+        background: white;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .type-vente-select:focus {
+        outline: none;
+        border-color: #d74123;
+        box-shadow: 0 0 0 3px rgba(215, 65, 35, 0.1);
+    }
+    
+    .type-vente-select:hover {
+        border-color: #d74123;
+    }
+    
+    .modify-button {
+        background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        margin-right: 5px;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(23, 162, 184, 0.3);
+    }
+    
+    .modify-button:hover {
+        background: linear-gradient(135deg, #138496 0%, #0f6674 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(23, 162, 184, 0.4);
+    }
+    
+    /* Styles pour la modal */
+    .modal {
+        position: fixed;
+        z-index: 10000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(5px);
+    }
+    
+    .modal-content {
+        background-color: white;
+        margin: 10% auto;
+        padding: 0;
+        border-radius: 15px;
+        width: 90%;
+        max-width: 500px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        animation: modalSlideIn 0.3s ease-out;
+    }
+    
+    .modal-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 15px 15px 0 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .modal-header h3 {
+        margin: 0;
+        font-size: 1.4em;
+        font-weight: 600;
+    }
+    
+    .close {
+        color: white;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .close:hover {
+        color: #ff6b6b;
+        transform: scale(1.1);
+    }
+    
+    .modal-body {
+        padding: 25px;
+    }
+    
+    .modal-body p {
+        margin: 10px 0;
+        color: #555;
+        font-size: 14px;
+    }
+    
+    .modal-select {
+        width: 100%;
+        padding: 12px 15px;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        font-size: 14px;
+        background: white;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-top: 8px;
+    }
+    
+    .modal-select:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .price-preview {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 15px;
+        border-left: 4px solid #28a745;
+    }
+    
+    .price-preview p {
+        margin: 0;
+        font-weight: 600;
+        color: #28a745;
+    }
+    
+    .modal-footer {
+        padding: 20px 25px;
+        border-top: 1px solid #e9ecef;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+    
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-secondary:hover {
+        background: #5a6268;
+        transform: translateY(-1px);
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-primary:hover {
+        background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+        transform: translateY(-1px);
+    }
+    
+    @keyframes modalSlideIn {
+        from {
+            opacity: 0;
+            transform: translateY(-50px) scale(0.9);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: #6c757d;
+        background: #f8f9fa;
+        border-radius: 10px;
+        border: 2px dashed #dee2e6;
+    }
+</style>
+</head>
+<body>
+
+<!-- Messages Django -->
+{% if messages %}
+    {% for message in messages %}
+        <div style="margin: 10px 0; padding: 10px; border-radius: 5px; background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;">
+            {{ message }}
+        </div>
+    {% endfor %}
+{% endif %}
+<header style="background-color: #d74123; padding: 10px; color: white; text-align: center; border-radius: 5px; margin-bottom: 0; max-width: 1200px; margin: 0 auto; box-sizing: border-box;">
+    <h1 style="font-size: 2.5em; margin: 0; color: white;">
+        Super Market
+    </h1>
+    <p style="margin: 10px 0 0 0; opacity: 0.9;">Adresse | Téléphone</p>
+</header>
+
+<div class="container">
+    <h2>Formulaire de Facturation de Vente</h2>
+
+    <!-- Messages d'alerte -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Formulaire principal pour la facturation -->
+    <form method="post" action="{% url 'enregistrer_facture' %}" id="main-form">
+        {% csrf_token %}
+        {% if facture %}
+            <input type="hidden" name="facture_id" value="{{ facture.id }}">
+        {% endif %}
+        
+        <!-- Champ caché pour la caisse -->
+        <input type="hidden" name="caisse_id" value="{% if caisse_actuelle %}{{ caisse_actuelle.id }}{% else %}{{ caisses.first.id }}{% endif %}">
+        
+        <div class="form-group">
+            <label for="client-name">Nom du Client</label>
+            <div class="client-selection">
+                <div class="client-mode-toggle">
+                    <button type="button" id="select-existing" class="mode-btn active">Sélectionner</button>
+                    <button type="button" id="enter-new" class="mode-btn">Saisir nouveau</button>
+                </div>
+                
+                <select id="client-select" name="client_id" class="client-input">
+                    <option value="">-- Sélectionner un client --</option>
+                    {% for client in clients %}
+                        <option value="{{ client.id }}" {% if facture and facture.client.id == client.id %}selected{% endif %}>
+                            {{ client.intitule }}
+                        </option>
+                    {% endfor %}
+                </select>
+                
+                <input type="text" id="client-input" name="client_name" placeholder="Entrer le nom du client" class="client-input" style="display: none;" value="{% if facture and not facture.client %}{{ facture.client_name }}{% endif %}">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="ticket-number">Numéro Ticket</label>
+            <input type="text" id="ticket-number" value="{{ numero_ticket }}" readonly>
+        </div>
+
+        <div class="form-group">
+            <label for="seller-name">Nom de la Vendeuse</label>
+            <input type="text" id="seller-name" value="{% if employe %}{{ employe.compte.nom }} {{ employe.compte.prenom }}{% else %}Vendeur{% endif %}" readonly>
+        </div>
+
+        <div class="form-group">
+            <label for="cash-register-number">Numéro de Caisse</label>
+            <input type="text" id="cash-register-number" value="{% if caisse_actuelle %}{{ caisse_actuelle.numero_caisse }}{% else %}{{ caisses.first.numero_caisse }}{% endif %}" readonly>
+        </div>
+
+        <div class="form-group">
+            <label for="sale-type">Type de Vente</label>
+            <select id="sale-type" name="type_vente" onchange="updateAllPricesByType()">
+                <option value="gros" {% if facture and facture.type_vente == 'gros' %}selected{% endif %}>Gros</option>
+                <option value="demi_gros" {% if facture and facture.type_vente == 'demi_gros' %}selected{% endif %}>Demi Gros</option>
+                <option value="detail" {% if facture and facture.type_vente == 'detail' %}selected{% endif %}>Détail</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="article-search">Rechercher un Article</label>
+            <input type="text" id="article-search" name="search_term" placeholder="Tapez au moins 2 lettres pour rechercher" value="{{ search_term|default:'' }}" onkeyup="searchArticles()">
+        </div>
+
+        <div class="button-group">
+            <button type="submit" name="action" value="save" id="save-button">Enregistrer la Facture</button>
+        </div>
+    </form>
+
+    <h3>Articles Sélectionnés</h3>
+    
+    <p class="right-align" id="total-hors-taxe">Prix Total Hors Taxe: {{ facture_temporaire.nette_a_payer|default:0|floatformat:0 }} FCFA</p>
+    
+    <table id="articles-table">
+        <thead>
+            <tr>
+                <th>Désignation</th>
+                <th>Référence</th>
+                <th>Quantité</th>
+                <th>Prix Unitaire</th>
+                <th>Prix Total</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% if facture_temporaire.lignes %}
+            {% for ligne in facture_temporaire.lignes %}
+            <tr data-article-id="{{ ligne.article_id }}">
+                <td>{{ ligne.designation }}</td>
+                <td>{{ ligne.reference }}</td>
+                <td class="center-cell">
+                    <input type="number" name="quantite_{{ forloop.counter0 }}" value="{{ ligne.quantite }}" step="0.001" class="quantity-input" data-index="{{ forloop.counter0 }}" onchange="updatePrixTotal(this)">
+                </td>
+                <td class="price-cell" data-prix-unitaire="{{ ligne.prix_unitaire }}">{{ ligne.prix_unitaire|floatformat:0 }} FCFA</td>
+                <td class="price-cell" data-prix-total="{{ ligne.prix_total }}">{{ ligne.prix_total|floatformat:0 }} FCFA</td>
+                <td class="center-cell">
+                    <button type="button" class="modify-button" data-index="{{ forloop.counter0 }}" data-article-id="{{ ligne.article_id }}" onclick="modifyTypeVente('{{ ligne.article_id }}', '{{ ligne.designation|escapejs }}', {{ ligne.prix_unitaire }}, this.closest('tr'))">Modifier</button>
+                    <button type="button" class="delete-button" data-index="{{ forloop.counter0 }}">Supprimer</button>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="empty-state">Aucun article sélectionné</td>
+            </tr>
+            {% endfor %}
+        {% else %}
+            <tr>
+                <td colspan="6" class="empty-state">Sélectionnez un article pour commencer</td>
+            </tr>
+        {% endif %}
+        </tbody>
+    </table>
+
+    <div class="action-buttons">
+        <button type="button" class="delete-button" onclick="clearFacture()">Supprimer la Vente</button>
+    </div>
+
+    <div class="summary">
+        <p class="visible" id="total-price">Net à Payer: {{ facture_temporaire.nette_a_payer|default:0|floatformat:0 }} FCFA</p>
+        <input type="text" id="total-input" class="total-input" value="{{ facture_temporaire.nette_a_payer|default:0|floatformat:0 }} FCFA" readonly>
+        <div class="form-group">
+            <label for="amount-paid">Montant Donné par le Client</label>
+            <input type="number" id="amount-paid" placeholder="Montant donné" value="{{ facture_temporaire.montant_regler|default:0|floatformat:0 }}" onchange="updateMontantRegler(this.value)">
+        </div>
+        <p id="change">Rendu: {{ facture_temporaire.rendu|default:0|floatformat:0 }} FCFA</p>
+    </div>
+
+    <!-- Boutons d'action -->
+    <!-- Token CSRF pour les requêtes AJAX -->
+    {% csrf_token %}
+    
+    <div class="action-buttons">
+        <button type="button" onclick="mettreEnAttente()" class="btn btn-warning">Mettre le Ticket en Attente</button>
+        <button type="button" onclick="rappelerTicket()" class="btn btn-info">Rappeler le Ticket</button>
+        <button type="button" onclick="returnToDashboard()" class="btn dashboard-button">Retour au Dashboard</button>
+    </div>
+    
+    
+    {% if facture %}
+            <a href="{% url 'imprimer_facture' facture.id %}" class="btn btn-primary">Imprimer la Facture</a>
+    {% endif %}
+    </div>
+</div>
+
+<!-- Modal pour modifier le type de vente -->
+<div id="modifyTypeModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Modifier le Type de Vente</h3>
+            <span class="close" onclick="closeModifyTypeModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <p><strong>Article:</strong> <span id="modal-article-name"></span></p>
+            <p><strong>Prix actuel:</strong> <span id="modal-current-price"></span> FCFA</p>
+            
+            <div class="form-group">
+                <label for="type-vente-select">Sélectionner le type de vente:</label>
+                <select id="type-vente-select" class="modal-select">
+                    <option value="">Chargement...</option>
+                </select>
+            </div>
+            
+            <div id="modal-price-preview" class="price-preview">
+                <p><strong>Nouveau prix:</strong> <span id="modal-new-price">-</span> FCFA</p>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeModifyTypeModal()">Annuler</button>
+            <button type="button" class="btn btn-primary" onclick="applyTypeVente()">Appliquer</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Variables globales
+let searchTimeout;
+let searchWindow = null;
+
+// Fonction de recherche d'articles
+function searchArticles() {
+    const searchTerm = document.getElementById('article-search').value;
+    
+    clearTimeout(searchTimeout);
+    
+    searchTimeout = setTimeout(() => {
+        if (searchTerm.length >= 2) {
+            openSearchWindow(searchTerm);
+        } else if (searchWindow && !searchWindow.closed) {
+            searchWindow.close();
+        }
+    }, 300);
+}
+
+// Ouvrir la fenêtre de recherche
+function openSearchWindow(searchTerm) {
+    if (searchWindow && !searchWindow.closed) {
+        searchWindow.close();
+    }
+    
+    const searchUrl = '/caisse/search-window/?q=' + encodeURIComponent(searchTerm);
+    searchWindow = window.open(searchUrl, 'searchArticles', 'width=800,height=600,scrollbars=yes,resizable=yes');
+    
+    if (!searchWindow) {
+        window.location.href = searchUrl;
+    }
+}
+
+// Ajouter un article à la facture
+function addArticleToInvoice(articleId, designation, reference, price, stock) {
+    console.log('addArticleToInvoice appelée avec:', {articleId, designation, reference, price, stock});
+    
+    // Ajouter immédiatement l'article au tableau pour un feedback visuel
+    addArticleToTable(articleId, designation, reference, price, stock);
+    
+    // Ensuite, envoyer la requête au serveur avec AJAX (sans recharger la page)
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch('{% url "ajouter_article_facture" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken
+        },
+        body: `article_id=${articleId}&quantite=1&csrfmiddlewaretoken=${csrfToken}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Article ajouté avec succès côté serveur');
+        } else {
+            console.error('Erreur côté serveur:', data.error);
+            showNotification('Erreur lors de l\'ajout de l\'article: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Erreur réseau:', error);
+        showNotification('Erreur de connexion', 'error');
+    });
+}
+
+// Ajouter un article directement au tableau
+function addArticleToTable(articleId, designation, reference, price, stock, options = {}) {
+    const tbody = document.querySelector('#articles-table tbody');
+    if (!tbody) return;
+    
+    const skipMerge = options.skipMerge || false;
+    const initialQuantity = options.quantity !== undefined ? normalizeDecimalInput(options.quantity) || 1 : 1;
+    const prixUnitaireOption = options.prix_unitaire !== undefined ? normalizeDecimalInput(options.prix_unitaire) : null;
+    const prixTotalOption = options.prix_total !== undefined ? normalizeDecimalInput(options.prix_total) : null;
+    const typeVente = options.typeVente || 'Détail';
+    
+    // Vérifier si l'article existe déjà
+    const existingRow = skipMerge ? null : tbody.querySelector(`tr[data-article-id="${articleId}"]`);
+    if (existingRow) {
+        // Augmenter la quantité si l'article existe déjà
+        const quantiteInput = existingRow.querySelector('.quantity-input');
+        const currentQuantity = normalizeDecimalInput(quantiteInput.value) || 1;
+        const newQuantity = currentQuantity + initialQuantity;
+        quantiteInput.value = newQuantity;
+        
+        // Mettre à jour le prix total
+        const prixUnitaire = normalizeDecimalInput(existingRow.cells[3].getAttribute('data-prix-unitaire')) || normalizeDecimalInput(price);
+        const prixTotal = safeDecimalCalculation(prixUnitaire, newQuantity, 'multiply');
+        const prixTotalCell = existingRow.querySelector('[data-prix-total]');
+        prixTotalCell.textContent = prixTotal.toLocaleString('fr-FR') + ' FCFA';
+        prixTotalCell.setAttribute('data-prix-total', prixTotal);
+        
+        // Recalculer le total général
+        updateTotalGeneral();
+        return;
+    }
+    
+    // Supprimer le message "Aucun article sélectionné" s'il existe
+    const emptyRow = tbody.querySelector('.empty-state');
+    if (emptyRow) {
+        emptyRow.remove();
+    }
+    
+    // Créer une nouvelle ligne
+    const newRow = document.createElement('tr');
+    newRow.setAttribute('data-article-id', articleId);
+    
+    const prixUnitaire = prixUnitaireOption !== null ? prixUnitaireOption : (parseFloat(price) || 0);
+    const prixTotal = prixTotalOption !== null ? prixTotalOption : safeDecimalCalculation(prixUnitaire, initialQuantity, 'multiply');
+    
+    newRow.innerHTML = `
+        <td>${designation}</td>
+        <td>${reference}</td>
+        <td class="center-cell">
+            <input type="number" name="quantite_0" value="${initialQuantity}" step="0.001" class="quantity-input" data-index="0" data-article-id="${articleId}" onchange="updatePrixTotal(this)">
+        </td>
+        <td class="price-cell" data-prix-unitaire="${prixUnitaire}">${prixUnitaire.toLocaleString('fr-FR')} FCFA</td>
+        <td class="price-cell" data-prix-total="${prixTotal}">${prixTotal.toLocaleString('fr-FR')} FCFA</td>
+        <td class="center-cell">
+            <button type="button" class="modify-button" data-index="0" data-article-id="${articleId}" onclick="modifyTypeVente('${articleId}', '${designation}', ${prixUnitaire}, this.closest('tr'))">Modifier</button>
+            <button type="button" class="delete-button" data-index="0" onclick="removeArticle(0)">Supprimer</button>
+        </td>
+    `;
+    
+    // Ajouter la ligne au tableau avec une animation
+    newRow.style.opacity = '0';
+    newRow.style.transform = 'translateX(-100%)';
+    newRow.setAttribute('data-type-vente', typeVente);
+    tbody.appendChild(newRow);
+    
+    // Animation d'apparition
+    setTimeout(() => {
+        newRow.style.transition = 'all 0.3s ease';
+        newRow.style.opacity = '1';
+        newRow.style.transform = 'translateX(0)';
+    }, 10);
+    
+    // Recalculer le total général
+    updateTotalGeneral();
+    
+    // Ajouter les event listeners
+    const quantiteInput = newRow.querySelector('.quantity-input');
+    const deleteButton = newRow.querySelector('.delete-button');
+    const modifyButton = newRow.querySelector('.modify-button');
+    
+    quantiteInput.addEventListener('change', function() {
+        const index = this.getAttribute('data-index');
+        const value = this.value;
+        updateQuantity(index, value);
+    });
+    
+    deleteButton.addEventListener('click', function() {
+        const index = this.getAttribute('data-index');
+        removeArticle(index);
+    });
+    
+    modifyButton.addEventListener('click', function() {
+        const row = this.closest('tr');
+        const articleId = this.getAttribute('data-article-id');
+        const designation = row.cells[0].innerText;
+        const prixUnitaire = parseFloat(row.cells[3].getAttribute('data-prix-unitaire')) || 0;
+        modifyTypeVente(articleId, designation, prixUnitaire, row);
+    });
+    
+    // Mettre à jour les index de tous les éléments
+    updateTableIndexes();
+}
+
+// Mettre à jour les index de tous les éléments du tableau
+function updateTableIndexes() {
+    const rows = document.querySelectorAll('#articles-table tbody tr[data-article-id]');
+    rows.forEach((row, index) => {
+        const quantiteInput = row.querySelector('.quantity-input');
+        const deleteButton = row.querySelector('.delete-button');
+        const modifyButton = row.querySelector('.modify-button');
+        
+        if (quantiteInput) {
+            quantiteInput.setAttribute('data-index', index);
+            quantiteInput.setAttribute('name', `quantite_${index}`);
+        }
+        
+        if (deleteButton) {
+            deleteButton.setAttribute('data-index', index);
+        }
+        
+        if (modifyButton) {
+            modifyButton.setAttribute('data-index', index);
+        }
+    });
+}
+
+// Mettre à jour la quantité
+function updateQuantity(index, newQuantity) {
+    // Permettre les quantités négatives et décimales
+    if (newQuantity === '' || newQuantity === null || newQuantity === undefined) {
+        alert('Veuillez saisir une quantité valide');
+        // Remettre l'ancienne valeur
+        const input = document.querySelector(`input[data-index="${index}"]`);
+        if (input) {
+            input.value = input.getAttribute('data-old-value') || '1';
+        }
+        return;
+    }
+    
+    // Mise à jour immédiate de l'affichage (calcul côté client)
+    updateDisplayRealtime(index, newQuantity);
+    
+    // Envoyer la mise à jour au serveur en arrière-plan
+    updateQuantityOnServer(index, newQuantity);
+}
+
+// Fonctions utilitaires pour les calculs décimaux
+function normalizeDecimalInput(value) {
+    if (value === null || value === undefined) return 0;
+    
+    let valueStr = String(value).trim();
+    
+    // Remplacer les virgules par des points (format français vers international)
+    valueStr = valueStr.replace(',', '.');
+    
+    // Supprimer les caractères non numériques sauf point et moins
+    valueStr = valueStr.replace(/[^\d.-]/g, '');
+    
+    // Supprimer les espaces (séparateurs de milliers français)
+    valueStr = valueStr.replace(/\s/g, '');
+    
+    // Gérer les cas vides
+    if (!valueStr || valueStr === '-' || valueStr === '.') return 0;
+    
+    // S'assurer qu'il n'y a qu'un seul point décimal
+    const parts = valueStr.split('.');
+    if (parts.length > 2) {
+        valueStr = parts[0] + '.' + parts.slice(1).join('');
+    }
+    
+    const result = parseFloat(valueStr);
+    return isNaN(result) ? 0 : result;
+}
+
+function safeDecimalCalculation(value1, value2, operation = 'multiply') {
+    const dec1 = normalizeDecimalInput(value1);
+    const dec2 = normalizeDecimalInput(value2);
+    
+    switch (operation) {
+        case 'multiply':
+            return Math.round((dec1 * dec2) * 100) / 100; // Arrondir à 2 décimales
+        case 'add':
+            return Math.round((dec1 + dec2) * 100) / 100;
+        case 'subtract':
+            return Math.round((dec1 - dec2) * 100) / 100;
+        case 'divide':
+            if (dec2 === 0) return 0;
+            return Math.round((dec1 / dec2) * 100) / 100;
+        default:
+            return 0;
+    }
+}
+
+function formatPrice(price) {
+    return normalizeDecimalInput(price).toLocaleString('fr-FR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
+// Mise à jour de l'affichage en temps réel
+function updateDisplayRealtime(index, newQuantity) {
+    const row = document.querySelector(`input[data-index="${index}"]`).closest('tr');
+    if (!row) return;
+    
+    // Récupérer le prix unitaire depuis la cellule
+    const prixUnitaireCell = row.cells[3]; // 4ème colonne (index 3)
+    const prixUnitaireText = prixUnitaireCell.textContent.replace(' FCFA', '');
+    const prixUnitaire = normalizeDecimalInput(prixUnitaireText);
+    
+    // Calculer le nouveau total avec calcul sécurisé
+    const nouveauTotal = safeDecimalCalculation(prixUnitaire, newQuantity, 'multiply');
+    
+    // Mettre à jour la cellule du prix total
+    const prixTotalCell = row.cells[4]; // 5ème colonne (index 4)
+    prixTotalCell.textContent = formatPrice(nouveauTotal) + ' FCFA';
+    
+    // Recalculer le total général
+    updateTotalGeneral();
+}
+
+// Recalculer le total général
+function updateTotalGeneral() {
+    let totalGeneral = 0;
+    const rows = document.querySelectorAll('#articles-table tbody tr');
+    
+    rows.forEach(row => {
+        if (row.cells.length > 4) {
+            const prixTotalText = row.cells[4].textContent.replace(' FCFA', '').replace(/\s/g, '');
+            const prixTotal = parseFloat(prixTotalText) || 0;
+            totalGeneral += prixTotal;
+        }
+    });
+    
+    // Mettre à jour l'affichage du total
+    const totalHorsTaxe = document.getElementById('total-hors-taxe');
+    const totalPrice = document.getElementById('total-price');
+    const totalInput = document.getElementById('total-input');
+    
+    if (totalHorsTaxe) {
+        totalHorsTaxe.textContent = `Prix Total Hors Taxe: ${totalGeneral.toLocaleString()} FCFA`;
+    }
+    if (totalPrice) {
+        totalPrice.textContent = `Net à Payer: ${totalGeneral.toLocaleString()} FCFA`;
+    }
+    if (totalInput) {
+        totalInput.value = `${totalGeneral.toLocaleString()} FCFA`;
+    }
+    
+    // Mettre à jour le rendu
+    updateRendu();
+}
+
+// Mettre à jour le rendu
+function updateRendu() {
+    const totalGeneral = getTotalGeneral();
+    const amountPaidInput = document.getElementById('amount-paid');
+    const montantRegler = amountPaidInput ? parseFloat(amountPaidInput.value) || 0 : 0;
+    const rendu = Math.max(0, montantRegler - totalGeneral);
+    
+    const changeElement = document.getElementById('change');
+    if (changeElement) {
+        changeElement.textContent = `Rendu: ${rendu.toLocaleString('fr-FR')} FCFA`;
+    }
+}
+
+// Obtenir le total général
+function getTotalGeneral() {
+    let totalGeneral = 0;
+    
+    // Essayer plusieurs sélecteurs pour trouver le tableau
+    let rows = document.querySelectorAll('#articles-table tbody tr');
+    if (rows.length === 0) {
+        rows = document.querySelectorAll('#articles-table tr');
+        console.log('DEBUG getTotalGeneral: Sélecteur tbody échoué, utilisation du sélecteur général');
+    }
+    if (rows.length === 0) {
+        rows = document.querySelectorAll('table tr');
+        console.log('DEBUG getTotalGeneral: Sélecteur #articles-table échoué, utilisation du sélecteur table général');
+    }
+    
+    rows.forEach((row, index) => {
+        if (row.cells.length > 4) {
+            const prixTotalText = row.cells[4].textContent || row.cells[4].innerText;
+            const prixTotal = normalizeDecimalInput(prixTotalText);
+            totalGeneral += prixTotal;
+        }
+    });
+    return totalGeneral;
+}
+
+
+// Mise à jour côté serveur avec AJAX
+function updateQuantityOnServer(index, newQuantity) {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch('{% url "update_quantity_temp" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken
+        },
+        body: `index=${index}&quantite=${newQuantity}&csrfmiddlewaretoken=${csrfToken}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            console.error('Erreur lors de la mise à jour:', data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Erreur réseau:', error);
+    });
+}
+
+// Supprimer un article
+function removeArticle(index) {
+    // Suppression immédiate de l'affichage
+    const input = document.querySelector(`input[data-index="${index}"]`);
+    if (input) {
+        const row = input.closest('tr');
+        if (row) {
+            // Animation de suppression
+            row.style.transition = 'all 0.3s ease';
+            row.style.opacity = '0';
+            row.style.transform = 'translateX(-100%)';
+            
+            setTimeout(() => {
+                row.remove();
+                // Mettre à jour les index après suppression
+                updateTableIndexes();
+                // Recalculer le total général
+                updateTotalGeneral();
+            }, 300);
+        }
+    }
+    
+    // Envoyer la suppression au serveur en arrière-plan
+    removeArticleOnServer(index);
+}
+
+// Suppression côté serveur avec AJAX
+function removeArticleOnServer(index) {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch('{% url "remove_article_temp" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken
+        },
+        body: `index=${index}&csrfmiddlewaretoken=${csrfToken}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            console.error('Erreur lors de la suppression:', data.error);
+            // Optionnel: afficher un message d'erreur à l'utilisateur
+        }
+    })
+    .catch(error => {
+        console.error('Erreur réseau:', error);
+    });
+}
+
+// Mettre à jour le montant réglé
+function updateMontantRegler(montant) {
+    if (montant < 0) {
+        alert('Le montant ne peut pas être négatif');
+        return;
+    }
+    
+    // Mise à jour immédiate de l'affichage
+    updateRendu();
+    
+    // Envoyer la mise à jour au serveur en arrière-plan
+    updateMontantReglerOnServer(montant);
+}
+
+// Mise à jour côté serveur pour le montant réglé avec AJAX
+function updateMontantReglerOnServer(montant) {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch('{% url "update_montant_regler" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken
+        },
+        body: `montant_regler=${montant}&csrfmiddlewaretoken=${csrfToken}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            console.error('Erreur lors de la mise à jour du montant:', data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Erreur réseau:', error);
+    });
+}
+
+// Vider la facture
+function clearFacture() {
+    // Suppression immédiate de tous les articles de l'affichage
+    const tbody = document.querySelector('#articles-table tbody');
+    if (tbody) {
+        // Animation de suppression pour toutes les lignes
+        const rows = tbody.querySelectorAll('tr');
+        rows.forEach((row, index) => {
+            if (row.cells.length > 1) { // Ignorer les lignes vides
+                row.style.transition = 'all 0.3s ease';
+                row.style.opacity = '0';
+                row.style.transform = 'translateX(-100%)';
+                
+                setTimeout(() => {
+                    row.remove();
+                }, 300 + (index * 50)); // Délai progressif pour l'animation
+            }
+        });
+        
+        // Afficher le message "Aucun article sélectionné" après suppression
+        setTimeout(() => {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Sélectionnez un article pour commencer</td></tr>';
+            updateTableIndexes();
+            updateTotalGeneral();
+        }, 300 + (rows.length * 50));
+    }
+    
+    // Envoyer la suppression au serveur en arrière-plan
+    clearFactureOnServer();
+}
+
+// Vider la facture côté serveur avec AJAX
+function clearFactureOnServer() {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch('{% url "clear_facture_temp" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken
+        },
+        body: `csrfmiddlewaretoken=${csrfToken}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            console.error('Erreur lors du vidage:', data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Erreur réseau:', error);
+    });
+}
+
+// Validation du formulaire principal - SUPPRIMÉ car géré par le gestionnaire AJAX ci-dessous
+
+// Auto-focus sur le champ de recherche d'articles et configuration des event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('article-search');
+    if (searchInput) {
+        searchInput.focus();
+    }
+    
+    // Gestion du basculement entre sélection et saisie de client
+    const selectExistingBtn = document.getElementById('select-existing');
+    const enterNewBtn = document.getElementById('enter-new');
+    const clientSelect = document.getElementById('client-select');
+    const clientInput = document.getElementById('client-input');
+    
+    if (selectExistingBtn && enterNewBtn && clientSelect && clientInput) {
+        selectExistingBtn.addEventListener('click', function() {
+            // Activer le mode sélection
+            selectExistingBtn.classList.add('active');
+            enterNewBtn.classList.remove('active');
+            clientSelect.style.display = 'block';
+            clientInput.style.display = 'none';
+            clientInput.value = ''; // Vider le champ de saisie
+        });
+        
+        enterNewBtn.addEventListener('click', function() {
+            // Activer le mode saisie
+            enterNewBtn.classList.add('active');
+            selectExistingBtn.classList.remove('active');
+            clientInput.style.display = 'block';
+            clientSelect.style.display = 'none';
+            clientSelect.value = ''; // Vider la sélection
+        });
+    }
+    
+    // Event listeners pour les inputs de quantité
+    const quantityInputs = document.querySelectorAll('.quantity-input');
+    quantityInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            const index = this.getAttribute('data-index');
+            const value = this.value;
+            updateQuantity(index, value);
+        });
+    });
+    
+    // Event listeners pour les boutons de suppression
+    const deleteButtons = document.querySelectorAll('.delete-button');
+    deleteButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const index = this.getAttribute('data-index');
+            removeArticle(index);
+        });
+    });
+    
+    // Event listener pour le champ montant donné
+    const amountPaidInput = document.getElementById('amount-paid');
+    if (amountPaidInput) {
+        amountPaidInput.addEventListener('input', function() {
+            updateRendu();
+        });
+    }
+    
+    // Stocker les anciennes valeurs des inputs de quantité pour validation
+    const quantityInputsForValidation = document.querySelectorAll('.quantity-input');
+    quantityInputsForValidation.forEach(input => {
+        input.setAttribute('data-old-value', input.value);
+    });
+
+    // Intercepter la soumission du formulaire principal
+    const mainForm = document.getElementById('main-form');
+    if (mainForm) {
+        mainForm.addEventListener('submit', function(e) {
+            e.preventDefault(); // Empêcher la soumission normale
+            
+            // Vérifier s'il y a des articles dans la facture
+            const rows = document.querySelectorAll('#articles-table tbody tr[data-article-id]');
+            if (rows.length === 0) {
+                showNotification('Aucun article dans la facture. Veuillez ajouter des articles avant d\'enregistrer.', 'error');
+                return;
+            }
+            
+            // Mettre à jour la session avant l'enregistrement
+            console.log('DEBUG: Mise à jour de la session avant enregistrement');
+            updateSessionFacture()
+            .then(() => {
+                console.log('DEBUG: Session mise à jour avec succès, procédure à l\'enregistrement');
+                // Afficher un indicateur de chargement
+                const saveButton = document.getElementById('save-button');
+                const originalText = saveButton.textContent;
+                saveButton.textContent = 'Enregistrement...';
+                saveButton.disabled = true;
+                
+                // Collecter les articles et les ajouter au formulaire
+                const factureData = collectInvoiceData();
+                console.log('DEBUG: Articles collectés pour le formulaire:', factureData.lignes);
+                
+                // Soumettre le formulaire via AJAX
+                const formData = new FormData(mainForm);
+                
+                // Ajouter les articles aux données du formulaire
+                factureData.lignes.forEach((ligne, index) => {
+                    formData.append(`article_${index}_id`, ligne.article_id);
+                    formData.append(`article_${index}_quantite`, ligne.quantite);
+                    formData.append(`article_${index}_prix_unitaire`, ligne.prix_unitaire);
+                    formData.append(`article_${index}_prix_total`, ligne.prix_total);
+                    formData.append(`article_${index}_designation`, ligne.designation);
+                    formData.append(`article_${index}_reference`, ligne.reference);
+                });
+                
+                console.log('DEBUG: FormData préparé avec', factureData.lignes.length, 'articles');
+                
+                // S'assurer que l'URL est correcte
+                const formAction = mainForm.getAttribute('action') || '{% url "enregistrer_facture" %}';
+                
+                fetch(formAction, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    }
+                })
+                .then(response => {
+                    if (response.ok) {
+                        return response.json();
+                    }
+                    throw new Error('Erreur lors de l\'enregistrement');
+                })
+                .then(data => {
+                    if (data.success) {
+                        showNotification(data.message || 'Facture enregistrée avec succès!', 'success');
+                        
+                        // Rafraîchir automatiquement le formulaire après 1.5 secondes
+                        setTimeout(() => {
+                            location.reload();
+                        }, 1500);
+                    } else {
+                        throw new Error(data.error || 'Erreur lors de l\'enregistrement');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erreur:', error);
+                    showNotification('Erreur lors de l\'enregistrement de la facture', 'error');
+                })
+                .finally(() => {
+                    // Restaurer le bouton
+                    saveButton.textContent = originalText;
+                    saveButton.disabled = false;
+                });
+            })
+            .catch(error => {
+                console.error('DEBUG: Erreur lors de la mise à jour de la session:', error);
+                showNotification('Erreur lors de la mise à jour de la session. Veuillez réessayer.', 'error');
+            });
+        });
+    }
+});
+
+// Fonction pour mettre à jour tous les prix selon le type de vente global
+function updateAllPricesByType() {
+    const typeVente = document.getElementById('sale-type').value;
+    const rows = document.querySelectorAll('#articles-table tbody tr[data-article-id]');
+    
+    if (!typeVente || rows.length === 0) {
+        return;
+    }
+    
+    console.log('Mise à jour globale du type de vente vers:', typeVente);
+    
+    // Afficher un indicateur de chargement
+    showNotification(`Mise à jour des prix vers ${typeVente}...`, 'info');
+    
+    // D'abord, mettre à jour côté serveur pour tous les articles
+    updateAllTypesVenteOnServer(typeVente)
+        .then(() => {
+            // Ensuite, mettre à jour l'affichage
+            updateAllPricesDisplay(typeVente);
+            
+            // Afficher un message de succès
+            setTimeout(() => {
+                showNotification(`Prix mis à jour vers ${typeVente} pour tous les articles`, 'success');
+            }, 500);
+        })
+        .catch(error => {
+            console.error('Erreur lors de la mise à jour globale:', error);
+            showNotification('Erreur lors de la mise à jour des prix', 'error');
+        });
+}
+
+// Mettre à jour l'affichage des prix pour tous les articles
+function updateAllPricesDisplay(typeVente) {
+    const rows = document.querySelectorAll('#articles-table tbody tr[data-article-id]');
+    
+    if (rows.length === 0) {
+        updateTotal();
+        return;
+    }
+    
+    // Compter les requêtes en cours pour savoir quand tout est terminé
+    let completedRequests = 0;
+    const totalRequests = rows.length;
+    
+    rows.forEach((row, index) => {
+        const articleId = row.getAttribute('data-article-id');
+        const quantiteInput = row.querySelector('.quantity-input');
+        const quantite = parseFloat(quantiteInput.value) || 1;
+    
+    // Récupérer les prix selon le type de vente
+    fetch(`/caisse/get-prix-by-type/?article_id=${articleId}&type_vente=${typeVente}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const prixUnitaire = data.prix;
+                const prixTotal = prixUnitaire * quantite;
+                
+                // Mettre à jour les cellules de prix
+                const prixUnitaireCell = row.querySelector('[data-prix-unitaire]');
+                const prixTotalCell = row.querySelector('[data-prix-total]');
+                
+                prixUnitaireCell.textContent = prixUnitaire.toLocaleString('fr-FR') + ' FCFA';
+                prixUnitaireCell.setAttribute('data-prix-unitaire', prixUnitaire);
+                
+                prixTotalCell.textContent = prixTotal.toLocaleString('fr-FR') + ' FCFA';
+                prixTotalCell.setAttribute('data-prix-total', prixTotal);
+                } else {
+                    console.error('Erreur lors de la récupération du prix pour l\'article', articleId, ':', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Erreur pour l\'article', articleId, ':', error);
+            })
+            .finally(() => {
+                completedRequests++;
+                
+                // Quand toutes les requêtes sont terminées, recalculer le total
+                if (completedRequests === totalRequests) {
+                    setTimeout(() => {
+                updateTotal();
+                    }, 100);
+                }
+            });
+    });
+}
+
+// Mettre à jour le type de vente global côté serveur
+function updateAllTypesVenteOnServer(typeVente) {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    return fetch('{% url "update_all_types_vente_temp" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken
+        },
+        body: `type_vente_global=${typeVente}&csrfmiddlewaretoken=${csrfToken}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Mise à jour globale réussie:', data.message);
+            return data;
+            } else {
+            throw new Error(data.error || 'Erreur inconnue');
+        }
+    });
+}
+
+// Fonction pour générer un nouveau numéro de ticket
+function generateNewTicketNumber() {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    return fetch('{% url "generate_ticket_number" %}', {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': csrfToken
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Mettre à jour le champ numéro de ticket
+            const ticketInput = document.getElementById('ticket-number');
+            if (ticketInput) {
+                ticketInput.value = data.numero_ticket;
+            }
+            return data.numero_ticket;
+        } else {
+            throw new Error(data.error || 'Erreur lors de la génération du numéro de ticket');
+        }
+    });
+}
+
+// Fonction pour retourner au dashboard
+function returnToDashboard() {
+    // Vérifier s'il y a des articles non sauvegardés
+    const rows = document.querySelectorAll('#articles-table tbody tr[data-article-id]');
+    if (rows.length > 0) {
+        if (confirm('Vous avez des articles non enregistrés. Êtes-vous sûr de vouloir retourner au dashboard ?')) {
+            window.location.href = '{% url "dashboard_caisse" %}';
+        }
+    } else {
+        window.location.href = '{% url "dashboard_caisse" %}';
+    }
+}
+
+// Fonction pour mettre à jour le prix total quand la quantité change
+function updatePrixTotal(quantiteInput) {
+    const row = quantiteInput.closest('tr');
+    const prixUnitaire = parseFloat(row.querySelector('[data-prix-unitaire]').getAttribute('data-prix-unitaire')) || 0;
+    const quantite = parseFloat(quantiteInput.value) || 1;
+    const prixTotal = prixUnitaire * quantite;
+    
+    const prixTotalCell = row.querySelector('[data-prix-total]');
+    prixTotalCell.textContent = prixTotal.toLocaleString('fr-FR') + ' FCFA';
+    prixTotalCell.setAttribute('data-prix-total', prixTotal);
+    
+    // Recalculer le total de la facture
+    updateTotal();
+}
+
+// Fonction pour mettre à jour le total de la facture
+function updateTotal() {
+    updateTotalGeneral();
+}
+
+// Fonction pour mettre à jour le type de vente et les prix
+function updateTypeVente(selectElement) {
+    const index = selectElement.getAttribute('data-index');
+    const articleId = selectElement.getAttribute('data-article-id');
+    const typeVente = selectElement.value;
+    
+    console.log('Changement de type de vente:', {index, articleId, typeVente});
+    
+    // Récupérer le nouveau prix selon le type de vente
+    fetch(`/caisse/get-prix-by-type/?article_id=${articleId}&type_vente=${typeVente}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const nouveauPrix = data.prix;
+                const row = selectElement.closest('tr');
+                const quantiteInput = row.querySelector('.quantity-input');
+                const quantite = parseFloat(quantiteInput.value) || 1;
+                const nouveauPrixTotal = nouveauPrix * quantite;
+                
+                // Mettre à jour les cellules de prix
+                const prixUnitaireCell = row.querySelector('[data-prix-unitaire]');
+                const prixTotalCell = row.querySelector('[data-prix-total]');
+                
+                prixUnitaireCell.textContent = nouveauPrix.toLocaleString('fr-FR') + ' FCFA';
+                prixUnitaireCell.setAttribute('data-prix-unitaire', nouveauPrix);
+                
+                prixTotalCell.textContent = nouveauPrixTotal.toLocaleString('fr-FR') + ' FCFA';
+                prixTotalCell.setAttribute('data-prix-total', nouveauPrixTotal);
+                
+                // Mettre à jour le type de vente dans l'attribut de la ligne
+                row.setAttribute('data-type-vente', typeVente);
+                
+                // Recalculer le total général
+                updateTotalGeneral();
+                
+                // Mettre à jour côté serveur
+                updateTypeVenteOnServer(index, typeVente);
+            } else {
+                console.error('Erreur lors de la récupération du prix:', data.error);
+                showNotification('Erreur lors de la mise à jour du prix', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            showNotification('Erreur de connexion', 'error');
+        });
+}
+
+// Variables globales pour la modal
+let currentModifyIndex = null;
+let currentModifyArticleId = null;
+let availableTypes = [];
+
+// Ouvrir la modal de modification du type de vente
+function openModifyTypeModal(button) {
+    console.log('DEBUG: openModifyTypeModal appelée avec button:', button);
+    
+    currentModifyIndex = button.getAttribute('data-index');
+    currentModifyArticleId = button.getAttribute('data-article-id');
+    
+    console.log('DEBUG: Index:', currentModifyIndex, 'Article ID:', currentModifyArticleId);
+    
+    const row = button.closest('tr');
+    const designation = row.cells[0].textContent;
+    const currentPrice = row.querySelector('[data-prix-unitaire]').getAttribute('data-prix-unitaire');
+    
+    console.log('DEBUG: Désignation:', designation, 'Prix actuel:', currentPrice);
+    
+    // Remplir les informations de base
+    document.getElementById('modal-article-name').textContent = designation;
+    document.getElementById('modal-current-price').textContent = parseFloat(currentPrice).toLocaleString('fr-FR');
+    
+    console.log('DEBUG: Informations de base remplies');
+    
+    // Charger les types de vente disponibles pour cet article
+    loadArticleTypes(currentModifyArticleId);
+    
+    console.log('DEBUG: Types de vente en cours de chargement');
+    
+    // Afficher la modal
+    document.getElementById('modifyTypeModal').style.display = 'block';
+    console.log('DEBUG: Modal affichée');
+}
+
+// Fermer la modal
+function closeModifyTypeModal() {
+    document.getElementById('modifyTypeModal').style.display = 'none';
+    currentModifyIndex = null;
+    currentModifyArticleId = null;
+    availableTypes = [];
+}
+
+// Charger les types de vente pour un article
+function loadArticleTypes(articleId) {
+    console.log('DEBUG: loadArticleTypes appelée avec articleId:', articleId);
+    
+    const select = document.getElementById('type-vente-select');
+    if (!select) {
+        console.error('DEBUG: Select type-vente-select non trouvé !');
+        return;
+    }
+    
+    select.innerHTML = '<option value="">Chargement...</option>';
+    console.log('DEBUG: Select initialisé avec "Chargement..."');
+    
+    const url = `/caisse/get-article-types/?article_id=${articleId}`;
+    console.log('DEBUG: URL de requête:', url);
+    
+    fetch(url)
+        .then(response => {
+            console.log('DEBUG: Réponse reçue:', response.status, response.statusText);
+            return response.json();
+        })
+        .then(data => {
+            console.log('DEBUG: Données reçues:', data);
+            
+            if (data.success) {
+                availableTypes = data.types;
+                select.innerHTML = '';
+                console.log('DEBUG: Types disponibles:', data.types);
+                
+                if (data.types.length > 0) {
+                    data.types.forEach(type => {
+                        const option = document.createElement('option');
+                        option.value = type.intitule;
+                        option.textContent = `${type.intitule} - ${parseFloat(type.prix).toLocaleString('fr-FR')} FCFA`;
+                        select.appendChild(option);
+                        console.log('DEBUG: Option ajoutée:', option.value, option.textContent);
+                    });
+                    
+                    // Ajouter un event listener pour le changement de sélection
+                    select.addEventListener('change', updatePricePreview);
+                } else {
+                    select.innerHTML = '<option value="">Aucun type de vente disponible</option>';
+                    console.log('DEBUG: Aucun type de vente disponible');
+                }
+            } else {
+                select.innerHTML = '<option value="">Erreur lors du chargement</option>';
+                console.error('DEBUG: Erreur du serveur:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('DEBUG: Erreur lors du chargement des types de vente:', error);
+            select.innerHTML = '<option value="">Erreur de connexion</option>';
+        });
+}
+
+// Mettre à jour l'aperçu du prix
+function updatePricePreview() {
+    const select = document.getElementById('type-vente-select');
+    const selectedType = select.value;
+    const newPriceSpan = document.getElementById('modal-new-price');
+    
+    if (selectedType) {
+        const type = availableTypes.find(t => t.intitule === selectedType);
+        if (type) {
+            newPriceSpan.textContent = parseFloat(type.prix).toLocaleString('fr-FR');
+        }
+    } else {
+        newPriceSpan.textContent = '-';
+    }
+}
+
+// Confirmer le changement de type
+function confirmTypeChange() {
+    const select = document.getElementById('modal-type-select');
+    const selectedType = select.value;
+    
+    if (!selectedType) {
+        showNotification('Veuillez sélectionner un type de vente', 'warning');
+        return;
+    }
+    
+    const type = availableTypes.find(t => t.intitule === selectedType);
+    if (!type) {
+        showNotification('Type de vente invalide', 'error');
+        return;
+    }
+    
+    // Mettre à jour le prix dans le tableau
+    const row = document.querySelector(`tr[data-article-id="${currentModifyArticleId}"]`);
+    if (row) {
+        const quantiteInput = row.querySelector('.quantity-input');
+        const quantite = parseFloat(quantiteInput.value) || 1;
+        const nouveauPrix = parseFloat(type.prix);
+        const nouveauPrixTotal = nouveauPrix * quantite;
+        
+        // Mettre à jour les cellules de prix
+        const prixUnitaireCell = row.querySelector('[data-prix-unitaire]');
+        const prixTotalCell = row.querySelector('[data-prix-total]');
+        
+        prixUnitaireCell.textContent = nouveauPrix.toLocaleString('fr-FR') + ' FCFA';
+        prixUnitaireCell.setAttribute('data-prix-unitaire', nouveauPrix);
+        
+        prixTotalCell.textContent = nouveauPrixTotal.toLocaleString('fr-FR') + ' FCFA';
+        prixTotalCell.setAttribute('data-prix-total', nouveauPrixTotal);
+        
+        // Recalculer le total général
+        updateTotalGeneral();
+        
+        // Mettre à jour côté serveur
+        updateTypeVenteOnServer(currentModifyIndex, selectedType);
+    }
+    
+    // Fermer la modal
+    closeModifyTypeModal();
+}
+
+// Mettre à jour le type de vente côté serveur
+function updateTypeVenteOnServer(index, typeVente) {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch('{% url "update_type_vente_temp" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken
+        },
+        body: `index=${index}&type_vente=${typeVente}&csrfmiddlewaretoken=${csrfToken}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            console.error('Erreur côté serveur:', data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Erreur réseau:', error);
+    });
+}
+
+// Fonction pour afficher des notifications
+function showNotification(message, type = 'info') {
+    // Créer l'élément de notification
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 600;
+        z-index: 10000;
+        animation: slideInRight 0.3s ease-out;
+        max-width: 300px;
+        word-wrap: break-word;
+    `;
+    
+    // Couleurs selon le type
+    switch(type) {
+        case 'success':
+            notification.style.backgroundColor = '#28a745';
+            break;
+        case 'error':
+            notification.style.backgroundColor = '#dc3545';
+            break;
+        case 'warning':
+            notification.style.backgroundColor = '#ffc107';
+            notification.style.color = '#212529';
+            break;
+        default:
+            notification.style.backgroundColor = '#17a2b8';
+    }
+    
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    // Supprimer la notification après 3 secondes
+    setTimeout(() => {
+        notification.style.animation = 'slideOutRight 0.3s ease-in';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, 3000);
+}
+
+// Ajouter les animations CSS pour les notifications
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    @keyframes slideOutRight {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+`;
+document.head.appendChild(style);
+
+// Fonction pour mettre en attente (basée sur la logique du document original)
+function mettreEnAttente() {
+    console.log('=== FONCTION mettreEnAttente APPELÉE ===');
+    
+    // Vérifier s'il y a des articles dans le tableau
+    const articlesTable = document.getElementById('articles-table');
+    console.log('articlesTable trouvé:', articlesTable);
+    console.log('Nombre de lignes:', articlesTable ? articlesTable.rows.length : 'N/A');
+    
+    if (!articlesTable || articlesTable.rows.length <= 1) {
+        console.log('Aucun article trouvé dans le tableau');
+        showNotification('Aucun article dans la facture. Veuillez ajouter des articles avant de mettre en attente.', 'warning');
+        return;
+    }
+    
+    // Vérifier qu'il y a au moins une ligne avec des données valides
+    let lignesValides = 0;
+    for (let i = 1; i < articlesTable.rows.length; i++) {
+        const row = articlesTable.rows[i];
+        const designation = row.cells[0].innerText.trim();
+        if (designation) {
+            lignesValides++;
+        }
+    }
+    
+    if (lignesValides === 0) {
+        console.log('DEBUG: Aucune ligne avec désignation valide trouvée');
+        showNotification('Aucun article valide trouvé dans la facture', 'warning');
+        return;
+    }
+    
+    console.log(`DEBUG: ${lignesValides} lignes valides trouvées sur ${articlesTable.rows.length - 1} lignes`);
+    
+    // Utiliser la fonction collectInvoiceData pour collecter les données
+    const factureData = collectInvoiceData();
+    console.log('DEBUG: Données collectées par collectInvoiceData:', factureData);
+    console.log('DEBUG: Nombre de lignes collectées:', factureData.lignes.length);
+    
+    console.log('DEBUG: Données à mettre en attente:', factureData);
+    console.log('DEBUG: Nombre de lignes:', factureData.lignes.length);
+    
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (!csrfToken) {
+        showNotification('Erreur: Token CSRF non trouvé', 'error');
+        return;
+    }
+    
+    const factureDataJson = JSON.stringify(factureData);
+    console.log('JSON à envoyer:', factureDataJson);
+    
+    const requestBody = `facture_data=${encodeURIComponent(factureDataJson)}&csrfmiddlewaretoken=${csrfToken.value}`;
+    console.log('Corps de la requête:', requestBody);
+    
+    // Envoyer les données via AJAX
+    fetch('{% url "mettre_en_attente" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken.value
+        },
+        body: requestBody
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification(data.message, 'success');
+            // Rafraîchir la page pour vider le formulaire (même logique que le document original)
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        } else {
+            showNotification('Erreur: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Erreur:', error);
+        showNotification('Erreur de connexion', 'error');
+    });
+}
+
+// Fonction pour rappeler un ticket (basée sur la logique du document original)
+function rappelerTicket() {
+    console.log('DEBUG: rappelerTicket() appelée');
+    
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    console.log('DEBUG: CSRF Token:', csrfToken);
+    
+    const url = '{% url "rappeler_ticket" %}';
+    console.log('DEBUG: URL:', url);
+    
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken
+        },
+        body: `csrfmiddlewaretoken=${csrfToken}`
+    })
+    .then(response => {
+        console.log('DEBUG: Réponse reçue:', response.status, response.statusText);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('DEBUG: Données reçues:', data);
+        if (data.success) {
+            showNotification(data.message, 'success');
+            // Restaurer les données exactement comme dans le document original
+            restoreTicketData(data.facture_data);
+        } else {
+            console.log('DEBUG: Erreur du serveur:', data.error);
+            showNotification('Erreur: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('DEBUG: Erreur de connexion:', error);
+        showNotification('Erreur de connexion: ' + error.message, 'error');
+    });
+}
+
+// Fonction pour restaurer les données du ticket (même logique que recallTicket() du document original)
+function restoreTicketData(data) {
+    if (!data) {
+        showNotification('Aucune donnée de ticket trouvée', 'error');
+        return;
+    }
+    
+    console.log('Données du ticket rappelé:', data);
+    
+    // Restaurer les informations de base
+    if (data.client) {
+        const clientSelect = document.getElementById('client-select');
+        if (clientSelect) {
+            clientSelect.value = data.client;
+        }
+    }
+    
+    // Restaurer les totaux
+    if (data.montant_regler !== undefined) {
+        const montantInput = document.getElementById('amount-paid');
+        if (montantInput) {
+            montantInput.value = data.montant_regler || 0;
+            // Ajouter un événement pour recalculer quand le montant change
+            montantInput.onchange = function() {
+                updateRendu();
+            };
+        }
+    } else {
+        // Si pas de montant réglé, initialiser avec le total
+        const montantInput = document.getElementById('amount-paid');
+        if (montantInput && !montantInput.value) {
+            // On initialisera après le recalcul des totaux
+        }
+    }
+    
+    // Vider le tableau actuel
+    const articlesTable = document.getElementById('articles-table');
+    while (articlesTable.rows.length > 1) {
+        articlesTable.deleteRow(1);
+    }
+    
+    // Restaurer les articles depuis data.lignes
+    const tbody = document.querySelector('#articles-table tbody');
+    if (tbody) {
+        tbody.innerHTML = '';
+    }
+    if (data.lignes && data.lignes.length > 0) {
+        data.lignes.forEach((ligne) => {
+            const quantite = normalizeDecimalInput(ligne.quantite) || 1;
+            const prixUnitaire = normalizeDecimalInput(ligne.prix_unitaire);
+            const prixTotal = ligne.prix_total !== undefined
+                ? normalizeDecimalInput(ligne.prix_total)
+                : safeDecimalCalculation(quantite, prixUnitaire, 'multiply');
+            
+            addArticleToTable(
+                ligne.article_id || '',
+                ligne.designation || '',
+                ligne.reference || '',
+                prixUnitaire,
+                null,
+                {
+                    quantity: quantite,
+                    prix_unitaire: prixUnitaire,
+                    prix_total: prixTotal,
+                    typeVente: ligne.type_vente || 'Détail',
+                    skipMerge: true
+                }
+            );
+        });
+        
+        updateTableIndexes();
+        updateTotalGeneral();
+    }
+    
+    // Mettre à jour la facture temporaire dans la session
+    updateSessionFacture();
+    
+    // Essayer de récupérer les article_id manquants
+    // recupererArticleIdsManquants(); // Fonction supprim�e pour �viter erreur NoReverseMatch
+    
+    // Recalculer une dernière fois tous les totaux pour s'assurer qu'ils sont corrects
+    setTimeout(() => {
+        recalculerTotauxApresRappel();
+        
+        // S'assurer que le montant réglé est initialisé si nécessaire
+        const montantInput = document.getElementById('amount-paid');
+        if (montantInput && !montantInput.value) {
+            const totalGeneral = getTotalGeneral();
+            montantInput.value = totalGeneral;
+        }
+        
+        // Recalculer le rendu une dernière fois
+        updateRendu();
+    }, 100);
+    
+    showNotification('Ticket rappelé avec succès', 'success');
+}
+
+// Fonction pour récupérer les article_id manquants
+function recupererArticleIdsManquants() {
+    console.log('DEBUG: Récupération des article_id manquants...');
+    
+    const articlesTable = document.getElementById('articles-table');
+    if (!articlesTable) return;
+    
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    // Parcourir toutes les lignes pour trouver celles sans article_id
+    for (let i = 1; i < articlesTable.rows.length; i++) {
+        const row = articlesTable.rows[i];
+        const articleId = row.getAttribute('data-article-id');
+        
+        if (!articleId || articleId.trim() === '') {
+            const designation = row.cells[0].innerText.trim();
+            const reference = row.cells[1].innerText.trim();
+            
+            if (designation) {
+                console.log(`DEBUG: Tentative de récupération de l'ID pour: "${designation}"`);
+                
+                // Appeler l'API pour récupérer l'ID
+                const formData = new FormData();
+                formData.append('designation', designation);
+                formData.append('reference', reference);
+                formData.append('csrfmiddlewaretoken', csrfToken);
+                
+                fetch('{% url "get_article_id_by_designation" %}', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        console.log(`DEBUG: ID récupéré pour "${designation}": ${data.article_id}`);
+                        
+                        // Mettre à jour la ligne avec l'ID récupéré
+                        row.setAttribute('data-article-id', data.article_id);
+                        
+                        // Mettre à jour aussi l'input de quantité
+                        const qtyInput = row.cells[2].querySelector('input');
+                        if (qtyInput) {
+                            qtyInput.setAttribute('data-article-id', data.article_id);
+                        }
+                        
+                        // Optionnel: mettre à jour le prix si différent
+                        const prixUnitaireCell = row.cells[3];
+                        const prixActuel = prixUnitaireCell ? normalizeDecimalInput(prixUnitaireCell.getAttribute('data-prix-unitaire') || prixUnitaireCell.innerText) : 0;
+                        const nouveauPrix = normalizeDecimalInput(data.prix_vente);
+                        if (data.prix_vente && nouveauPrix !== prixActuel) {
+                            console.log(`DEBUG: Mise à jour du prix pour "${designation}": ${data.prix_vente}`);
+                            
+                            // Recalculer le prix total
+                            const quantite = normalizeDecimalInput(qtyInput.value) || 1;
+                            const nouveauPrixDecimal = normalizeDecimalInput(data.prix_vente);
+                            const prixTotal = safeDecimalCalculation(quantite, nouveauPrixDecimal, 'multiply');
+                            
+                            // Mettre à jour les cellules de prix
+                            if (prixUnitaireCell) {
+                                prixUnitaireCell.innerText = nouveauPrix.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' FCFA';
+                                prixUnitaireCell.setAttribute('data-prix-unitaire', nouveauPrix);
+                            }
+                            
+                            const prixTotalCell = row.cells[4];
+                            if (prixTotalCell) {
+                                prixTotalCell.innerText = prixTotal.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' FCFA';
+                                prixTotalCell.setAttribute('data-prix-total', prixTotal);
+                            }
+                            
+                            // Recalculer les totaux
+                            recalculerTotauxApresRappel();
+                        }
+                    } else {
+                        console.log(`DEBUG: Impossible de récupérer l'ID pour "${designation}": ${data.error}`);
+                    }
+                })
+                .catch(error => {
+                    console.error(`DEBUG: Erreur lors de la récupération de l'ID pour "${designation}":`, error);
+                });
+            }
+        }
+    }
+}
+
+// Fonction pour supprimer un article (nécessaire pour les boutons de suppression)
+function deleteArticle(row) {
+    const articlesTable = document.getElementById('articles-table');
+    articlesTable.deleteRow(row.rowIndex);
+    updateTotalGeneral();
+    updateSessionFacture();
+}
+
+// Fonction pour collecter les données de la facture
+function collectInvoiceData() {
+    console.log('DEBUG: collectInvoiceData() appelée');
+    
+    const articlesTable = document.getElementById('articles-table');
+    if (!articlesTable || articlesTable.rows.length <= 1) {
+        console.log('DEBUG: Aucun article trouvé dans le tableau - lignes:', articlesTable ? articlesTable.rows.length : 'tableau non trouvé');
+        return {
+            lignes: [],
+            client: '',
+            remise: 0,
+            montant_regler: 0,
+            nette_a_payer: 0,
+            rendu: 0
+        };
+    }
+    
+    console.log('DEBUG: Tableau trouvé avec', articlesTable.rows.length, 'lignes');
+    
+    const factureData = {
+        client: document.getElementById('client-select') ? document.getElementById('client-select').value : '',
+        remise: 0, // Pas de champ remise visible dans le template
+        montant_regler: parseFloat(document.getElementById('amount-paid') ? document.getElementById('amount-paid').value : 0) || 0,
+        lignes: []
+    };
+    
+    // Parcourir les lignes du tableau
+    for (let i = 1; i < articlesTable.rows.length; i++) {
+        const row = articlesTable.rows[i];
+        if (row.cells.length >= 5) {
+            const designation = row.cells[0].innerText;
+            const reference = row.cells[1].innerText;
+            const quantityInput = row.cells[2].querySelector('input');
+            const quantity = quantityInput ? normalizeDecimalInput(quantityInput.value) || 1 : 1;
+            
+            // Récupérer le prix unitaire depuis l'attribut data-prix-unitaire (mis à jour lors du changement de type de vente)
+            const prixUnitaireCell = row.cells[3] ? row.cells[3] : null;
+            let unitPrice = 0;
+            if (prixUnitaireCell) {
+                // Priorité 1: Récupérer depuis l'attribut data-prix-unitaire (le plus fiable)
+                const prixFromAttr = prixUnitaireCell.getAttribute('data-prix-unitaire');
+                if (prixFromAttr) {
+                    unitPrice = normalizeDecimalInput(prixFromAttr);
+                } else {
+                    // Priorité 2: Récupérer depuis le texte si l'attribut n'existe pas
+                    const unitPriceText = prixUnitaireCell.innerText || prixUnitaireCell.textContent || '';
+                    unitPrice = normalizeDecimalInput(unitPriceText);
+                }
+            }
+            
+            // Récupérer le prix total depuis l'attribut ou le texte
+            const prixTotalCell = row.cells[4] ? row.cells[4] : null;
+            let total = 0;
+            if (prixTotalCell) {
+                // Priorité 1: Récupérer depuis l'attribut data-prix-total
+                const totalFromAttr = prixTotalCell.getAttribute('data-prix-total');
+                if (totalFromAttr) {
+                    total = normalizeDecimalInput(totalFromAttr);
+                } else {
+                    // Priorité 2: Récupérer depuis le texte
+                    const totalText = prixTotalCell.innerText || prixTotalCell.textContent || '';
+                    total = normalizeDecimalInput(totalText);
+                }
+            }
+            
+            // Récupérer l'ID de l'article depuis les attributs de la ligne
+            let articleId = row.getAttribute('data-article-id') || '';
+            const typeVente = row.getAttribute('data-type-vente') || 'Détail';
+            
+            console.log(`DEBUG: Ligne ${i} - articleId initial: "${articleId}", designation: "${designation}", reference: "${reference}"`);
+            
+            // Vérifier que l'article_id n'est pas vide
+            if (!articleId) {
+                console.error(`DEBUG: ERREUR - article_id vide pour la ligne ${i}`, row);
+                // Essayer de récupérer depuis l'input de quantité
+                const qtyInput = row.cells[2].querySelector('input');
+                if (qtyInput) {
+                    const articleIdFromInput = qtyInput.getAttribute('data-article-id');
+                    console.log(`DEBUG: Récupération depuis input: "${articleIdFromInput}"`);
+                    if (articleIdFromInput) {
+                        row.setAttribute('data-article-id', articleIdFromInput);
+                        articleId = articleIdFromInput; // Mettre à jour la variable
+                    }
+                }
+                
+                // Si toujours pas d'article_id, essayer de le récupérer depuis les données stockées
+                if (!articleId) {
+                    const designation = row.cells[0].innerText;
+                    const reference = row.cells[1].innerText;
+                    console.error(`DEBUG: Impossible de récupérer l'article_id pour: "${designation}" (${reference})`);
+                    console.error(`DEBUG: ATTENTION - Cet article sera inclus avec un article_id vide`);
+                    // Pour la mise en attente, on peut inclure l'article même sans article_id
+                    // car il sera restauré correctement lors du rappel
+                    articleId = ''; // Utiliser une chaîne vide plutôt que de continuer
+                }
+            }
+            
+            console.log(`DEBUG: Ligne ${i} - articleId final: "${articleId}"`);
+            
+            factureData.lignes.push({
+                article_id: articleId,
+                designation: designation,
+                reference: reference,
+                quantite: quantity,
+                prix_unitaire: unitPrice,
+                prix_total: total,
+                type_vente: typeVente
+            });
+        }
+    }
+    
+    // Recalculer les prix totaux correctement avant l'envoi
+    factureData.lignes.forEach(ligne => {
+        const quantite = normalizeDecimalInput(ligne.quantite);
+        const prixUnitaire = normalizeDecimalInput(ligne.prix_unitaire);
+        ligne.prix_total = safeDecimalCalculation(quantite, prixUnitaire, 'multiply');
+    });
+    
+    // Calculer les totaux
+    const totalHT = factureData.lignes.reduce((sum, ligne) => sum + ligne.prix_total, 0);
+    factureData.nette_a_payer = totalHT - factureData.remise;
+    factureData.rendu = factureData.montant_regler - factureData.nette_a_payer;
+    
+    console.log('DEBUG: Données collectées:', factureData);
+    console.log('DEBUG: Nombre de lignes collectées:', factureData.lignes.length);
+    console.log('DEBUG: Détail des lignes:', factureData.lignes);
+    
+    // Vérifier que tous les articles ont un article_id valide
+    const articlesSansId = factureData.lignes.filter(ligne => !ligne.article_id);
+    if (articlesSansId.length > 0) {
+        console.error('DEBUG: ATTENTION - Articles sans article_id:', articlesSansId);
+        console.error('DEBUG: Ces articles peuvent être mis en attente mais nécessiteront une récupération d\'ID lors du rappel');
+    } else {
+        console.log('DEBUG: Tous les articles ont un article_id valide');
+    }
+    
+    // Vérifier qu'il y a au moins une ligne collectée
+    if (factureData.lignes.length === 0) {
+        console.error('DEBUG: ERREUR CRITIQUE - Aucune ligne collectée par collectInvoiceData()');
+        console.error('DEBUG: Cela peut indiquer un problème avec la structure du tableau HTML');
+    }
+    
+    return factureData;
+}
+
+// Fonction pour mettre à jour la facture temporaire dans la session
+function updateSessionFacture() {
+    const factureData = collectInvoiceData();
+    console.log('DEBUG: Mise à jour de la session avec:', factureData);
+    
+    // Vérifier que nous avons des articles à enregistrer
+    if (!factureData.lignes || factureData.lignes.length === 0) {
+        console.error('DEBUG: Aucun article à enregistrer dans la session');
+        return Promise.reject('Aucun article dans la facture');
+    }
+    
+    // Mettre à jour la session directement via une requête AJAX
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    return fetch('{% url "mettre_en_attente" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken
+        },
+        body: `facture_data=${encodeURIComponent(JSON.stringify(factureData))}&csrfmiddlewaretoken=${csrfToken}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('DEBUG: Facture temporaire mise à jour avec succès:', data);
+            console.log('DEBUG: Nombre de tickets en attente:', data.tickets_en_attente);
+            return data;
+        } else {
+            console.error('DEBUG: Erreur lors de la mise à jour de la session:', data.error);
+            throw new Error(data.error);
+        }
+    })
+    .catch(error => {
+        console.error('DEBUG: Erreur lors de la mise à jour:', error);
+        throw error;
+    });
+}
+
+// Fonction pour modifier le type de vente d'un article
+function modifyTypeVente(articleId, designation, prixActuel, row) {
+    console.log('Modification du type de vente pour:', designation);
+    
+    // Afficher la modal de modification
+    document.getElementById('modal-article-name').textContent = designation;
+    document.getElementById('modal-current-price').textContent = prixActuel.toLocaleString('fr-FR');
+    
+    // Stocker l'ID de l'article et la ligne pour la modification
+    document.getElementById('modifyTypeModal').setAttribute('data-article-id', articleId);
+    document.getElementById('modifyTypeModal').setAttribute('data-row-index', row.rowIndex);
+    
+    // Charger les types de vente disponibles pour cet article
+    loadTypesVenteForArticle(articleId);
+    
+    // Afficher la modal
+    document.getElementById('modifyTypeModal').style.display = 'block';
+}
+
+// Fonction pour charger les types de vente d'un article
+function loadTypesVenteForArticle(articleId) {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch(`/caisse/article-types-vente/${articleId}/`, {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': csrfToken
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const select = document.getElementById('type-vente-select');
+            select.innerHTML = '<option value="">Sélectionner un type</option>';
+            
+            data.types_vente.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type.intitule;
+                option.textContent = `${type.intitule} - ${type.prix.toLocaleString('fr-FR')} FCFA`;
+                select.appendChild(option);
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Erreur lors du chargement des types de vente:', error);
+    });
+}
+
+// Fonction pour appliquer le nouveau type de vente
+function applyTypeVente() {
+    const select = document.getElementById('type-vente-select');
+    const selectedType = select.value;
+    
+    if (!selectedType) {
+        showNotification('Veuillez sélectionner un type de vente', 'error');
+        return;
+    }
+    
+    const modal = document.getElementById('modifyTypeModal');
+    const articleId = modal.getAttribute('data-article-id');
+    const rowIndex = modal.getAttribute('data-row-index');
+    
+    // Trouver la ligne dans le tableau
+    const articlesTable = document.getElementById('articles-table');
+    const row = articlesTable.rows[parseInt(rowIndex)];
+    
+    // Mettre à jour le prix unitaire et total
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch(`/caisse/update-type-vente/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken
+        },
+        body: `article_id=${articleId}&type_vente=${encodeURIComponent(selectedType)}&csrfmiddlewaretoken=${csrfToken}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Mettre à jour l'affichage de la ligne
+            const qtyInput = row.querySelector('.quantity-input');
+            const quantite = normalizeDecimalInput(qtyInput.value) || 1;
+            const nouveauPrix = parseFloat(data.nouveau_prix) || 0;
+            const nouveauTotal = safeDecimalCalculation(quantite, nouveauPrix, 'multiply');
+            
+            // Mettre à jour les cellules de prix
+            const prixUnitaireCell = row.cells[3];
+            const prixTotalCell = row.cells[4];
+            
+            if (prixUnitaireCell) {
+                prixUnitaireCell.innerText = nouveauPrix.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' FCFA';
+                prixUnitaireCell.setAttribute('data-prix-unitaire', nouveauPrix);
+            }
+            
+            if (prixTotalCell) {
+                prixTotalCell.innerText = nouveauTotal.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' FCFA';
+                prixTotalCell.setAttribute('data-prix-total', nouveauTotal);
+            }
+            
+            // Mettre à jour les attributs de la ligne
+            row.setAttribute('data-type-vente', selectedType);
+            
+            // Recalculer le total général
+            updateTotalGeneral();
+            updateSessionFacture();
+            
+            // Fermer la modal
+            closeModifyTypeModal();
+            
+            showNotification('Type de vente modifié avec succès', 'success');
+        } else {
+            showNotification('Erreur: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Erreur:', error);
+        showNotification('Erreur de connexion', 'error');
+    });
+}
+
+// Cette fonction est déjà définie plus haut dans le code
+
+// Fonction pour recalculer tous les totaux après rappel de ticket
+function recalculerTotauxApresRappel() {
+    console.log('DEBUG: Recalcul des totaux après rappel');
+    
+    const articlesTable = document.getElementById('articles-table');
+    if (!articlesTable || articlesTable.rows.length <= 1) {
+        console.log('DEBUG: Aucun article pour calculer les totaux');
+        // Réinitialiser les totaux à zéro
+        const totalHorsTaxe = document.getElementById('total-hors-taxe');
+        const totalInput = document.getElementById('total-input');
+        const totalPrice = document.getElementById('total-price');
+        const changeElement = document.getElementById('change');
+        
+        if (totalHorsTaxe) totalHorsTaxe.textContent = 'Prix Total Hors Taxe: 0 FCFA';
+        if (totalInput) totalInput.value = '0 FCFA';
+        if (totalPrice) totalPrice.textContent = 'Net à Payer: 0 FCFA';
+        if (changeElement) changeElement.textContent = 'Rendu: 0 FCFA';
+        
+        return;
+    }
+    
+    let totalHT = 0;
+    
+    // Calculer le total hors taxe en parcourant toutes les lignes
+    for (let i = 1; i < articlesTable.rows.length; i++) {
+        const row = articlesTable.rows[i];
+        if (row.cells.length >= 5) {
+            // Récupérer le prix total depuis la 5ème colonne (index 4)
+            const totalText = row.cells[4].innerText || row.cells[4].textContent;
+            const total = normalizeDecimalInput(totalText);
+            totalHT += total;
+            console.log(`DEBUG: Ligne ${i}, prix total: ${total}, totalHT cumulé: ${totalHT}`);
+        }
+    }
+    
+    // Récupérer la remise (si elle existe)
+    const remise = 0; // Pas de champ remise visible dans le template
+    
+    // Calculer le net à payer
+    const netteAPayer = totalHT - remise;
+    
+    // Récupérer le montant réglé
+    const amountPaidInput = document.getElementById('amount-paid');
+    const montantRegle = amountPaidInput ? parseFloat(amountPaidInput.value) || 0 : 0;
+    
+    console.log('DEBUG: Total HT calculé:', totalHT);
+    console.log('DEBUG: Remise:', remise);
+    console.log('DEBUG: Nette à payer:', netteAPayer);
+    console.log('DEBUG: Montant réglé:', montantRegle);
+    
+    // Mettre à jour le "Prix Total Hors Taxe"
+    const totalHorsTaxe = document.getElementById('total-hors-taxe');
+    if (totalHorsTaxe) {
+        totalHorsTaxe.textContent = `Prix Total Hors Taxe: ${totalHT.toLocaleString('fr-FR')} FCFA`;
+        console.log('DEBUG: Total hors taxe mis à jour:', totalHorsTaxe.textContent);
+    }
+    
+    // Mettre à jour le "Net à Payer"
+    const totalPrice = document.getElementById('total-price');
+    if (totalPrice) {
+        totalPrice.textContent = `Net à Payer: ${netteAPayer.toLocaleString('fr-FR')} FCFA`;
+        console.log('DEBUG: Net à payer mis à jour:', totalPrice.textContent);
+    }
+    
+    // Mettre à jour le champ de saisie du total
+    const totalInput = document.getElementById('total-input');
+    if (totalInput) {
+        totalInput.value = `${netteAPayer.toLocaleString('fr-FR')} FCFA`;
+        console.log('DEBUG: Total input mis à jour:', totalInput.value);
+    }
+    
+    // Mettre à jour l'affichage du rendu en utilisant la fonction existante
+    updateRendu();
+    console.log('DEBUG: Rendu mis à jour via updateRendu()');
+    
+    // Mettre à jour le montant réglé si nécessaire
+    if (amountPaidInput && !amountPaidInput.value) {
+        amountPaidInput.value = netteAPayer;
+        console.log('DEBUG: Montant réglé initialisé à:', netteAPayer);
+    }
+}
+
+// Fonction de diagnostic pour déboguer les problèmes de mise en attente
+function diagnostiquerTableauArticles() {
+    console.log('=== DIAGNOSTIC DU TABLEAU ARTICLES ===');
+    
+    const articlesTable = document.getElementById('articles-table');
+    if (!articlesTable) {
+        console.error('ERREUR: Tableau articles-table non trouvé');
+        return;
+    }
+    
+    console.log(`Nombre total de lignes: ${articlesTable.rows.length}`);
+    
+    if (articlesTable.rows.length <= 1) {
+        console.log('Aucun article dans le tableau');
+        return;
+    }
+    
+    for (let i = 1; i < articlesTable.rows.length; i++) {
+        const row = articlesTable.rows[i];
+        const designation = row.cells[0] ? row.cells[0].innerText.trim() : 'VIDE';
+        const reference = row.cells[1] ? row.cells[1].innerText.trim() : 'VIDE';
+        const articleId = row.getAttribute('data-article-id') || 'VIDE';
+        
+        console.log(`Ligne ${i}:`);
+        console.log(`  - Désignation: "${designation}"`);
+        console.log(`  - Référence: "${reference}"`);
+        console.log(`  - Article ID: "${articleId}"`);
+        console.log(`  - Nombre de cellules: ${row.cells.length}`);
+        
+        if (row.cells[2]) {
+            const qtyInput = row.cells[2].querySelector('input');
+            const qtyInputId = qtyInput ? qtyInput.getAttribute('data-article-id') || 'VIDE' : 'PAS D\'INPUT';
+            console.log(`  - Input quantité article_id: "${qtyInputId}"`);
+        }
+    }
+    
+    // Tester collectInvoiceData
+    console.log('=== TEST collectInvoiceData ===');
+    const factureData = collectInvoiceData();
+    console.log('Résultat collectInvoiceData:', factureData);
+    console.log(`Nombre de lignes collectées: ${factureData.lignes.length}`);
+    
+    console.log('=== FIN DIAGNOSTIC ===');
+}
+
+// Fonction de diagnostic pour le modal de type de vente
+function diagnostiquerModalTypeVente() {
+    console.log('=== DIAGNOSTIC MODAL TYPE VENTE ===');
+    
+    const modal = document.getElementById('modifyTypeModal');
+    const select = document.getElementById('type-vente-select');
+    
+    console.log('Modal trouvé:', modal ? 'OUI' : 'NON');
+    console.log('Select trouvé:', select ? 'OUI' : 'NON');
+    
+    if (modal) {
+        console.log('Modal display:', modal.style.display);
+        console.log('Modal visible:', modal.offsetParent !== null);
+    }
+    
+    if (select) {
+        console.log('Select options count:', select.options.length);
+        console.log('Select value:', select.value);
+        for (let i = 0; i < select.options.length; i++) {
+            console.log(`Option ${i}: "${select.options[i].value}" - "${select.options[i].text}"`);
+        }
+    }
+    
+    // Vérifier les boutons
+    const buttons = document.querySelectorAll('button.modify-button');
+    console.log(`Nombre de boutons "Modifier": ${buttons.length}`);
+    
+    buttons.forEach((btn, index) => {
+        console.log(`Bouton ${index}:`);
+        console.log(`  - data-article-id: "${btn.getAttribute('data-article-id')}"`);
+        console.log(`  - data-index: "${btn.getAttribute('data-index')}"`);
+        console.log(`  - onclick: "${btn.getAttribute('onclick')}"`);
+    });
+    
+    console.log('=== FIN DIAGNOSTIC MODAL ===');
+}
+
+// Fonction de test simple pour vérifier les clics
+function testButtonClick() {
+    console.log('DEBUG: testButtonClick appelée - les clics fonctionnent !');
+    alert('Test réussi - les clics fonctionnent !');
+}
+
+// Fonction unifiée pour ouvrir le modal (version simplifiée)
+function openModifyTypeModalSimple(button) {
+    console.log('DEBUG: openModifyTypeModalSimple appelée');
+    console.log('DEBUG: Button reçu:', button);
+    console.log('DEBUG: Button element:', button.tagName, button.className);
+    
+    // Test simple d'abord
+    alert('Modal devrait s\'ouvrir maintenant...');
+    
+    const modal = document.getElementById('modifyTypeModal');
+    if (modal) {
+        modal.style.display = 'block';
+        console.log('DEBUG: Modal affiché');
+    } else {
+        console.error('DEBUG: Modal non trouvé !');
+        alert('ERREUR: Modal non trouvé !');
+    }
+}
+
+// Exposer les fonctions de diagnostic globalement pour pouvoir les appeler depuis la console
+window.diagnostiquerTableauArticles = diagnostiquerTableauArticles;
+window.diagnostiquerModalTypeVente = diagnostiquerModalTypeVente;
+window.testButtonClick = testButtonClick;
+window.openModifyTypeModalSimple = openModifyTypeModalSimple;
+
+// Configuration initiale
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('=== PAGE CHARGÉE ===');
+    console.log('Fonctions JavaScript disponibles:');
+    console.log('- mettreEnAttente:', typeof mettreEnAttente);
+    console.log('- rappelerTicket:', typeof rappelerTicket);
+    console.log('- diagnostiquerTableauArticles:', typeof diagnostiquerTableauArticles);
+    console.log('=== FIN CHARGEMENT ===');
+});
+
+</script>
+
+</body>
+</html>

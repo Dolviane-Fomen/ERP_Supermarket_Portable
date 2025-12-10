@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consulter Livraisons</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { font-size: 1.8em; margin: 0; }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .btn-primary { background: #28a745; color: white; }
+        .btn-primary:hover { background: #218838; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover { background: #5a6268; }
+        .badge-warning { background: #ffc107; color: #212529; }
+        .content { padding: 30px; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e1e8ed;
+        }
+        th {
+            background-color: #f8f9fa;
+            color: #2c3e50;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85em;
+        }
+        tr:hover { background-color: #f8f9fa; }
+        .badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            color: white;
+        }
+        .btn-primary { background: #28a745; color: white; }
+        .btn-primary:hover { background: #218838; }
+        .btn-info { background: #17a2b8; color: white; }
+        .btn-info:hover { background: #138496; }
+        .badge-success { background: #28a745; }
+        .badge-danger { background: #dc3545; }
+        .badge-info { background: #17a2b8; }
+        .badge-warning { background: #ffc107; color: #212529; }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        .empty-state i { font-size: 3em; margin-bottom: 10px; }
+        .details-table {
+            width: 100%;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+        .details-table th, .details-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .details-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-truck"></i> Consulter Livraisons</h1>
+            <a href="{% url 'dashboard_commandes' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Retour
+            </a>
+        </div>
+        <div class="content">
+            {% if livraisons %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date Livraison</th>
+                        <th>Heure Départ</th>
+                        <th>Heure Arrivée</th>
+                        <th>Commande</th>
+                        <th>Client</th>
+                        <th>Livreur</th>
+                        <th>Zone</th>
+                        <th>État</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for livraison in livraisons %}
+                    <tr>
+                        <td>{{ livraison.date_livraison|date:"d/m/Y" }}</td>
+                        <td>{% if livraison.heure_depart %}{{ livraison.heure_depart|time:"H:i" }}{% else %}-{% endif %}</td>
+                        <td>{% if livraison.heure_arrivee %}{{ livraison.heure_arrivee|time:"H:i" }}{% else %}-{% endif %}</td>
+                        <td>#{{ livraison.commande.id|default:"-" }}</td>
+                        <td>{{ livraison.commande.client.intitule|default:"-" }}</td>
+                        <td>{% if livraison.livreur %}{{ livraison.livreur.nom }} {{ livraison.livreur.prenom }}{% else %}-{% endif %}</td>
+                        <td>{{ livraison.zone|default:"-" }}</td>
+                        <td>
+                            <span class="badge badge-{% if livraison.etat_livraison == 'livree' or livraison.etat_livraison == 'confirmee' %}success{% elif livraison.etat_livraison == 'annulee' %}danger{% elif livraison.etat_livraison == 'planifiee' %}info{% elif livraison.etat_livraison == 'en_cours' %}warning{% else %}info{% endif %}">
+                                {{ livraison.get_etat_livraison_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{% url 'detail_commande' livraison.commande.id %}?from_livraison=true" class="btn btn-secondary" style="padding: 5px 10px; font-size: 0.85em;">
+                                <i class="fas fa-eye"></i> Voir
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-truck"></i>
+                <p>Aucune livraison trouvée</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        function showDetails(livraisonId) {
+            const detailsRow = document.getElementById('details-' + livraisonId);
+            const detailsContent = document.getElementById('details-content-' + livraisonId);
+            
+            if (detailsRow.style.display === 'none' || detailsRow.style.display === '') {
+                // Charger les détails depuis le serveur
+                fetch('{% url "consulter_livraisons" %}?livraison_id=' + livraisonId)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.quantites_livrees) {
+                            let html = '<table class="details-table"><thead><tr><th>Article</th><th>Quantité Commandée</th><th>Quantité Livrée</th><th>Quantité Non Livrée</th></tr></thead><tbody>';
+                            for (let key in data.quantites_livrees) {
+                                const item = data.quantites_livrees[key];
+                                html += '<tr>';
+                                html += '<td>' + item.article_designation + '</td>';
+                                html += '<td>' + parseFloat(item.quantite_commandee).toFixed(3) + '</td>';
+                                html += '<td>' + parseFloat(item.quantite_livree).toFixed(3) + '</td>';
+                                html += '<td>' + parseFloat(item.quantite_non_livree).toFixed(3) + '</td>';
+                                html += '</tr>';
+                            }
+                            html += '</tbody></table>';
+                            detailsContent.innerHTML = html;
+                        }
+                        detailsRow.style.display = 'table-row';
+                    })
+                    .catch(error => {
+                        console.error('Erreur:', error);
+                        detailsContent.innerHTML = '<p style="color: #dc3545;">Erreur lors du chargement des détails.</p>';
+                        detailsRow.style.display = 'table-row';
+                    });
+            } else {
+                detailsRow.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Définir État de Livraison</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { font-size: 1.8em; margin: 0; }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .btn-primary { background: #28a745; color: white; }
+        .btn-primary:hover { background: #218838; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover { background: #5a6268; }
+        .content { padding: 30px; }
+        .info-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-left: 4px solid #06beb6;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .info-item {
+            display: flex;
+            flex-direction: column;
+        }
+        .info-label {
+            font-size: 0.85em;
+            color: #6c757d;
+            margin-bottom: 5px;
+        }
+        .info-value {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        .form-group {
+            margin-bottom: 25px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 10px;
+            color: #2c3e50;
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .radio-option {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .radio-option:hover {
+            border-color: #06beb6;
+            background: #f0f9fa;
+        }
+        .radio-option input[type="radio"] {
+            margin-right: 15px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        .radio-option label {
+            margin: 0;
+            cursor: pointer;
+            flex: 1;
+            font-weight: 500;
+        }
+        .articles-section {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #e1e8ed;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e1e8ed;
+        }
+        th {
+            background-color: #f8f9fa;
+            color: #2c3e50;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85em;
+        }
+        tr:hover { background-color: #f8f9fa; }
+        .quantite-input {
+            width: 120px;
+            padding: 8px;
+            border: 2px solid #e1e8ed;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .quantite-input:focus {
+            outline: none;
+            border-color: #06beb6;
+            box-shadow: 0 0 0 3px rgba(6, 190, 182, 0.1);
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-check-circle"></i> Définir État de Livraison</h1>
+            <a href="{% url 'definir_etat_livraison' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Retour
+            </a>
+        </div>
+        <div class="content">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <!-- Informations de la livraison -->
+            <div class="info-card">
+                <h3 style="margin-bottom: 15px; color: #2c3e50;"><i class="fas fa-info-circle"></i> Informations de la Livraison</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="info-label">Livraison #</span>
+                        <span class="info-value">{{ livraison.id }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Client</span>
+                        <span class="info-value">{{ livraison.commande.client.intitule }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Date de Livraison</span>
+                        <span class="info-value">{{ livraison.date_livraison|date:"d/m/Y" }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Livreur</span>
+                        <span class="info-value">{% if livraison.livreur %}{{ livraison.livreur.nom }} {{ livraison.livreur.prenom }}{% else %}-{% endif %}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Zone</span>
+                        <span class="info-value">{{ livraison.zone|default:"-" }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">État Actuel</span>
+                        <span class="info-value">{{ livraison.get_etat_livraison_display }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <form method="POST" id="etat-form">
+                {% csrf_token %}
+                
+                <div class="form-group">
+                    <label><i class="fas fa-tasks"></i> Sélectionner l'état de la livraison *</label>
+                    <div class="radio-group">
+                        <div class="radio-option">
+                            <input type="radio" name="etat_livraison" value="livree" id="etat_livree" required>
+                            <label for="etat_livree">
+                                <strong>Livré</strong> - Tous les articles ont été livrés avec succès
+                            </label>
+                        </div>
+                        <div class="radio-option">
+                            <input type="radio" name="etat_livraison" value="pas_livree" id="etat_pas_livree" required>
+                            <label for="etat_pas_livree">
+                                <strong>Pas livré</strong> - La livraison n'a pas pu être effectuée
+                            </label>
+                        </div>
+                        <div class="radio-option">
+                            <input type="radio" name="etat_livraison" value="livree_partiellement" id="etat_partiel" required>
+                            <label for="etat_partiel">
+                                <strong>Livré partiellement</strong> - Certains articles ont été livrés, d'autres non
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section pour les quantités livrées (affichée seulement si partiel) -->
+                {% if commandes_groupe %}
+                <div class="articles-section" id="articles-section" style="display: none;">
+                    <h3 style="margin-bottom: 15px; color: #2c3e50;"><i class="fas fa-box"></i> Quantités Livrées par Article</h3>
+                    <p style="color: #6c757d; margin-bottom: 15px;">Veuillez renseigner la quantité livrée pour chaque article :</p>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Article</th>
+                                <th>Référence</th>
+                                <th>Quantité Commandée</th>
+                                <th>Quantité Livrée</th>
+                                <th>Quantité Non Livrée</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cmd in commandes_groupe %}
+                            <tr>
+                                <td>{{ cmd.article.designation }}</td>
+                                <td>{{ cmd.article.reference_article|default:"-" }}</td>
+                                <td>{{ cmd.quantite|floatformat:3 }}</td>
+                                <td>
+                                    <input type="number" 
+                                           name="quantite_livree_{{ cmd.id }}" 
+                                           id="quantite_livree_{{ cmd.id }}"
+                                           class="quantite-input" 
+                                           value="{% for key, value in quantites_livrees.items %}{% if key == cmd.id %}{{ value|floatformat:3 }}{% endif %}{% empty %}{{ cmd.quantite|floatformat:3 }}{% endfor %}{% if not quantites_livrees %}{{ cmd.quantite|floatformat:3 }}{% endif %}"
+                                           min="0" 
+                                           max="{{ cmd.quantite }}" 
+                                           step="0.001"
+                                           data-quantite-commandee="{{ cmd.quantite }}"
+                                           onchange="updateQuantiteNonLivree({{ cmd.id }})"
+                                           required>
+                                </td>
+                                <td>
+                                    <span id="quantite_non_livree_{{ cmd.id }}" class="quantite-non-livree">0.000</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+
+                <div style="text-align: right; margin-top: 30px;">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Enregistrer l'État
+                    </button>
+                    <a href="{% url 'definir_etat_livraison' %}" class="btn btn-secondary" style="margin-left: 10px;">
+                        <i class="fas fa-times"></i> Annuler
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Afficher/masquer la section des quantités selon l'état sélectionné
+        const etatRadios = document.querySelectorAll('input[name="etat_livraison"]');
+        const articlesSection = document.getElementById('articles-section');
+        
+        etatRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                if (this.value === 'livree_partiellement' && articlesSection) {
+                    articlesSection.style.display = 'block';
+                    // Rendre les champs requis
+                    const quantiteInputs = articlesSection.querySelectorAll('.quantite-input');
+                    quantiteInputs.forEach(input => {
+                        input.required = true;
+                        updateQuantiteNonLivree(input.dataset.quantiteCommandee ? parseInt(input.id.split('_').pop()) : null);
+                    });
+                } else {
+                    if (articlesSection) {
+                        articlesSection.style.display = 'none';
+                        // Rendre les champs non requis
+                        const quantiteInputs = articlesSection.querySelectorAll('.quantite-input');
+                        quantiteInputs.forEach(input => input.required = false);
+                    }
+                }
+            });
+        });
+
+        // Fonction pour mettre à jour la quantité non livrée
+        function updateQuantiteNonLivree(commandeId) {
+            const input = document.getElementById('quantite_livree_' + commandeId);
+            const quantiteCommandee = parseFloat(input.dataset.quantiteCommandee) || 0;
+            const quantiteLivree = parseFloat(input.value) || 0;
+            const quantiteNonLivree = quantiteCommandee - quantiteLivree;
+            
+            const span = document.getElementById('quantite_non_livree_' + commandeId);
+            if (span) {
+                span.textContent = quantiteNonLivree.toFixed(3);
+                if (quantiteNonLivree < 0) {
+                    span.style.color = '#dc3545';
+                    input.style.borderColor = '#dc3545';
+                } else {
+                    span.style.color = '#2c3e50';
+                    input.style.borderColor = '#e1e8ed';
+                }
+            }
+
+            // Valider que la quantité livrée ne dépasse pas la quantité commandée
+            if (quantiteLivree > quantiteCommandee) {
+                input.setCustomValidity('La quantité livrée ne peut pas dépasser la quantité commandée');
+            } else if (quantiteLivree < 0) {
+                input.setCustomValidity('La quantité livrée ne peut pas être négative');
+            } else {
+                input.setCustomValidity('');
+            }
+        }
+
+        // Validation du formulaire
+        document.getElementById('etat-form').addEventListener('submit', function(e) {
+            const selectedEtat = document.querySelector('input[name="etat_livraison"]:checked');
+            if (!selectedEtat) {
+                e.preventDefault();
+                alert('Veuillez sélectionner un état de livraison.');
+                return false;
+            }
+
+            if (selectedEtat.value === 'livree_partiellement') {
+                const quantiteInputs = document.querySelectorAll('.quantite-input');
+                let hasError = false;
+                quantiteInputs.forEach(input => {
+                    const quantiteCommandee = parseFloat(input.dataset.quantiteCommandee) || 0;
+                    const quantiteLivree = parseFloat(input.value) || 0;
+                    if (quantiteLivree > quantiteCommandee || quantiteLivree < 0) {
+                        hasError = true;
+                    }
+                });
+                if (hasError) {
+                    e.preventDefault();
+                    alert('Veuillez vérifier les quantités livrées. Elles ne peuvent pas dépasser les quantités commandées.');
+                    return false;
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+

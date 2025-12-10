@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facture Commande - {{ facture.numero_facture }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        @page {
+            margin: 10mm;
+            size: A4;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 11px;
+            line-height: 1.4;
+            color: #000;
+            background: white;
+            width: 210mm;
+            max-width: 100%;
+            padding: 10mm;
+            margin: 0 auto;
+        }
+        
+        .invoice {
+            width: 100%;
+            max-width: 190mm;
+            margin: 0 auto;
+            background: white;
+        }
+        
+        /* STYLE SAGE - TEXTE PUR */
+        .center { text-align: center; }
+        .right { text-align: right; }
+        .bold { font-weight: bold; }
+        .small { font-size: 10px; }
+        
+        /* EN-TÊTE STYLE SAGE */
+        .company-name {
+            font-size: 22px;
+            font-weight: bold;
+            text-align: center;
+            margin: 5px 0 5px 0;
+            color: #06beb6;
+        }
+        
+        .company-info {
+            font-size: 11px;
+            text-align: center;
+            line-height: 1.4;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        /* SÉPARATEURS STYLE SAGE - CARACTÈRES */
+        .separator {
+            text-align: center;
+            margin: 8px 0;
+            font-size: 10px;
+            letter-spacing: 1px;
+            line-height: 1.2;
+            color: #6c757d;
+            border-top: 1px solid #e9ecef;
+            padding-top: 8px;
+        }
+        
+        .separator-double {
+            text-align: center;
+            margin: 10px 0;
+            font-size: 11px;
+            letter-spacing: 1px;
+            line-height: 1.2;
+            font-weight: bold;
+            color: #06beb6;
+            border-top: 2px solid #06beb6;
+            border-bottom: 2px solid #06beb6;
+            padding: 6px 0;
+        }
+        
+        .separator-dashed {
+            text-align: center;
+            margin: 8px 0;
+            font-size: 10px;
+            letter-spacing: 1px;
+            line-height: 1.2;
+            border-top: 1px dashed #ccc;
+            padding-top: 8px;
+        }
+        
+        /* INFO FACTURE STYLE SAGE */
+        .info-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .info-box {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 3px solid #06beb6;
+        }
+        
+        .info-box h3 {
+            font-size: 12px;
+            margin-bottom: 8px;
+            color: #2c3e50;
+            font-weight: 700;
+        }
+        
+        .info-line {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            margin-bottom: 5px;
+            gap: 10px;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            flex-shrink: 0;
+            min-width: 80px;
+            color: #6c757d;
+        }
+        
+        .info-line span:last-child {
+            font-weight: 600;
+            text-align: right;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            color: #2c3e50;
+        }
+        
+        /* ARTICLES STYLE SAGE */
+        .articles-section {
+            margin: 15px 0;
+        }
+        
+        .articles-section h3 {
+            font-size: 13px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+        
+        .articles-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 5px;
+            background: white;
+            font-size: 10px;
+        }
+        
+        .articles-table thead {
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            color: white;
+        }
+        
+        .articles-table th {
+            padding: 6px 8px;
+            text-align: left;
+            font-weight: 700;
+            font-size: 10px;
+            border: none;
+        }
+        
+        .articles-table th:first-child {
+            border-radius: 4px 0 0 0;
+        }
+        
+        .articles-table th:last-child {
+            border-radius: 0 4px 0 0;
+            text-align: right;
+        }
+        
+        .articles-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #e9ecef;
+            font-size: 10px;
+        }
+        
+        .articles-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .article-name {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .article-qty {
+            text-align: center;
+            color: #6c757d;
+        }
+        
+        .article-price {
+            text-align: right;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        /* TOTAUX STYLE SAGE */
+        .totals-section {
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 2px solid #e9ecef;
+        }
+        
+        .totals-container {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 10px;
+        }
+        
+        .totals-box {
+            min-width: 250px;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 3px solid #06beb6;
+        }
+        
+        .total-line {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-bottom: 8px;
+            font-weight: 600;
+            gap: 15px;
+        }
+        
+        .total-label {
+            font-weight: 600;
+            color: #6c757d;
+        }
+        
+        .total-value {
+            font-weight: 700;
+            text-align: right;
+            color: #2c3e50;
+            min-width: 120px;
+        }
+        
+        .grand-total {
+            padding: 10px 0;
+            margin-top: 10px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            color: #06beb6;
+            border-top: 2px solid #06beb6;
+            border-bottom: 2px solid #06beb6;
+        }
+        
+        /* FOOTER STYLE SAGE */
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            padding-top: 15px;
+            border-top: 1px solid #e9ecef;
+            font-size: 11px;
+            font-weight: 600;
+            color: #6c757d;
+        }
+        
+        .footer-line {
+            margin: 5px 0;
+            word-wrap: break-word;
+        }
+        
+        .footer-line:last-child {
+            margin-bottom: 0;
+            color: #06beb6;
+            font-weight: 700;
+        }
+        
+        /* IMPRESSION */
+        @media print {
+            body {
+                padding: 0;
+                font-size: 11px;
+                margin: 0;
+            }
+            
+            .no-print {
+                display: none !important;
+            }
+            
+            .invoice {
+                max-height: 277mm; /* Hauteur A4 moins marges */
+                overflow: hidden;
+            }
+            
+            .footer {
+                margin-bottom: 0 !important;
+                page-break-inside: avoid;
+            }
+            
+            .totals-section {
+                page-break-inside: avoid;
+            }
+            
+            .articles-section {
+                page-break-inside: avoid;
+            }
+            
+            .info-section {
+                page-break-inside: avoid;
+            }
+            
+            .grand-total {
+                font-size: 18px;
+            }
+            
+            /* Empêcher les sauts de page */
+            .invoice > * {
+                page-break-inside: avoid;
+            }
+        }
+        
+        /* CONTRÔLES */
+        .print-controls {
+            background: #f0f0f0;
+            padding: 10px;
+            text-align: center;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+        }
+        
+        .print-controls button {
+            padding: 8px 15px;
+            margin: 0 5px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .print-controls button:hover {
+            background: #0056b3;
+        }
+        
+        .print-controls button.secondary {
+            background: #6c757d;
+        }
+        
+        .print-controls button.secondary:hover {
+            background: #545b62;
+        }
+    </style>
+</head>
+<body>
+    <div class="print-controls no-print">
+        <button onclick="window.print()">🖨️ Imprimer</button>
+        <button onclick="window.close()" class="secondary">❌ Fermer</button>
+        <a href="{% url 'dashboard_commandes' %}" style="text-decoration: none;">
+            <button class="secondary">🏠 Retour Dashboard</button>
+        </a>
+    </div>
+
+    <div class="invoice">
+        <!-- EN-TÊTE STYLE SAGE -->
+        <div class="company-name">SUPER MARKET</div>
+        <div class="company-info">
+            GROS - DEMI GROS - DETAIL<br>
+            BP 11190 YAOUNDE - {{ agence.nom_agence|default:"AGENCE" }}<br>
+            TEL: (237) 670930091<br>
+            NUI: P029418061497G
+        </div>
+        
+        <div class="separator-double"></div>
+        
+        <!-- INFORMATIONS FACTURE -->
+        <div class="info-section">
+            <div class="info-box">
+                <h3><i class="fas fa-file-invoice"></i> Informations Facture</h3>
+                <div class="info-line">
+                    <span class="info-label">FACTURE N°</span>
+                    <span>{{ facture.numero_facture }}</span>
+                </div>
+                <div class="info-line">
+                    <span class="info-label">DATE</span>
+                    <span>{{ facture.date_display|default:"--/--/----" }}</span>
+                </div>
+                <div class="info-line">
+                    <span class="info-label">HEURE</span>
+                    <span>{{ facture.heure_display|default:"--:--" }}</span>
+                </div>
+            </div>
+            
+            <div class="info-box">
+                <h3><i class="fas fa-user"></i> Informations Client</h3>
+                <div class="info-line">
+                    <span class="info-label">CLIENT</span>
+                    <span>{{ facture.client_nom|default:"Client" }}</span>
+                </div>
+                {% if facture.client_adresse %}
+                <div class="info-line">
+                    <span class="info-label">ADRESSE</span>
+                    <span>{{ facture.client_adresse }}</span>
+                </div>
+                {% endif %}
+                {% if facture.client_telephone %}
+                <div class="info-line">
+                    <span class="info-label">TÉLÉPHONE</span>
+                    <span>{{ facture.client_telephone }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="separator"></div>
+        
+        <!-- ARTICLES -->
+        <div class="articles-section">
+            <h3 style="font-size: 13px; font-weight: 700; color: #2c3e50; margin-bottom: 8px;">
+                <i class="fas fa-shopping-cart"></i> Détail des Articles
+            </h3>
+            <table class="articles-table">
+                <thead>
+                    <tr>
+                        <th>ARTICLE</th>
+                        <th style="text-align: center;">QUANTITÉ</th>
+                        <th style="text-align: center;">PRIX UNITAIRE</th>
+                        <th style="text-align: right;">TOTAL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ligne in facture.lignes %}
+                    <tr>
+                        <td class="article-name">{{ ligne.designation|default:"Article" }}</td>
+                        <td class="article-qty">{{ ligne.quantite|floatformat:2 }}</td>
+                        <td class="article-qty">{{ ligne.prix_unitaire|floatformat:0 }} FCFA</td>
+                        <td class="article-price">{{ ligne.prix_total|floatformat:0 }} FCFA</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" style="text-align: center; padding: 30px; color: #6c757d;">
+                            Aucun article
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="separator"></div>
+        
+        <!-- TOTAUX STYLE SAGE -->
+        <div class="totals-section">
+            <div class="totals-container">
+                <div class="totals-box">
+                    <div class="total-line">
+                        <span class="total-label">SOUS-TOTAL</span>
+                        <span class="total-value">{{ facture.prix_total|floatformat:0 }} FCFA</span>
+                    </div>
+                    
+                    {% if facture.net_a_payer and facture.net_a_payer != facture.prix_total %}
+                    <div class="total-line">
+                        <span class="total-label">NET À PAYER</span>
+                        <span class="total-value">{{ facture.net_a_payer|floatformat:0 }} FCFA</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- GRAND TOTAL STYLE SAGE -->
+            <div class="grand-total">
+                TOTAL: {{ facture.prix_total|floatformat:0 }} FCFA
+            </div>
+        </div>
+        
+        <div class="separator-dashed"></div>
+        
+        <!-- FOOTER STYLE SAGE -->
+        <div class="footer">
+            <div class="footer-line">MERCI DE VOTRE COMMANDE</div>
+            <div class="footer-line">À TRÈS BIENTÔT</div>
+        </div>
+    </div>
+    
+    <script>
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const isPreview = urlParams.get('preview') === 'true';
+            
+            if (!isPreview) {
+                setTimeout(function() {
+                    window.print();
+                }, 500);
+            }
+        };
+    </script>
+</body>
+</html>
+

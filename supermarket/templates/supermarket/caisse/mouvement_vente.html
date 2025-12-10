@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mouvement de Vente</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #d74123 0%, #ff6b35 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px; 
+            font-weight: 300;
+        }
+        .header .subtitle {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        .content { padding: 40px; }
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+            border: 1px solid #f0f0f0;
+            text-align: center;
+        }
+        .stat-card .icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+            opacity: 0.7;
+        }
+        .stat-card .label {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .stat-card .value {
+            color: #2c3e50;
+            font-weight: 700;
+            font-size: 1.5em;
+        }
+        .table-container {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+            margin-bottom: 30px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            padding: 15px 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 0.9em;
+        }
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+        .chiffre-affaires {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 8px 25px rgba(40, 167, 69, 0.3);
+        }
+        .chiffre-affaires .label {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+        .chiffre-affaires .montant {
+            font-size: 2.5em;
+            font-weight: 700;
+        }
+        .actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            min-width: 150px;
+            justify-content: center;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #d74123, #ff6b35);
+            color: white;
+        }
+        .btn-secondary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 1.1em;
+        }
+        .no-data i {
+            font-size: 3em;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+        @media (max-width: 768px) {
+            .stats-bar { grid-template-columns: 1fr; }
+            .actions { flex-direction: column; }
+            .btn { width: 100%; }
+            .header h1 { font-size: 2em; }
+            .content { padding: 20px; }
+            table { font-size: 0.9em; }
+            th, td { padding: 10px 8px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-chart-line"></i> Mouvement de Vente</h1>
+            <div class="subtitle">
+                {% if periode_affichage %}
+                    Suivi des ventes du {{ periode_affichage }}
+                {% else %}
+                    Suivi des ventes
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="content">
+            <div class="stats-bar">
+                <div class="stat-card">
+                    <div class="icon"><i class="fas fa-receipt"></i></div>
+                    <div class="label">Total Tickets</div>
+                    <div class="value">{{ total_tickets }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="icon"><i class="fas fa-box"></i></div>
+                    <div class="label">Articles Vendus</div>
+                    <div class="value">{{ total_articles }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="icon"><i class="fas fa-clock"></i></div>
+                    <div class="label">Dernière Vente</div>
+                    <div class="value">{{ derniere_vente_heure }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="icon"><i class="fas fa-user"></i></div>
+                    <div class="label">Vendeuse</div>
+                    <div class="value">{{ vendeuse_nom }}</div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <h3 style="margin-bottom: 20px; color: #2c3e50;"><i class="fas fa-list"></i> Détail des Ventes</h3>
+                
+                {% if ventes_data %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th><i class="fas fa-ticket-alt"></i> Ticket</th>
+                                <th><i class="fas fa-tag"></i> Désignation</th>
+                                <th><i class="fas fa-barcode"></i> Référence</th>
+                                <th><i class="fas fa-hashtag"></i> Quantité</th>
+                                <th><i class="fas fa-euro-sign"></i> Prix Unitaire</th>
+                                <th><i class="fas fa-calculator"></i> Total</th>
+                                <th><i class="fas fa-clock"></i> Heure</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for vente in ventes_data %}
+                                <tr>
+                                    <td>{{ vente.ticket }}</td>
+                                    <td>{{ vente.designation }}</td>
+                                    <td>{{ vente.reference }}</td>
+                                    <td>{{ vente.quantite }}</td>
+                                    <td>{{ vente.prix_unitaire|floatformat:2 }} FCFA</td>
+                                    <td>{{ vente.total|floatformat:2 }} FCFA</td>
+                                    <td>{{ vente.heure }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="no-data">
+                        {% if session_caisse %}
+                            <i class="fas fa-shopping-cart"></i>
+                            <div>Aucune vente enregistrée pour cette période</div>
+                        {% else %}
+                            <i class="fas fa-lock"></i>
+                            <div>Caisse fermée</div>
+                            <p>La caisse est fermée. Ouvrez une nouvelle session pour commencer les ventes.</p>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="chiffre-affaires">
+                <div class="label">
+                    <i class="fas fa-money-bill-wave"></i>
+                    Chiffre d'Affaires du {{ periode_affichage }}
+                </div>
+                <div class="montant">{{ chiffre_affaires|floatformat:2 }} FCFA</div>
+            </div>
+
+            <div class="actions">
+                <a href="{% url 'dashboard_caisse' %}" class="btn btn-secondary">
+                    <i class="fas fa-home"></i> Retour au Dashboard
+                </a>
+                <button class="btn btn-primary" onclick="window.print()">
+                    <i class="fas fa-print"></i> Imprimer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Fonction pour normaliser les entrées décimales
+        function normalizeDecimalInput(value) {
+            if (value === null || value === undefined) return 0;
+            let valueStr = String(value).trim();
+            // Remplacer les virgules par des points (format français vers international)
+            valueStr = valueStr.replace(',', '.');
+            // Supprimer les caractères non numériques sauf point et moins
+            valueStr = valueStr.replace(/[^\d.-]/g, '');
+            // Supprimer les espaces (séparateurs de milliers)
+            valueStr = valueStr.replace(/\s/g, '');
+            if (!valueStr || valueStr === '-' || valueStr === '.') return 0;
+            // Gérer les multiples points décimaux
+            const parts = valueStr.split('.');
+            if (parts.length > 2) {
+                valueStr = parts[0] + '.' + parts.slice(1).join('');
+            }
+            const result = parseFloat(valueStr);
+            return isNaN(result) ? 0 : result;
+        }
+        
+        // Fonction pour formater les montants avec virgule et 2 décimales (format français)
+        function formatMontant(montant) {
+            // Normaliser d'abord pour gérer les virgules
+            montant = normalizeDecimalInput(montant);
+            if (isNaN(montant)) return '0,00';
+            
+            // Formater avec virgule comme séparateur décimal et espaces pour milliers
+            return montant.toLocaleString('fr-FR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+        
+        // Formater tous les montants dans le tableau après chargement
+        document.addEventListener('DOMContentLoaded', function() {
+            // Formater les prix unitaires et totaux dans le tableau
+            const prixCells = document.querySelectorAll('td');
+            prixCells.forEach(cell => {
+                const text = cell.textContent.trim();
+                // Si la cellule contient un nombre suivi de "FCFA", reformater
+                if (text.includes('FCFA')) {
+                    // Extraire le montant en utilisant normalizeDecimalInput
+                    const montant = normalizeDecimalInput(text);
+                    if (!isNaN(montant) && montant > 0) {
+                        cell.textContent = formatMontant(montant) + ' FCFA';
+                    }
+                }
+            });
+            
+            // Formater le chiffre d'affaires
+            const chiffreAffairesElement = document.querySelector('.chiffre-affaires .montant');
+            if (chiffreAffairesElement) {
+                const text = chiffreAffairesElement.textContent.trim();
+                const montant = normalizeDecimalInput(text);
+                if (!isNaN(montant)) {
+                    chiffreAffairesElement.textContent = formatMontant(montant) + ' FCFA';
+                }
+            }
+        });
+        
+        // Actualiser la page toutes les 30 secondes (comme dans le document original)
+        setInterval(function() {
+            location.reload();
+        }, 30000);
+    </script>
+
+</body>
+</html>

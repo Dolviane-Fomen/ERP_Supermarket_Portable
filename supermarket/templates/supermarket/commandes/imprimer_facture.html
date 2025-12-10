@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Imprimer Facture</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: white;
+            padding: 20px;
+        }
+        @media print {
+            body { padding: 0; }
+            .no-print { display: none; }
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #06beb6;
+            padding-bottom: 20px;
+        }
+        .header h1 {
+            color: #06beb6;
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        .info-section {
+            margin-bottom: 30px;
+        }
+        .info-section h2 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #e1e8ed;
+        }
+        th {
+            background-color: #f8f9fa;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        .total {
+            text-align: right;
+            margin-top: 20px;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #06beb6;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            font-weight: 600;
+            margin: 10px 5px;
+        }
+        .btn-primary {
+            background: #28a745;
+            color: white;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="no-print" style="text-align: center; margin-bottom: 20px;">
+            <button onclick="window.print()" class="btn btn-primary">
+                <i class="fas fa-print"></i> Imprimer
+            </button>
+            <a href="{% url 'detail_facture_commande' facture.id %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Retour
+            </a>
+        </div>
+
+        <div class="header">
+            <h1>FACTURE</h1>
+            <p>Numéro: {{ facture.numero_facture }}</p>
+            <p>Date: {{ facture.date_facture|date:"d/m/Y" }}</p>
+        </div>
+
+        <div class="info-section">
+            <h2>Client</h2>
+            {% if facture.commande %}
+            <p><strong>Nom:</strong> {{ facture.commande.client.intitule }}</p>
+            <p><strong>Adresse:</strong> {{ facture.commande.client.adresse|default:"-" }}</p>
+            <p><strong>Téléphone:</strong> {{ facture.commande.client.telephone|default:"-" }}</p>
+            {% endif %}
+        </div>
+
+        {% if commandes %}
+        <div class="info-section">
+            <h2>Articles</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Article</th>
+                        <th>Quantité</th>
+                        <th>Prix unitaire</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for commande in commandes %}
+                    <tr>
+                        <td>{{ commande.article.designation }}</td>
+                        <td>{{ commande.quantite|floatformat:2 }}</td>
+                        <td>{{ commande.article.prix_vente|floatformat:0 }} FCFA</td>
+                        <td>{{ commande.prix_total|floatformat:0 }} FCFA</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="total">
+                Total: {{ facture.commande.prix_total|floatformat:0|default:"0" }} FCFA
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
+

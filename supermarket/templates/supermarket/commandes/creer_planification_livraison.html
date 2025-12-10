@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Créer Planification Livraison</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { font-size: 1.8em; margin: 0; }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .btn-primary { background: #28a745; color: white; }
+        .btn-primary:hover { background: #218838; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover { background: #5a6268; }
+        .content { padding: 30px; }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #06beb6;
+            box-shadow: 0 0 0 3px rgba(6, 190, 182, 0.1);
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-calendar-plus"></i> Créer Planification Livraison</h1>
+            <a href="{% url 'planification_livraison' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Retour
+            </a>
+        </div>
+        <div class="content">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            {% if commande_selectionnee %}
+            <!-- Informations de la commande -->
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+                <h3 style="margin-bottom: 15px; color: #2c3e50;"><i class="fas fa-info-circle"></i> Informations de la Commande</h3>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                    <div>
+                        <strong>Client:</strong> {{ commande_selectionnee.client.intitule }}
+                    </div>
+                    <div>
+                        <strong>Date commande:</strong> {{ commande_selectionnee.date|date:"d/m/Y" }}
+                    </div>
+                    <div>
+                        <strong>Heure commande:</strong> {{ commande_selectionnee.heure|time:"H:i" }}
+                    </div>
+                    <div>
+                        <strong>Nombre d'articles:</strong> {{ commandes_groupe|length }}
+                    </div>
+                </div>
+                {% if commandes_groupe %}
+                <div style="margin-top: 15px;">
+                    <strong>Articles:</strong>
+                    <ul style="margin-top: 10px; padding-left: 20px;">
+                        {% for cmd in commandes_groupe %}
+                        <li>{{ cmd.article.designation }} - Quantité: {{ cmd.quantite|floatformat:3 }} - Prix: {{ cmd.prix_total|floatformat:0 }} FCFA</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <form method="POST">
+                {% csrf_token %}
+                {% if commande_selectionnee %}
+                    <input type="hidden" name="commande_id" value="{{ commande_selectionnee.id }}">
+                {% else %}
+                    <div class="form-group">
+                        <label>Commande *</label>
+                        <select name="commande_id" id="commande_id" required onchange="chargerInfosCommande(this.value)">
+                            <option value="">Sélectionner une commande</option>
+                            {% for commande in commandes %}
+                            <option value="{{ commande.id }}">
+                                #{{ commande.id }} - {{ commande.client.intitule }} - {{ commande.article.designation }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                {% endif %}
+
+                <div class="form-group">
+                    <label>Date de livraison *</label>
+                    <input type="date" name="date_livraison" id="date_livraison" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Heure de départ *</label>
+                    <input type="time" name="heure_depart" id="heure_depart" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Heure d'arrivée *</label>
+                    <input type="time" name="heure_arrivee" id="heure_arrivee" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Livreur *</label>
+                    <select name="livreur_id" id="livreur_id" required>
+                        <option value="">Sélectionner un livreur</option>
+                        {% for livreur in livreurs %}
+                        <option value="{{ livreur.id }}">{{ livreur.nom }} {{ livreur.prenom }} - {{ livreur.telephone }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Zone de livraison *</label>
+                    <input type="text" name="zone" id="zone" value="{% if commande_selectionnee and commande_selectionnee.client.zone %}{{ commande_selectionnee.client.zone }}{% endif %}" required placeholder="Ex: Centre-ville, Quartier X, etc.">
+                </div>
+
+                <div class="form-group">
+                    <label>Notes (optionnel)</label>
+                    <textarea name="notes" id="notes" rows="3" placeholder="Notes supplémentaires sur la livraison..."></textarea>
+                </div>
+
+                <div style="text-align: right; margin-top: 30px;">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Planifier la Livraison
+                    </button>
+                    <a href="{% url 'planification_livraison' %}" class="btn btn-secondary" style="margin-left: 10px;">
+                        <i class="fas fa-times"></i> Annuler
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
+

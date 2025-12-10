@@ -1,0 +1,408 @@
+{% extends 'supermarket/base.html' %}
+{% load static %}
+
+{% block title %}Détails du Fournisseur - {{ fournisseur.intitule }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .fournisseur-detail-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #f8f9fa;
+        min-height: 100vh;
+    }
+
+    .fournisseur-header {
+        background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+        color: white;
+        padding: 30px;
+        border-radius: 15px;
+        margin-bottom: 30px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+
+    .fournisseur-title {
+        font-size: 2.5em;
+        font-weight: 700;
+        margin-bottom: 10px;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .fournisseur-subtitle {
+        font-size: 1.2em;
+        opacity: 0.9;
+        margin-bottom: 20px;
+    }
+
+    .fournisseur-info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .info-card {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        border-left: 4px solid #6f42c1;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .info-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+    }
+
+    .info-card h3 {
+        color: #333;
+        margin-bottom: 15px;
+        font-size: 1.3em;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .info-card h3 i {
+        color: #6f42c1;
+        font-size: 1.2em;
+    }
+
+    .info-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .info-item:last-child {
+        border-bottom: none;
+    }
+
+    .info-label {
+        font-weight: 600;
+        color: #555;
+        min-width: 120px;
+    }
+
+    .info-value {
+        color: #333;
+        text-align: right;
+        flex: 1;
+    }
+
+    .factures-section {
+        background: white;
+        border-radius: 12px;
+        padding: 25px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+    }
+
+    .section-title {
+        font-size: 1.8em;
+        font-weight: 700;
+        color: #333;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .section-title i {
+        color: #6f42c1;
+    }
+
+    .factures-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+
+    .factures-table th {
+        background: #f8f9fa;
+        color: #333;
+        font-weight: 600;
+        padding: 15px 12px;
+        text-align: left;
+        border-bottom: 2px solid #e9ecef;
+        font-size: 0.9em;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .factures-table td {
+        padding: 12px;
+        border-bottom: 1px solid #f0f0f0;
+        color: #555;
+    }
+
+    .factures-table tr:hover {
+        background: #f8f9fa;
+    }
+
+    .facture-numero {
+        font-weight: 600;
+        color: #6f42c1;
+    }
+
+    .facture-date {
+        color: #666;
+        font-size: 0.9em;
+    }
+
+    .facture-montant {
+        font-weight: 600;
+        color: #28a745;
+        text-align: right;
+    }
+
+    .no-factures {
+        text-align: center;
+        padding: 40px;
+        color: #666;
+        font-style: italic;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 15px;
+        margin-top: 30px;
+        flex-wrap: wrap;
+    }
+
+    .btn {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        font-size: 0.95em;
+    }
+
+    .btn-primary {
+        background: #6f42c1;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: #5a32a3;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(111, 66, 193, 0.3);
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+
+    .btn-secondary:hover {
+        background: #5a6268;
+        transform: translateY(-2px);
+    }
+
+    .btn-success {
+        background: #28a745;
+        color: white;
+    }
+
+    .btn-success:hover {
+        background: #218838;
+        transform: translateY(-2px);
+    }
+
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.8em;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .status-active {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .status-inactive {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    @media (max-width: 768px) {
+        .fournisseur-detail-container {
+            padding: 15px;
+        }
+        
+        .fournisseur-title {
+            font-size: 2em;
+        }
+        
+        .fournisseur-info-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .action-buttons {
+            flex-direction: column;
+        }
+        
+        .btn {
+            justify-content: center;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fournisseur-detail-container">
+    <!-- En-tête du fournisseur -->
+    <div class="fournisseur-header">
+        <h1 class="fournisseur-title">{{ fournisseur.intitule }}</h1>
+        <p class="fournisseur-subtitle">Détails du fournisseur</p>
+    </div>
+
+    <!-- Informations du fournisseur -->
+    <div class="fournisseur-info-grid">
+        <!-- Informations générales -->
+        <div class="info-card">
+            <h3><i class="fas fa-truck"></i> Informations Générales</h3>
+            <div class="info-item">
+                <span class="info-label">Nom complet:</span>
+                <span class="info-value">{{ fournisseur.intitule }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Email:</span>
+                <span class="info-value">{{ fournisseur.email|default:"Non renseigné" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Téléphone:</span>
+                <span class="info-value">{{ fournisseur.telephone|default:"Non renseigné" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Statut:</span>
+                <span class="info-value">
+                    <span class="status-badge status-active">Actif</span>
+                </span>
+            </div>
+        </div>
+
+        <!-- Informations de contact -->
+        <div class="info-card">
+            <h3><i class="fas fa-map-marker-alt"></i> Adresse</h3>
+            <div class="info-item">
+                <span class="info-label">Adresse:</span>
+                <span class="info-value">{{ fournisseur.adresse|default:"Non renseignée" }}</span>
+            </div>
+        </div>
+
+        <!-- Informations commerciales -->
+        <div class="info-card">
+            <h3><i class="fas fa-chart-line"></i> Informations Commerciales</h3>
+            <div class="info-item">
+                <span class="info-label">Agence:</span>
+                <span class="info-value">{{ fournisseur.agence.nom_agence }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Date création:</span>
+                <span class="info-value">{{ fournisseur.date_creation|date:"d/m/Y" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Nombre de factures:</span>
+                <span class="info-value">{{ factures_achat.count }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section des factures d'achat -->
+    <div class="factures-section">
+        <h2 class="section-title">
+            <i class="fas fa-file-invoice"></i>
+            Historique des Factures d'Achat ({{ factures_achat.count }})
+        </h2>
+
+        {% if factures_achat %}
+            <table class="factures-table">
+                <thead>
+                    <tr>
+                        <th>N° Facture</th>
+                        <th>Date</th>
+                        <th>Heure</th>
+                        <th>Montant Total</th>
+                        <th>Statut</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for facture in factures_achat %}
+                    <tr>
+                        <td>
+                            <span class="facture-numero">#{{ facture.reference_achat }}</span>
+                        </td>
+                        <td>
+                            <span class="facture-date">{{ facture.date_achat|date:"d/m/Y" }}</span>
+                        </td>
+                        <td>
+                            <span class="facture-date">{{ facture.heure|time:"H:i" }}</span>
+                        </td>
+                        <td>
+                            <span class="facture-montant">{{ facture.prix_total_global|floatformat:0 }} FCFA</span>
+                        </td>
+                        <td>
+                            <span class="status-badge status-active">Payée</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="no-factures">
+                <i class="fas fa-file-invoice" style="font-size: 3em; color: #ddd; margin-bottom: 15px;"></i>
+                <p>Aucune facture d'achat trouvée pour ce fournisseur.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Boutons d'action -->
+    <div class="action-buttons">
+        <a href="{% url 'consulter_fournisseurs' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i>
+            Retour à la liste
+        </a>
+        <a href="{% url 'modifier_fournisseur' fournisseur.id %}" class="btn btn-primary">
+            <i class="fas fa-edit"></i>
+            Modifier le fournisseur
+        </a>
+        <a href="{% url 'creer_facture_achat' %}?fournisseur={{ fournisseur.id }}" class="btn btn-success">
+            <i class="fas fa-plus"></i>
+            Nouvelle facture d'achat
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Animation d'entrée pour les cartes
+    document.addEventListener('DOMContentLoaded', function() {
+        const cards = document.querySelectorAll('.info-card, .factures-section');
+        cards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            
+            setTimeout(() => {
+                card.style.transition = 'all 0.6s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 100);
+        });
+    });
+</script>
+{% endblock %}

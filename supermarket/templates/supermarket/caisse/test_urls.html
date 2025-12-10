@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test URLs</title>
+</head>
+<body>
+    <h1>Test des URLs pour les tickets en attente</h1>
+    
+    <h2>URLs générées par Django:</h2>
+    <p><strong>lister_factures_attente:</strong> {% url "lister_factures_attente" %}</p>
+    <p><strong>rappeler_facture_specifique:</strong> {% url "rappeler_facture_specifique" %}</p>
+    
+    <h2>Test des URLs:</h2>
+    <button onclick="testListerFactures()">Test Lister Factures</button>
+    <button onclick="testRappelerFacture()">Test Rappeler Facture</button>
+    
+    <div id="result"></div>
+    
+    <script>
+    function testListerFactures() {
+        const resultDiv = document.getElementById('result');
+        resultDiv.innerHTML = 'Test en cours...';
+        
+        fetch('{% url "lister_factures_attente" %}', {
+            method: 'GET',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => {
+            resultDiv.innerHTML += '<br>Status: ' + response.status;
+            return response.json();
+        })
+        .then(data => {
+            resultDiv.innerHTML += '<br>Réponse: ' + JSON.stringify(data);
+        })
+        .catch(error => {
+            resultDiv.innerHTML += '<br>Erreur: ' + error.message;
+        });
+    }
+    
+    function testRappelerFacture() {
+        const resultDiv = document.getElementById('result');
+        resultDiv.innerHTML = 'Test en cours...';
+        
+        fetch('{% url "rappeler_facture_specifique" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: 'facture_id=1'
+        })
+        .then(response => {
+            resultDiv.innerHTML += '<br>Status: ' + response.status;
+            return response.json();
+        })
+        .then(data => {
+            resultDiv.innerHTML += '<br>Réponse: ' + JSON.stringify(data);
+        })
+        .catch(error => {
+            resultDiv.innerHTML += '<br>Erreur: ' + error.message;
+        });
+    }
+    </script>
+    
+    {% csrf_token %}
+</body>
+</html>
+

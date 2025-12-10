@@ -1,0 +1,971 @@
+{% extends 'supermarket/stock/base_stock.html' %}
+{% load static %}
+
+{% block title %}Créer Facture de Transfert{% endblock %}
+
+{% block extra_css %}
+<style>
+    body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 0;
+        position: relative;
+        overflow-x: hidden;
+    }
+
+    body::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: 
+            radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.2) 0%, transparent 50%);
+        z-index: -1;
+    }
+
+    .container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .main-card {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 20px;
+        box-shadow: 
+            0 20px 40px rgba(0, 0, 0, 0.1),
+            0 0 0 1px rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+        overflow: hidden;
+        margin-bottom: 20px;
+    }
+
+    .form-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 30px 40px;
+        text-align: center;
+        position: relative;
+    }
+
+    .form-header h2 {
+        margin: 0;
+        font-size: 1.8em;
+        font-weight: 700;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .form-header p {
+        margin: 10px 0 0 0;
+        opacity: 0.9;
+        font-size: 1em;
+    }
+
+    .form-content {
+        padding: 40px;
+    }
+
+    .form-group {
+        margin-bottom: 35px;
+        background: #f8f9fa;
+        border-radius: 15px;
+        padding: 25px;
+        border: 1px solid #e9ecef;
+        position: relative;
+        transition: all 0.3s ease;
+    }
+
+    .form-group:hover {
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        transform: translateY(-2px);
+    }
+
+    .form-group-title {
+        font-size: 1.2em;
+        font-weight: 700;
+        color: #495057;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e9ecef;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .form-group-title i {
+        color: #667eea;
+        font-size: 1.1em;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 25px;
+        margin-bottom: 20px;
+    }
+
+    .form-row:last-child {
+        margin-bottom: 0;
+    }
+
+    .form-field {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .form-field label {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 8px;
+        font-size: 0.95em;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .required {
+        color: #dc3545;
+        font-weight: bold;
+    }
+
+    .form-field input,
+    .form-field select,
+    .form-field textarea {
+        padding: 12px 16px;
+        border: 2px solid #e9ecef;
+        border-radius: 10px;
+        font-size: 0.95em;
+        transition: all 0.3s ease;
+        background: white;
+        color: #495057;
+    }
+
+    .form-field input:focus,
+    .form-field select:focus,
+    .form-field textarea:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        transform: translateY(-1px);
+    }
+
+    .form-field textarea {
+        resize: vertical;
+        min-height: 100px;
+    }
+
+    .help-text {
+        font-size: 0.85em;
+        color: #6c757d;
+        margin-top: 5px;
+        font-style: italic;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        margin-top: 40px;
+        padding-top: 30px;
+        border-top: 2px solid #e9ecef;
+    }
+
+    .btn {
+        padding: 15px 30px;
+        border-radius: 12px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+        font-size: 1em;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+        text-align: center;
+        justify-content: center;
+        min-width: 150px;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+        box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+    }
+
+    .btn-secondary:hover {
+        background: #5a6268;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(108, 117, 125, 0.4);
+    }
+
+    .alert {
+        padding: 15px 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        border: 1px solid transparent;
+        font-weight: 500;
+    }
+
+    .alert-success {
+        background: #d4edda;
+        color: #155724;
+        border-color: #c3e6cb;
+    }
+
+    .alert-danger {
+        background: #f8d7da;
+        color: #721c24;
+        border-color: #f5c6cb;
+    }
+
+    .alert-info {
+        background: #d1ecf1;
+        color: #0c5460;
+        border-color: #bee5eb;
+    }
+
+    .alert-warning {
+        background: #fff3cd;
+        color: #856404;
+        border-color: #ffeaa7;
+    }
+
+    .articles-section {
+        margin-top: 20px;
+    }
+
+    .article-selector {
+        background: #ffffff;
+        border: 2px solid #e9ecef;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+
+    .selected-articles {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 20px;
+        border: 1px solid #e9ecef;
+    }
+
+    .selected-articles h4 {
+        margin: 0 0 15px 0;
+        color: #495057;
+        font-size: 1.1em;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .total-display {
+        text-align: right;
+        margin-bottom: 15px;
+        padding: 10px;
+        background: #e9ecef;
+        border-radius: 8px;
+        font-weight: 600;
+        color: #495057;
+    }
+
+    #articles-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    #articles-table thead {
+        background: #667eea;
+        color: white;
+    }
+
+    #articles-table th {
+        padding: 15px 10px;
+        text-align: left;
+        font-weight: 600;
+        font-size: 0.9em;
+    }
+
+    #articles-table td {
+        padding: 12px 10px;
+        border-bottom: 1px solid #e9ecef;
+        vertical-align: middle;
+    }
+
+    #articles-table tbody tr:hover {
+        background: #f8f9fa;
+    }
+
+    .no-articles {
+        text-align: center;
+        color: #6c757d;
+        padding: 30px;
+        font-style: italic;
+    }
+
+    .no-articles i {
+        font-size: 2em;
+        margin-bottom: 10px;
+        opacity: 0.5;
+        display: block;
+    }
+
+    .quantity-input, .price-input {
+        width: 80px;
+        padding: 5px 8px;
+        border: 1px solid #e9ecef;
+        border-radius: 4px;
+        text-align: center;
+        font-size: 0.9em;
+    }
+
+    .quantity-input:focus, .price-input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+    }
+
+    .delete-button {
+        background: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 5px 10px;
+        cursor: pointer;
+        font-size: 0.8em;
+        transition: all 0.3s ease;
+    }
+
+    .delete-button:hover {
+        background: #c82333;
+        transform: scale(1.05);
+    }
+
+    .search-results {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 1000;
+        display: none;
+    }
+
+    .search-result-item {
+        padding: 10px 15px;
+        cursor: pointer;
+        border-bottom: 1px solid #f8f9fa;
+        transition: background 0.2s ease;
+    }
+
+    .search-result-item:hover {
+        background: #f8f9fa;
+    }
+
+    .search-result-item:last-child {
+        border-bottom: none;
+    }
+
+    .search-result-name {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 3px;
+    }
+
+    .search-result-details {
+        font-size: 0.85em;
+        color: #6c757d;
+    }
+
+    .total-section {
+        text-align: center;
+        padding: 20px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-radius: 12px;
+        border: 2px solid #dee2e6;
+    }
+
+    .total-amount {
+        font-size: 2.5em;
+        font-weight: 700;
+        color: #667eea;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin: 0;
+    }
+
+    @media (max-width: 768px) {
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+        
+        .form-actions {
+            flex-direction: column;
+        }
+        
+        .btn {
+            width: 100%;
+        }
+        
+        .container {
+            padding: 10px;
+        }
+        
+        .form-content {
+            padding: 20px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="main-card">
+        <div class="form-header">
+            <h2><i class="fas fa-truck"></i> Créer Facture de Transfert</h2>
+            <p>Enregistrer un nouveau transfert entre agences</p>
+        </div>
+        
+        <div class="form-content">
+            <form method="POST" id="facture-form">
+                {% csrf_token %}
+                <input type="hidden" id="articles_data" name="articles_data" value="">
+                
+                <!-- Messages -->
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+                
+                <!-- Informations générales -->
+                <div class="form-group">
+                    <div class="form-group-title">
+                        <i class="fas fa-info-circle"></i>
+                        Informations Générales
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="numero_compte">
+                                <i class="fas fa-hashtag"></i>
+                                Numéro de Compte <span class="required">*</span>
+                            </label>
+                            <input type="text" id="numero_compte" name="numero_compte" required>
+                            <div class="help-text">Numéro de compte du transfert</div>
+                        </div>
+
+                        <div class="form-field">
+                            <label for="reference_transfert">
+                                <i class="fas fa-barcode"></i>
+                                Référence Transfert <span class="required">*</span>
+                            </label>
+                            <input type="text" id="reference_transfert" name="reference_transfert" required>
+                            <div class="help-text">Référence unique du transfert</div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="date_transfert">
+                                <i class="fas fa-calendar"></i>
+                                Date de Transfert <span class="required">*</span>
+                            </label>
+                            <input type="date" id="date_transfert" name="date_transfert" required>
+                            <div class="help-text">Date du transfert</div>
+                        </div>
+
+                        <div class="form-field">
+                            <label for="statut">
+                                <i class="fas fa-flag"></i>
+                                Statut
+                            </label>
+                            <select id="statut" name="statut">
+                                {% for value, label in statut_choices %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="help-text">Statut actuel du transfert</div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="etat">
+                                <i class="fas fa-exchange-alt"></i>
+                                État du Transfert <span class="required">*</span>
+                            </label>
+                            <select id="etat" name="etat" required onchange="updateStockBehavior()">
+                                <option value="entrer">Entrer (Augmente le stock)</option>
+                                <option value="sortir" selected>Sortir (Diminue le stock)</option>
+                            </select>
+                            <div class="help-text" id="etat-help-text">État du transfert : Sortir (diminue le stock)</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lieux de Transfert -->
+                <div class="form-group">
+                    <div class="form-group-title">
+                        <i class="fas fa-map-marker-alt"></i>
+                        Lieux de Transfert
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="lieu_depart">
+                                <i class="fas fa-arrow-up"></i>
+                                Lieu de Départ <span class="required">*</span>
+                            </label>
+                            <input type="text" id="lieu_depart" name="lieu_depart" required>
+                            <div class="help-text">Agence ou lieu de départ du transfert</div>
+                        </div>
+
+                        <div class="form-field">
+                            <label for="lieu_arrivee">
+                                <i class="fas fa-arrow-down"></i>
+                                Lieu d'Arrivée <span class="required">*</span>
+                            </label>
+                            <input type="text" id="lieu_arrivee" name="lieu_arrivee" required>
+                            <div class="help-text">Agence ou lieu d'arrivée du transfert</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Articles à Transférer -->
+                <div class="form-group">
+                    <div class="form-group-title">
+                        <i class="fas fa-boxes"></i>
+                        Articles à Transférer
+                    </div>
+                    
+                    <div class="articles-section">
+                        <div class="article-selector">
+                            <div class="form-field">
+                                <label for="article_search">
+                                    <i class="fas fa-search"></i>
+                                    Rechercher un Article
+                                </label>
+                                <input type="text" id="article_search" placeholder="Tapez au moins 2 lettres pour rechercher" onkeyup="searchArticles()">
+                                <div class="help-text">Commencez à taper pour rechercher un article</div>
+                            </div>
+                        </div>
+                        
+                        <div class="selected-articles">
+                            <h4><i class="fas fa-list"></i> Articles Sélectionnés</h4>
+                            <div class="total-display">
+                                <span id="total-quantity">Quantité Totale: 0</span>
+                            </div>
+                            <table id="articles-table">
+                                <thead>
+                                    <tr>
+                                        <th>Désignation</th>
+                                        <th>Quantité</th>
+                                        <th>Prix d'Achat</th>
+                                        <th>Total</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="no-articles-row">
+                                        <td colspan="5" class="no-articles">
+                                            <i class="fas fa-info-circle"></i>
+                                            <p>Aucun article sélectionné</p>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Total -->
+                <div class="form-group">
+                    <div class="form-group-title">
+                        <i class="fas fa-calculator"></i>
+                        Total du Transfert
+                    </div>
+                    <div class="total-section">
+                        <div class="total-amount" id="total-amount">0.00 FRCF</div>
+                        <input type="hidden" id="prix_total_global" name="prix_total_global" value="0">
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Enregistrer le Transfert
+                    </button>
+                    <a href="{% url 'consulter_factures_transfert' %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Annuler
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Variables globales
+let searchTimeout;
+let searchWindow = null;
+let totalAmount = 0;
+
+// Fonction de recherche d'articles
+function searchArticles() {
+    const searchTerm = document.getElementById('article_search').value.trim();
+    
+    clearTimeout(searchTimeout);
+    
+    searchTimeout = setTimeout(() => {
+        if (searchTerm.length >= 1) {
+            // Requête AJAX vers le serveur pour récupérer les vrais articles
+            fetch(`/stock/search-articles/?q=${encodeURIComponent(searchTerm)}`)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('📦 Données reçues:', data);
+                    console.log('📦 Articles trouvés:', data.articles);
+                    
+                    // Si aucun article trouvé, utiliser des données simulées temporairement
+                    if (data.articles.length === 0) {
+                        console.log('Aucun article trouvé, utilisation de données simulées');
+                        const mockArticles = [
+                            { id: 1, designation: 'Ordinateur Portable', prix_achat: 500000, stock: 10, reference_article: 'ORD001' },
+                            { id: 2, designation: 'Souris USB', prix_achat: 5000, stock: 50, reference_article: 'SOU001' },
+                            { id: 3, designation: 'Clavier Mécanique', prix_achat: 15000, stock: 25, reference_article: 'CLA001' },
+                            { id: 4, designation: 'Écran 24 pouces', prix_achat: 80000, stock: 15, reference_article: 'ECR001' },
+                            { id: 5, designation: 'Casque Audio', prix_achat: 25000, stock: 30, reference_article: 'CAS001' },
+                        ];
+                        
+                        const filteredArticles = mockArticles.filter(article => 
+                            article.designation.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            article.reference_article.toLowerCase().includes(searchTerm.toLowerCase())
+                        );
+                        showSearchResults(filteredArticles);
+                    } else {
+                        showSearchResults(data.articles);
+                    }
+                })
+                .catch(error => {
+                    console.error('❌ Erreur lors de la recherche AJAX:', error);
+                    console.log('🔄 Utilisation des données simulées en cas d\'erreur');
+                    // En cas d'erreur, utiliser les données simulées
+                    const mockArticles = [
+                        { id: 1, designation: 'Ordinateur Portable', prix_achat: 500000, stock: 10, reference_article: 'ORD001' },
+                        { id: 2, designation: 'Souris USB', prix_achat: 5000, stock: 50, reference_article: 'SOU001' },
+                        { id: 3, designation: 'Clavier Mécanique', prix_achat: 15000, stock: 25, reference_article: 'CLA001' },
+                        { id: 4, designation: 'Écran 24 pouces', prix_achat: 80000, stock: 15, reference_article: 'ECR001' },
+                        { id: 5, designation: 'Casque Audio', prix_achat: 25000, stock: 30, reference_article: 'CAS001' },
+                    ];
+                    
+                    const filteredArticles = mockArticles.filter(article => 
+                        article.designation.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        article.reference_article.toLowerCase().includes(searchTerm.toLowerCase())
+                    );
+                    showSearchResults(filteredArticles);
+                });
+        } else {
+            hideSearchResults();
+        }
+    }, 300);
+}
+
+// Afficher les résultats de recherche
+function showSearchResults(articles) {
+    console.log('🎯 showSearchResults appelée avec:', articles);
+    const searchInput = document.getElementById('article_search');
+    let searchResults = document.getElementById('search_results');
+    
+    if (!searchResults) {
+        // Créer le conteneur des résultats s'il n'existe pas
+        searchResults = document.createElement('div');
+        searchResults.id = 'search_results';
+        searchResults.className = 'search-results';
+        searchInput.parentNode.style.position = 'relative';
+        searchInput.parentNode.appendChild(searchResults);
+    }
+    
+    searchResults.innerHTML = '';
+    
+    if (articles.length === 0) {
+        searchResults.innerHTML = '<div class="search-result-item">Aucun article trouvé</div>';
+    } else {
+        articles.forEach(article => {
+            const item = document.createElement('div');
+            item.className = 'search-result-item';
+            item.innerHTML = `
+                <div class="search-result-name">${article.reference_article || ''} - ${article.designation}</div>
+                <div class="search-result-details">Prix: ${article.prix_achat.toLocaleString()} FRCF | Stock: ${article.stock || 0}</div>
+            `;
+            item.onclick = () => addArticleToTable(article.id, article.designation, article.prix_achat, article.stock || 0, article.reference_article || '');
+            searchResults.appendChild(item);
+        });
+    }
+    
+    searchResults.style.display = 'block';
+    console.log('Résultats affichés:', searchResults.style.display);
+}
+
+// Masquer les résultats de recherche
+function hideSearchResults() {
+    const searchResults = document.getElementById('search_results');
+    if (searchResults) {
+        searchResults.style.display = 'none';
+    }
+}
+
+// Ajouter un article au tableau
+function addArticleToTable(articleId, designation, prixAchat, stock, reference = '') {
+    const tbody = document.querySelector('#articles-table tbody');
+    if (!tbody) return;
+    
+    // Vérifier si l'article existe déjà
+    const existingRow = tbody.querySelector(`tr[data-article-id="${articleId}"]`);
+    if (existingRow) {
+        // Augmenter la quantité si l'article existe déjà
+        const quantiteInput = existingRow.querySelector('.quantity-input');
+        const currentQuantity = parseInt(quantiteInput.value) || 1;
+        const newQuantity = currentQuantity + 1;
+        quantiteInput.value = newQuantity;
+        updateRowTotal(existingRow);
+        updateTotalQuantity();
+        hideSearchResults();
+        return;
+    }
+    
+    // Supprimer la ligne "aucun article" si elle existe
+    const noArticlesRow = tbody.querySelector('.no-articles-row');
+    if (noArticlesRow) {
+        noArticlesRow.remove();
+    }
+    
+    // Créer une nouvelle ligne
+    const newRow = document.createElement('tr');
+    newRow.setAttribute('data-article-id', articleId);
+    newRow.innerHTML = `
+        <td>${reference ? reference + ' - ' : ''}${designation}</td>
+        <td>
+            <input type="number" class="quantity-input" value="1" min="1" 
+                   onchange="updateRowTotal(this.closest('tr'))" 
+                   oninput="updateRowTotal(this.closest('tr'))">
+        </td>
+        <td>
+            <input type="number" class="price-input" value="${prixAchat}" min="0" step="0.01"
+                   readonly
+                   style="background-color: #f8f9fa; cursor: not-allowed;">
+        </td>
+        <td class="total-cell">${prixAchat.toLocaleString()} FRCF</td>
+        <td>
+            <button type="button" class="delete-button" onclick="removeArticleFromTable(this.closest('tr'))">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
+    `;
+    
+    tbody.appendChild(newRow);
+    updateTotalQuantity();
+    hideSearchResults();
+    document.getElementById('article_search').value = '';
+}
+
+// Mettre à jour le total d'une ligne
+function updateRowTotal(row) {
+    const quantiteInput = row.querySelector('.quantity-input');
+    const priceInput = row.querySelector('.price-input');
+    const totalCell = row.querySelector('.total-cell');
+    
+    const quantite = parseInt(quantiteInput.value) || 0;
+    const prix = parseFloat(priceInput.value) || 0; // Prix fixe, non modifiable
+    const total = quantite * prix;
+    
+    totalCell.textContent = total.toLocaleString() + ' FRCF';
+    updateTotalQuantity();
+    updateTotalAmount();
+}
+
+// Supprimer un article du tableau
+function removeArticleFromTable(row) {
+    row.remove();
+    
+    // Vérifier s'il reste des articles
+    const tbody = document.querySelector('#articles-table tbody');
+    const remainingRows = tbody.querySelectorAll('tr[data-article-id]');
+    
+    if (remainingRows.length === 0) {
+        // Ajouter la ligne "aucun article"
+        const noArticlesRow = document.createElement('tr');
+        noArticlesRow.className = 'no-articles-row';
+        noArticlesRow.innerHTML = `
+            <td colspan="5" class="no-articles">
+                <i class="fas fa-info-circle"></i>
+                <p>Aucun article sélectionné</p>
+            </td>
+        `;
+        tbody.appendChild(noArticlesRow);
+    }
+    
+    updateTotalQuantity();
+    updateTotalAmount();
+}
+
+// Mettre à jour la quantité totale
+function updateTotalQuantity() {
+    let totalQuantity = 0;
+    const rows = document.querySelectorAll('#articles-table tbody tr[data-article-id]');
+    
+    rows.forEach(row => {
+        const quantiteInput = row.querySelector('.quantity-input');
+        if (quantiteInput) {
+            const quantite = parseInt(quantiteInput.value) || 0;
+            totalQuantity += quantite;
+        }
+    });
+    
+    document.getElementById('total-quantity').textContent = `Quantité Totale: ${totalQuantity}`;
+    
+    // Mettre à jour le champ quantite
+    const quantiteInput = document.getElementById('quantite');
+    if (quantiteInput) {
+        quantiteInput.value = totalQuantity;
+    }
+}
+
+// Mettre à jour le montant total
+function updateTotalAmount() {
+    let total = 0;
+    const rows = document.querySelectorAll('#articles-table tbody tr[data-article-id]');
+    
+    rows.forEach(row => {
+        const quantiteInput = row.querySelector('.quantity-input');
+        const priceInput = row.querySelector('.price-input');
+        if (quantiteInput && priceInput) {
+            const quantite = parseInt(quantiteInput.value) || 0;
+            const prix = parseFloat(priceInput.value) || 0;
+            total += quantite * prix;
+        }
+    });
+    
+    totalAmount = total;
+    document.getElementById('total-amount').textContent = total.toFixed(2) + ' FRCF';
+    document.getElementById('prix_total_global').value = total.toFixed(2);
+}
+
+// Fonction pour mettre à jour le comportement du stock selon l'état
+function updateStockBehavior() {
+    const etatSelect = document.getElementById('etat');
+    const helpText = document.getElementById('etat-help-text');
+    const selectedValue = etatSelect.value;
+    
+    if (selectedValue === 'entrer') {
+        helpText.textContent = 'État du transfert : Entrer (augmente le stock)';
+        helpText.style.color = '#28a745';
+        helpText.style.fontWeight = '600';
+    } else {
+        helpText.textContent = 'État du transfert : Sortir (diminue le stock)';
+        helpText.style.color = '#dc3545';
+        helpText.style.fontWeight = '600';
+    }
+    
+    console.log(`🔄 État du transfert changé: ${selectedValue}`);
+}
+
+// Préparer les données des articles avant soumission
+document.getElementById('facture-form').addEventListener('submit', function(e) {
+    const articles = [];
+    const rows = document.querySelectorAll('#articles-table tbody tr[data-article-id]');
+    const etat = document.getElementById('etat').value;
+    
+    // Validation de l'état
+    if (!etat) {
+        e.preventDefault();
+        alert('Veuillez sélectionner un état pour le transfert.');
+        return;
+    }
+    
+    rows.forEach(row => {
+        const articleId = row.getAttribute('data-article-id');
+        const designation = row.cells[0].textContent.trim();
+        const quantite = row.querySelector('.quantity-input').value;
+        const prixAchat = row.querySelector('.price-input').value;
+        
+        if (articleId && quantite && prixAchat) {
+            articles.push({
+                id: articleId,
+                designation: designation,
+                quantite: quantite,
+                prix_achat: prixAchat
+            });
+        }
+    });
+    
+    // Validation des articles
+    if (articles.length === 0) {
+        e.preventDefault();
+        alert('Veuillez ajouter au moins un article au transfert.');
+        return;
+    }
+    
+    // Mettre à jour le champ caché
+    document.getElementById('articles_data').value = JSON.stringify(articles);
+    console.log(`📦 Articles à transférer (${etat}):`, articles);
+    console.log(`💰 Total du transfert: ${totalAmount.toFixed(2)} FRCF`);
+    
+    // Confirmation selon l'état
+    const action = etat === 'entrer' ? 'augmenter' : 'diminuer';
+    const confirmation = confirm(`Êtes-vous sûr de vouloir créer ce transfert ?\n\nÉtat: ${etat.toUpperCase()}\nAction: ${action} le stock de ${articles.length} article(s)\n\nCette action est irréversible !`);
+    
+    if (!confirmation) {
+        e.preventDefault();
+    }
+});
+
+// Événements
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('article_search');
+    
+    // Masquer les résultats quand on clique ailleurs
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#article_search') && !e.target.closest('#search_results')) {
+            hideSearchResults();
+        }
+    });
+    
+    // Focus sur le champ de recherche
+    if (searchInput) {
+        searchInput.focus();
+    }
+    
+    // Initialiser le total
+    updateTotalAmount();
+});
+</script>
+{% endblock %}

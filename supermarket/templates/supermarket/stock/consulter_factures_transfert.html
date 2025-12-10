@@ -1,0 +1,449 @@
+{% extends 'supermarket/stock/base_stock.html' %}
+{% load static %}
+
+{% block title %}Documents de Transfert - Gestion de Stock{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <form id="deleteForm" method="post" style="display:none;">
+        {% csrf_token %}
+    </form>
+    <!-- Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <h1><i class="fas fa-truck"></i> Documents de Transfert</h1>
+            <p>Gestion des factures de transfert entre agences</p>
+        </div>
+        <div class="header-actions">
+            <a href="{% url 'creer_facture_transfert' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Nouveau Transfert
+            </a>
+        </div>
+    </div>
+
+    <!-- Filtres et Recherche -->
+    <div class="filters-section">
+        <form method="GET" class="filters-form">
+            <div class="filters-row">
+                <div class="filter-group">
+                    <input type="text" name="search" placeholder="Rechercher par référence, lieu..." 
+                           value="{{ search_query }}" class="form-control">
+                </div>
+                <div class="filter-group">
+                    <select name="statut_filter" class="form-control">
+                        <option value="">Tous les statuts</option>
+                        {% for value, label in statut_choices %}
+                            <option value="{{ value }}" {% if statut_filter == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <input type="date" name="date_debut" value="{{ date_debut }}" 
+                           placeholder="Date début" class="form-control">
+                </div>
+                <div class="filter-group">
+                    <input type="date" name="date_fin" value="{{ date_fin }}" 
+                           placeholder="Date fin" class="form-control">
+                </div>
+                <div class="filter-group">
+                    <button type="submit" class="btn btn-secondary">
+                        <i class="fas fa-search"></i> Filtrer
+                    </button>
+                    <a href="{% url 'consulter_factures_transfert' %}" class="btn btn-outline">
+                        <i class="fas fa-times"></i> Effacer
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Statistiques -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-truck"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ total_factures }}</div>
+                <div class="stat-label">Total Transferts</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ factures_en_cours }}</div>
+                <div class="stat-label">En Cours</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ factures_terminees }}</div>
+                <div class="stat-label">Terminés</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-boxes"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ quantite_totale }}</div>
+                <div class="stat-label">Quantité Totale</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tableau des factures -->
+    <div class="table-container">
+        <div class="table-header">
+            <h3>Liste des Factures de Transfert</h3>
+            <div class="table-actions">
+                <button class="btn btn-outline" onclick="window.print()">
+                    <i class="fas fa-print"></i> Imprimer
+                </button>
+            </div>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Référence</th>
+                        <th>Compte</th>
+                        <th>Date</th>
+                        <th>Départ</th>
+                        <th>Arrivée</th>
+                        <th>Quantité</th>
+                        <th>Statut</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for facture in factures %}
+                    <tr>
+                        <td>
+                            <strong>{{ facture.reference_transfert }}</strong>
+                        </td>
+                        <td>{{ facture.numero_compte }}</td>
+                        <td>{{ facture.date_transfert|date:"d/m/Y" }}</td>
+                        <td>{{ facture.lieu_depart }}</td>
+                        <td>{{ facture.lieu_arrivee }}</td>
+                        <td class="amount">{{ facture.quantite }}</td>
+                        <td>
+                            <span class="status-badge status-{{ facture.statut }}">
+                                {{ facture.get_statut_display }}
+                            </span>
+                        </td>
+                        <td class="actions">
+                            <a href="{% url 'detail_facture_transfert' facture.id %}" 
+                               class="btn btn-sm btn-info" title="Voir détails">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <a href="{% url 'modifier_facture_transfert' facture.id %}" 
+                               class="btn btn-sm btn-warning" title="Modifier">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <button onclick="confirmDelete('{{ facture.id }}', '{{ facture.reference_transfert }}')" 
+                                    class="btn btn-sm btn-danger" title="Supprimer">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center">
+                            <div class="empty-state">
+                                <i class="fas fa-truck"></i>
+                                <p>Aucune facture de transfert trouvée</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 15px;
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.header-content h1 {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 600;
+}
+
+.header-content p {
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+}
+
+.header-actions .btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.header-actions .btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+}
+
+.filters-section {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.filters-form {
+    width: 100%;
+}
+
+.filters-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr auto;
+    gap: 1rem;
+    align-items: end;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.filter-group .form-control {
+    padding: 0.75rem;
+    border: 2px solid #e1e5e9;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+.filter-group .form-control:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: transform 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.stat-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+}
+
+.stat-card:nth-child(1) .stat-icon { background: linear-gradient(135deg, #667eea, #764ba2); }
+.stat-card:nth-child(2) .stat-icon { background: linear-gradient(135deg, #f093fb, #f5576c); }
+.stat-card:nth-child(3) .stat-icon { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+.stat-card:nth-child(4) .stat-icon { background: linear-gradient(135deg, #43e97b, #38f9d7); }
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #2d3748;
+    line-height: 1;
+}
+
+.stat-label {
+    color: #718096;
+    font-size: 0.9rem;
+    margin-top: 0.25rem;
+}
+
+.table-container {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.table-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid #e1e5e9;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.table-header h3 {
+    margin: 0;
+    color: #2d3748;
+    font-size: 1.25rem;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table th {
+    background: #f7fafc;
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: #4a5568;
+    border-bottom: 2px solid #e1e5e9;
+}
+
+.data-table td {
+    padding: 1rem;
+    border-bottom: 1px solid #e1e5e9;
+    vertical-align: middle;
+}
+
+.data-table tr:hover {
+    background: #f7fafc;
+}
+
+.amount {
+    font-weight: 600;
+    color: #2d3748;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-en_attente { background: #fed7d7; color: #c53030; }
+.status-en_cours { background: #fef5e7; color: #dd6b20; }
+.status-termine { background: #c6f6d5; color: #2f855a; }
+.status-annule { background: #fbb6ce; color: #b83280; }
+
+.actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-sm {
+    padding: 0.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.btn-info {
+    background: #4299e1;
+    color: white;
+    border: none;
+}
+
+.btn-info:hover {
+    background: #3182ce;
+    transform: translateY(-2px);
+}
+
+.btn-warning {
+    background: #ed8936;
+    color: white;
+    border: none;
+}
+
+.btn-warning:hover {
+    background: #dd6b20;
+    transform: translateY(-2px);
+}
+
+.btn-danger {
+    background: #e53e3e;
+    color: white;
+    border: none;
+}
+
+.btn-danger:hover {
+    background: #c53030;
+    transform: translateY(-2px);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #718096;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+@media (max-width: 768px) {
+    .filters-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .page-header {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<script>
+function confirmDelete(factureId, factureName) {
+    if (confirm(`Êtes-vous sûr de vouloir supprimer le transfert "${factureName}" ?\n\nCette action est irréversible.`)) {
+        const form = document.getElementById('deleteForm');
+        form.action = `/stock/supprimer-facture-transfert/${factureId}/`;
+        form.submit();
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,101 @@
+{% extends 'supermarket/base.html' %}
+
+{% block title %}Export/Import des Données - ERP Supermarket{% endblock %}
+
+{% block header_title %}Export/Import des Données{% endblock %}
+{% block header_subtitle %}Sauvegarder et restaurer les données pour migration vers nouvelle version{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 1200px; margin: 30px auto; padding: 20px;">
+    {% if not can_export_import %}
+    <div class="alert alert-danger" role="alert">
+        <i class="fas fa-exclamation-triangle"></i> Vous n'avez pas les permissions nécessaires pour exporter/importer les données. 
+        Seuls les administrateurs et gérants peuvent effectuer cette opération.
+    </div>
+    {% else %}
+    
+    <div class="row">
+        <!-- Section Export -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-download"></i> Exporter les Données</h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">
+                        Exportez toutes les données de votre ERP au format JSON. 
+                        Ce fichier peut être utilisé pour migrer vers une nouvelle version du système.
+                    </p>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> <strong>Données exportées :</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Agences et configurations</li>
+                            <li>Articles et stocks</li>
+                            <li>Clients et fournisseurs</li>
+                            <li>Factures (vente, achat, transfert)</li>
+                            <li>Mouvements de stock</li>
+                            <li>Comptes utilisateurs (sans mots de passe)</li>
+                        </ul>
+                    </div>
+                    <p class="text-muted">Sélectionnez une agence pour exporter ses données spécifiques.</p>
+                    <a href="{% url 'export_data' %}" class="btn btn-primary btn-lg btn-block">
+                        <i class="fas fa-download"></i> Exporter les Données
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Section Import -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0"><i class="fas fa-upload"></i> Importer les Données</h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">
+                        Importez des données depuis un fichier JSON exporté précédemment.
+                    </p>
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i> <strong>Attention :</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>L'import peut écraser des données existantes</li>
+                            <li>Assurez-vous d'avoir fait une sauvegarde avant</li>
+                            <li>Les mots de passe des utilisateurs ne sont pas importés</li>
+                        </ul>
+                    </div>
+                    <a href="{% url 'import_data' %}" class="btn btn-success btn-lg btn-block">
+                        <i class="fas fa-upload"></i> Importer des Données
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Instructions -->
+    <div class="card shadow-sm mt-4">
+        <div class="card-header bg-info text-white">
+            <h4 class="mb-0"><i class="fas fa-question-circle"></i> Instructions</h4>
+        </div>
+        <div class="card-body">
+            <h5>Pour migrer vers une nouvelle version :</h5>
+            <ol>
+                <li><strong>Exporter les données</strong> depuis l'ancienne version</li>
+                <li>Installer la nouvelle version du système</li>
+                <li><strong>Importer les données</strong> dans la nouvelle version</li>
+                <li>Vérifier que toutes les données ont été importées correctement</li>
+            </ol>
+            
+            <h5 class="mt-4">Notes importantes :</h5>
+            <ul>
+                <li>Le fichier d'export est au format JSON et peut être ouvert avec n'importe quel éditeur de texte</li>
+                <li>Les mots de passe des utilisateurs ne sont pas exportés pour des raisons de sécurité</li>
+                <li>Vous devrez recréer les comptes utilisateurs manuellement après l'import</li>
+                <li>Les IDs des enregistrements peuvent changer lors de l'import</li>
+            </ul>
+        </div>
+    </div>
+    
+    {% endif %}
+</div>
+{% endblock %}
+

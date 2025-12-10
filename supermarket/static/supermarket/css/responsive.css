@@ -1,0 +1,211 @@
+/* ============================================
+   STYLES RESPONSIVE GLOBAUX POUR L'ERP
+   Compatible mobile, tablette et desktop
+   ============================================ */
+
+/* Styles de base pour mobile */
+@media (max-width: 768px) {
+    /* Réduire les paddings */
+    body {
+        padding: 10px !important;
+    }
+    
+    /* Headers responsive */
+    header {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        padding: 12px !important;
+    }
+    
+    .header-info {
+        margin-left: 0 !important;
+        margin-top: 10px !important;
+        width: 100% !important;
+        justify-content: space-between !important;
+    }
+    
+    /* Titres responsive */
+    h1, .super-market-title {
+        font-size: 1.4em !important;
+    }
+    
+    h2 {
+        font-size: 1.2em !important;
+    }
+    
+    /* Menus responsive */
+    .menu-bar {
+        width: 100% !important;
+        margin-bottom: 15px !important;
+    }
+    
+    .menu-item {
+        padding: 12px !important;
+        font-size: 0.95em !important;
+    }
+    
+    /* Containers flex en colonne */
+    .container {
+        flex-direction: column !important;
+    }
+    
+    .content {
+        padding-left: 0 !important;
+        padding-top: 10px !important;
+    }
+    
+    /* Grilles en une colonne */
+    .kpis, .cards, .modules-grid {
+        grid-template-columns: 1fr !important;
+        gap: 15px !important;
+    }
+    
+    /* Tableaux avec scroll horizontal */
+    .table-container, .table-card {
+        overflow-x: auto !important;
+        padding: 15px !important;
+    }
+    
+    table {
+        min-width: 600px !important;
+    }
+    
+    /* Boutons pleine largeur */
+    .btn, .logout-button {
+        width: 100% !important;
+        justify-content: center !important;
+        padding: 10px !important;
+        font-size: 0.9em !important;
+    }
+    
+    /* Formulaires */
+    .form-row {
+        flex-direction: column !important;
+        grid-template-columns: 1fr !important;
+    }
+    
+    .form-field {
+        width: 100% !important;
+    }
+    
+    .form-actions {
+        flex-direction: column !important;
+    }
+    
+    /* Inputs pour éviter le zoom sur iOS */
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    input[type="date"],
+    input[type="time"],
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+}
+
+/* Styles pour très petits écrans (smartphones) */
+@media (max-width: 480px) {
+    body {
+        padding: 5px !important;
+    }
+    
+    header {
+        padding: 10px !important;
+    }
+    
+    .username {
+        display: none !important;
+    }
+    
+    h1, .super-market-title {
+        font-size: 1.2em !important;
+    }
+    
+    .menu-item {
+        padding: 10px !important;
+        font-size: 0.9em !important;
+    }
+    
+    .kpi-card, .card {
+        padding: 15px !important;
+    }
+    
+    .kpi-icon {
+        font-size: 2em !important;
+    }
+    
+    .kpi-value {
+        font-size: 1.8em !important;
+    }
+    
+    .card-title {
+        font-size: 1em !important;
+    }
+    
+    .table-container, .table-card {
+        padding: 10px !important;
+    }
+    
+    th, td {
+        padding: 8px !important;
+        font-size: 0.85em !important;
+    }
+    
+    .badge {
+        padding: 4px 8px !important;
+        font-size: 0.8em !important;
+    }
+    
+    .btn {
+        padding: 8px !important;
+        font-size: 0.85em !important;
+    }
+    
+    .submenu {
+        padding: 5px 0 !important;
+    }
+    
+    .submenu-item {
+        padding: 10px 15px !important;
+        font-size: 0.9em !important;
+    }
+    
+    .form-container {
+        padding: 15px !important;
+    }
+    
+    .info-grid {
+        grid-template-columns: 1fr !important;
+        gap: 20px !important;
+    }
+    
+    .info-item {
+        flex-direction: column !important;
+        gap: 5px !important;
+    }
+}
+
+/* Styles pour tablettes */
+@media (min-width: 481px) and (max-width: 768px) {
+    .kpis {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+    
+    .cards {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+
+/* Amélioration du touch sur mobile */
+@media (hover: none) and (pointer: coarse) {
+    .btn, .menu-item, .submenu-item {
+        min-height: 44px !important; /* Taille minimale recommandée pour le touch */
+    }
+    
+    input, select, textarea {
+        min-height: 44px !important;
+    }
+}
+

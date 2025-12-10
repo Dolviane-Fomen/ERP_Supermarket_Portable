@@ -1,0 +1,423 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion - Gestion de Caisse</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            width: 100%;
+            max-width: 450px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .login-header .logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #d74123 0%, #ff6b35 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            box-shadow: 0 10px 20px rgba(215, 65, 35, 0.3);
+        }
+
+        .login-header .logo i {
+            font-size: 2.5em;
+            color: white;
+        }
+
+        .login-header h1 {
+            color: #2c3e50;
+            font-size: 2em;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .login-header p {
+            color: #7f8c8d;
+            font-size: 1.1em;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+            position: relative;
+        }
+
+        .form-group label {
+            display: block;
+            color: #2c3e50;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 15px 20px;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #d74123;
+            box-shadow: 0 0 0 3px rgba(215, 65, 35, 0.1);
+        }
+
+        .form-group .input-icon {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #bdc3c7;
+            font-size: 1.2em;
+            pointer-events: none;
+        }
+
+        .agence-info {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-left: 4px solid #d74123;
+        }
+
+        .agence-info h3 {
+            color: #2c3e50;
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .agence-info p {
+            color: #7f8c8d;
+            font-size: 0.9em;
+            margin: 5px 0;
+        }
+
+        .login-button {
+            width: 100%;
+            background: linear-gradient(135deg, #d74123 0%, #ff6b35 100%);
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 12px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 20px rgba(215, 65, 35, 0.3);
+        }
+
+        .login-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 25px rgba(215, 65, 35, 0.4);
+        }
+
+        .login-button:active {
+            transform: translateY(0);
+        }
+
+        .back-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #7f8c8d;
+            text-decoration: none;
+            font-size: 0.9em;
+            margin-top: 20px;
+            transition: color 0.3s ease;
+        }
+
+        .back-button:hover {
+            color: #d74123;
+        }
+
+        .messages {
+            margin-bottom: 20px;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .test-accounts {
+            background: linear-gradient(135deg, #e8f5e8 0%, #f0f8f0 100%);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 25px;
+            border: 1px solid #d4edda;
+        }
+
+        .test-accounts h4 {
+            color: #155724;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .test-accounts .account-item {
+            background: white;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-left: 3px solid #28a745;
+            font-size: 0.9em;
+        }
+
+        .test-accounts .account-item strong {
+            color: #2c3e50;
+        }
+
+        .test-accounts .account-item .password {
+            color: #d74123;
+            font-family: monospace;
+        }
+
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 30px 20px;
+                margin: 10px;
+            }
+            
+            .login-header h1 {
+                font-size: 1.6em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <div class="logo">
+                <i class="fas fa-cash-register"></i>
+            </div>
+            <h1>Gestion de Caisse</h1>
+            <p>Connectez-vous pour accéder à votre interface</p>
+        </div>
+
+        <!-- Messages Django -->
+        {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">
+                        <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <form method="POST">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="username">Nom d'utilisateur</label>
+                <input type="text" id="username" name="username" required placeholder="Entrez votre nom d'utilisateur">
+                <i class="fas fa-user input-icon"></i>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Mot de passe</label>
+                <input type="password" id="password" name="password" required placeholder="Entrez votre mot de passe">
+                <i class="fas fa-lock input-icon"></i>
+            </div>
+
+            <div class="agence-info">
+                <h3><i class="fas fa-building"></i> Agences disponibles</h3>
+                {% for agence in agences %}
+                    <p><strong>{{ agence.nom_agence }}</strong> - {{ agence.adresse }}</p>
+                {% empty %}
+                    <p>Aucune agence configurée</p>
+                {% endfor %}
+            </div>
+
+            <button type="submit" class="login-button">
+                <i class="fas fa-sign-in-alt"></i> Se connecter
+            </button>
+            
+            <button type="button" class="login-button" onclick="fillTestCredentials()" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); margin-top: 10px;">
+                <i class="fas fa-magic"></i> Connexion rapide (Admin)
+            </button>
+        </form>
+
+        <div class="test-accounts">
+            <h4><i class="fas fa-key"></i> Comptes fonctionnels disponibles</h4>
+            
+            <!-- Agence Principale -->
+            <div class="agence-section" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #007bff;">
+                <h5 style="color: #007bff; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-building"></i> Agence Principale
+                </h5>
+                
+                <div class="account-item" style="background: white; border-radius: 6px; padding: 12px; margin-bottom: 10px; border-left: 3px solid #28a745;">
+                    <strong style="color: #2c3e50;">
+                        👑 Administrateur Admin Agence 6 (Admin)
+                    </strong>
+                    <br>
+                    <span style="color: #6c757d; font-size: 0.9em;">
+                        <strong>Username:</strong> admin_6 / 
+                        <span class="password" style="color: #d74123; font-family: monospace;">admin6123</span>
+                    </span>
+                    <br>
+                    <small style="color: #6c757d;">
+                        📧 Email: admin6@supermarket.com | 📞 Téléphone: 0000000006
+                    </small>
+                </div>
+                
+                <div class="account-item" style="background: white; border-radius: 6px; padding: 12px; margin-bottom: 10px; border-left: 3px solid #28a745;">
+                    <strong style="color: #2c3e50;">
+                        💰 Caissier Caissier Agence 6 (Caissier)
+                    </strong>
+                    <br>
+                    <span style="color: #6c757d; font-size: 0.9em;">
+                        <strong>Username:</strong> caissier_6 / 
+                        <span class="password" style="color: #d74123; font-family: monospace;">caisse6123</span>
+                    </span>
+                    <br>
+                    <small style="color: #6c757d;">
+                        📧 Email: caissier6@supermarket.com | 📞 Téléphone: 0000000016
+                    </small>
+                </div>
+            </div>
+            
+            <!-- Super Market Principal -->
+            <div class="agence-section" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #28a745;">
+                <h5 style="color: #28a745; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-building"></i> Super Market Principal
+                </h5>
+                
+                <div class="account-item" style="background: white; border-radius: 6px; padding: 12px; margin-bottom: 10px; border-left: 3px solid #28a745;">
+                    <strong style="color: #2c3e50;">
+                        👑 Administrateur Admin Agence 5 (Admin)
+                    </strong>
+                    <br>
+                    <span style="color: #6c757d; font-size: 0.9em;">
+                        <strong>Username:</strong> admin_5 / 
+                        <span class="password" style="color: #d74123; font-family: monospace;">admin5123</span>
+                    </span>
+                    <br>
+                    <small style="color: #6c757d;">
+                        📧 Email: admin5@supermarket.com | 📞 Téléphone: 0000000005
+                    </small>
+                </div>
+                
+                <div class="account-item" style="background: white; border-radius: 6px; padding: 12px; margin-bottom: 10px; border-left: 3px solid #28a745;">
+                    <strong style="color: #2c3e50;">
+                        💰 Caissier Caissier Agence 5 (Caissier)
+                    </strong>
+                    <br>
+                    <span style="color: #6c757d; font-size: 0.9em;">
+                        <strong>Username:</strong> caissier_5 / 
+                        <span class="password" style="color: #d74123; font-family: monospace;">caisse5123</span>
+                    </span>
+                    <br>
+                    <small style="color: #6c757d;">
+                        📧 Email: caissier5@supermarket.com | 📞 Téléphone: 0000000015
+                    </small>
+                </div>
+            </div>
+            
+            <div style="background: #d1ecf1; border: 1px solid #bee5eb; border-radius: 8px; padding: 15px; margin-top: 20px;">
+                <h5 style="color: #0c5460; margin-bottom: 10px;"><i class="fas fa-info-circle"></i> Instructions de connexion</h5>
+                <p style="color: #0c5460; margin: 0; font-size: 0.9em;">
+                    ✅ Tous les comptes ci-dessus sont testés et fonctionnels<br>
+                    🔑 Utilisez les identifiants affichés pour vous connecter<br>
+                    🏢 Chaque utilisateur accède à la caisse de son agence respective<br>
+                    📊 Total: 4 comptes fonctionnels (2 par agence)<br>
+                    🚨 Si un compte ne fonctionne pas, essayez de rafraîchir la page
+                </p>
+            </div>
+        </div>
+
+        <a href="{% url 'index' %}" class="back-button">
+            <i class="fas fa-arrow-left"></i> Retour à l'accueil
+        </a>
+    </div>
+
+    <script>
+        // Animation d'entrée
+        document.addEventListener('DOMContentLoaded', function() {
+            const container = document.querySelector('.login-container');
+            container.style.opacity = '0';
+            container.style.transform = 'translateY(30px)';
+            
+            setTimeout(() => {
+                container.style.transition = 'all 0.6s ease';
+                container.style.opacity = '1';
+                container.style.transform = 'translateY(0)';
+            }, 100);
+        });
+
+        // Focus sur le premier champ
+        document.getElementById('username').focus();
+        
+        // Fonction pour remplir automatiquement les identifiants de test
+        window.fillTestCredentials = function() {
+            document.getElementById('username').value = 'admin_6';
+            document.getElementById('password').value = 'admin6123';
+            document.getElementById('password').focus();
+        };
+    </script>
+</body>
+</html>

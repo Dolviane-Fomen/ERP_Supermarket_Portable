@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Réinitialiser le Mot de Passe</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .header {
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            color: white;
+            box-shadow: 0 4px 15px rgba(6, 190, 182, 0.3);
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2em;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #06beb6;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .back-link:hover {
+            color: #48b1bf;
+            text-decoration: underline;
+        }
+        .form-container {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .info-box {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border-left: 4px solid #2196f3;
+        }
+        .info-box p {
+            margin: 0;
+            color: #0c5460;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .info-box strong {
+            color: #06beb6;
+        }
+        .form-group {
+            margin-bottom: 25px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 0.95em;
+        }
+        .form-group label .required {
+            color: #dc3545;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #06beb6;
+            box-shadow: 0 0 0 3px rgba(6, 190, 182, 0.1);
+        }
+        .form-group input.error {
+            border-color: #dc3545;
+        }
+        .form-group small {
+            display: block;
+            margin-top: 5px;
+            color: #6c757d;
+            font-size: 0.85em;
+        }
+        .password-match {
+            color: #28a745;
+            font-weight: 600;
+        }
+        .password-mismatch {
+            color: #dc3545;
+            font-weight: 600;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1em;
+        }
+        .btn-warning {
+            background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+            color: #212529;
+            box-shadow: 0 4px 10px rgba(255, 193, 7, 0.3);
+        }
+        .btn-warning:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(255, 193, 7, 0.4);
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        .form-actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #e1e8ed;
+        }
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            animation: slideInDown 0.3s ease-out;
+        }
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border-left: 4px solid #28a745;
+        }
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid #dc3545;
+        }
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border-left: 4px solid #17a2b8;
+        }
+        @keyframes slideInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="{% url 'detail_compte' compte.id %}" class="back-link">
+            <i class="fas fa-arrow-left"></i> Retour aux détails
+        </a>
+        
+        <div class="header">
+            <h1><i class="fas fa-key"></i> Réinitialiser le Mot de Passe</h1>
+            </div>
+
+            {% if messages %}
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">
+                    <span><i class="fas fa-{% if message.tags == 'success' %}check-circle{% else %}exclamation-circle{% endif %}"></i> {{ message }}</span>
+                    <button onclick="this.parentElement.remove()" style="background: none; border: none; cursor: pointer; font-size: 1.2em; opacity: 0.7;">&times;</button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+        <div class="form-container">
+            <div class="info-box">
+                <p>
+                    <i class="fas fa-info-circle"></i>
+                    Réinitialisation du mot de passe pour <strong>{{ compte.nom_complet }}</strong> ({{ compte.numero_compte }})
+                </p>
+                    </div>
+
+            <form method="POST" id="passwordForm">
+                        {% csrf_token %}
+                
+                        <div class="form-group">
+                    <label for="nouveau_mot_de_passe">Nouveau mot de passe <span class="required">*</span></label>
+                    <input type="password" id="nouveau_mot_de_passe" name="nouveau_mot_de_passe" required minlength="8">
+                    <small><i class="fas fa-info-circle"></i> Le mot de passe doit contenir au moins 8 caractères.</small>
+                        </div>
+
+                        <div class="form-group">
+                    <label for="confirmer_mot_de_passe">Confirmer le mot de passe <span class="required">*</span></label>
+                    <input type="password" id="confirmer_mot_de_passe" name="confirmer_mot_de_passe" required minlength="8">
+                    <small id="password-match-message"></small>
+                        </div>
+
+                <div class="form-actions">
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-key"></i> Réinitialiser le mot de passe
+                            </button>
+                            <a href="{% url 'detail_compte' compte.id %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Annuler
+                            </a>
+                        </div>
+                    </form>
+    </div>
+</div>
+
+<script>
+    // Vérifier que les mots de passe correspondent
+        const nouveauPassword = document.getElementById('nouveau_mot_de_passe');
+        const confirmerPassword = document.getElementById('confirmer_mot_de_passe');
+        const matchMessage = document.getElementById('password-match-message');
+
+        function checkPasswordMatch() {
+            if (confirmerPassword.value.length === 0) {
+                matchMessage.textContent = '';
+                confirmerPassword.classList.remove('error');
+                return;
+            }
+
+            if (nouveauPassword.value === confirmerPassword.value) {
+                matchMessage.textContent = '✓ Les mots de passe correspondent';
+                matchMessage.className = 'password-match';
+                confirmerPassword.classList.remove('error');
+                confirmerPassword.setCustomValidity('');
+        } else {
+                matchMessage.textContent = '✗ Les mots de passe ne correspondent pas';
+                matchMessage.className = 'password-mismatch';
+                confirmerPassword.classList.add('error');
+                confirmerPassword.setCustomValidity('Les mots de passe ne correspondent pas.');
+            }
+        }
+
+        nouveauPassword.addEventListener('input', checkPasswordMatch);
+        confirmerPassword.addEventListener('input', checkPasswordMatch);
+</script>
+</body>
+</html>

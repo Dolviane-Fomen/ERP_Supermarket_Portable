@@ -1,0 +1,48 @@
+{
+  "system_name": "ERP_Supermarket_Network",
+  "version": "1.0",
+  "sync_interval": 10,
+  "max_retries": 3,
+  "timeout": 30,
+  "network_nodes": [
+    {
+      "id": "PC1",
+      "name": "Station Principale",
+      "ip": "192.168.1.100",
+      "port": 8001,
+      "role": "master",
+      "priority": 1
+    },
+    {
+      "id": "PC2",
+      "name": "Station Caisse",
+      "ip": "192.168.1.101",
+      "port": 8002,
+      "role": "slave",
+      "priority": 2
+    },
+    {
+      "id": "PC3",
+      "name": "Station Stock",
+      "ip": "192.168.1.102",
+      "port": 8003,
+      "role": "slave",
+      "priority": 3
+    },
+    {
+      "id": "PC4",
+      "name": "Station Comptabilit\u00e9",
+      "ip": "192.168.1.103",
+      "port": 8004,
+      "role": "slave",
+      "priority": 4
+    }
+  ],
+  "sync_rules": {
+    "articles": "bidirectional",
+    "clients": "bidirectional",
+    "ventes": "master_to_slave",
+    "stock": "bidirectional",
+    "comptabilite": "slave_to_master"
+  }
+}

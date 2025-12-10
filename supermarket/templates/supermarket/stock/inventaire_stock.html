@@ -1,0 +1,907 @@
+{% extends 'supermarket/stock/base_stock.html' %}
+{% load static %}
+
+{% block title %}Inventaire de Stock{% endblock %}
+
+{% block extra_css %}
+<style>
+    body {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        min-height: 100vh;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 0;
+    }
+
+    .container-fluid {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .page-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 30px;
+        margin-bottom: 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+    }
+
+    .header-content h1 {
+        margin: 0;
+        font-size: 2.2em;
+        font-weight: 700;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .header-content p {
+        margin: 10px 0 0 0;
+        opacity: 0.9;
+        font-size: 1.1em;
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 15px;
+    }
+
+    .btn {
+        padding: 12px 25px;
+        border: none;
+        border-radius: 10px;
+        font-size: 1em;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+    }
+
+    .btn-secondary {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.3);
+        border-color: rgba(255, 255, 255, 0.5);
+        transform: translateY(-2px);
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        border: 1px solid #e9ecef;
+        transition: all 0.3s ease;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    }
+
+    .stat-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5em;
+        color: white;
+    }
+
+    .stat-card:nth-child(1) .stat-icon {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .stat-card:nth-child(2) .stat-icon {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    }
+
+    .stat-card:nth-child(3) .stat-icon {
+        background: linear-gradient(135deg, #fd7e14 0%, #e83e8c 100%);
+    }
+
+    .stat-number {
+        font-size: 2em;
+        font-weight: 700;
+        color: #2c3e50;
+        margin-bottom: 5px;
+    }
+
+    .stat-label {
+        color: #6c757d;
+        font-size: 0.9em;
+        font-weight: 500;
+    }
+
+    .card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        border: 1px solid #e9ecef;
+        overflow: hidden;
+        margin-bottom: 25px;
+    }
+
+    .card-header {
+        background: #f8f9fa;
+        padding: 20px 25px;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .card-header h5 {
+        margin: 0;
+        color: #495057;
+        font-size: 1.3em;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .card-body {
+        padding: 25px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 8px;
+        display: block;
+        font-size: 0.9em;
+    }
+
+    .form-control {
+        padding: 12px 15px;
+        border: 2px solid #e1e8ed;
+        border-radius: 8px;
+        font-size: 0.95em;
+        transition: all 0.3s ease;
+        background: white;
+        font-family: inherit;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .btn-block {
+        width: 100%;
+    }
+
+    .loading-spinner {
+        text-align: center;
+        padding: 40px;
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 15px;
+        margin: 20px 0;
+    }
+
+    .spinner-border {
+        width: 3rem;
+        height: 3rem;
+        border-width: 0.3em;
+    }
+
+    .export-actions {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+        margin-bottom: 25px;
+    }
+
+    .btn-success {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+    }
+
+    .btn-success:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+    }
+
+    .btn-danger {
+        background: linear-gradient(135deg, #dc3545 0%, #e83e8c 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+    }
+
+    .btn-danger:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4);
+    }
+
+    .btn-info {
+        background: linear-gradient(135deg, #17a2b8 0%, #6610f2 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(23, 162, 184, 0.3);
+    }
+
+    .btn-info:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(23, 162, 184, 0.4);
+    }
+
+    .table-responsive {
+        overflow-x: auto;
+    }
+
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0;
+    }
+
+    .table th {
+        background: #f8f9fa;
+        color: #495057;
+        font-weight: 600;
+        padding: 15px 12px;
+        text-align: left;
+        border-bottom: 2px solid #e9ecef;
+        font-size: 0.85em;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .table th i {
+        margin-right: 6px;
+        color: #667eea;
+    }
+
+    .table td {
+        padding: 12px;
+        border-bottom: 1px solid #f1f3f4;
+        vertical-align: middle;
+        font-size: 0.9em;
+    }
+
+    .table tbody tr:hover {
+        background: #f8f9fa;
+    }
+
+    .alert {
+        padding: 15px 20px;
+        border-radius: 10px;
+        margin-bottom: 25px;
+        border: 1px solid transparent;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .alert-info {
+        background: #d1ecf1;
+        border-color: #bee5eb;
+        color: #0c5460;
+    }
+
+    .alert-success {
+        background: #d4edda;
+        border-color: #c3e6cb;
+        color: #155724;
+    }
+
+    .alert-warning {
+        background: #fff3cd;
+        border-color: #ffeaa7;
+        color: #856404;
+    }
+
+    .alert-danger {
+        background: #f8d7da;
+        border-color: #f5c6cb;
+        color: #721c24;
+    }
+
+    /* Styles pour la sélection d'articles */
+    .articles-selection {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin-top: 15px;
+    }
+
+    .articles-list {
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        background: white;
+        margin-top: 15px;
+    }
+
+    .article-item {
+        padding: 12px 15px;
+        border-bottom: 1px solid #f1f3f4;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .article-item:last-child {
+        border-bottom: none;
+    }
+
+    .article-item:hover {
+        background: #f8f9fa;
+    }
+
+    .article-checkbox {
+        margin-right: 10px;
+    }
+
+    .article-info {
+        flex: 1;
+    }
+
+    .article-reference {
+        font-weight: 600;
+        color: #495057;
+        font-size: 0.9em;
+    }
+
+    .article-designation {
+        color: #6c757d;
+        font-size: 0.85em;
+        margin-top: 2px;
+    }
+
+    .article-stock {
+        font-size: 0.8em;
+        color: #28a745;
+        font-weight: 500;
+    }
+
+    .no-articles {
+        text-align: center;
+        padding: 40px;
+        color: #6c757d;
+        font-style: italic;
+    }
+
+    .selection-summary {
+        background: #e3f2fd;
+        border: 1px solid #bbdefb;
+        border-radius: 8px;
+        padding: 15px;
+        margin-top: 15px;
+        font-size: 0.9em;
+        color: #1565c0;
+    }
+
+    .badge {
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 0.75em;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .badge-en-cours {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .badge-termine {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .badge-annule {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    @media (max-width: 768px) {
+        .page-header {
+            flex-direction: column;
+            text-align: center;
+            gap: 20px;
+        }
+
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .export-actions {
+            flex-direction: column;
+        }
+
+        .table-responsive {
+            font-size: 0.9em;
+        }
+
+        .table th,
+        .table td {
+            padding: 10px 8px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- En-tête -->
+    <div class="page-header">
+        <div class="header-content">
+            <h1><i class="fas fa-clipboard-list"></i> Inventaire de Stock</h1>
+            <p>Génération et consultation des inventaires de stock</p>
+        </div>
+        <div class="header-actions">
+            <a href="{% url 'dashboard_stock' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Retour au Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistiques générales -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-boxes"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ total_articles }}</div>
+                <div class="stat-label">Articles en Stock</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-cubes"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ total_quantite }}</div>
+                <div class="stat-label">Quantité Totale</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-money-bill-wave"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ valeur_totale_stock|floatformat:0 }} FCFA</div>
+                <div class="stat-label">Valeur Totale du Stock</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulaire de génération -->
+    <div class="card">
+        <div class="card-header">
+            <h5><i class="fas fa-plus-circle"></i> Générer un Inventaire</h5>
+        </div>
+        <div class="card-body">
+            <form id="inventaireForm" method="POST" action="{% url 'generer_inventaire' %}">
+                {% csrf_token %}
+                <div class="row">
+                    <!-- Période -->
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label for="date_debut">Date de Début <span style="color: red;">*</span></label>
+                            <input type="date" class="form-control" id="date_debut" name="date_debut" required>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label for="date_fin">Date de Fin <span style="color: red;">*</span></label>
+                            <input type="date" class="form-control" id="date_fin" name="date_fin" required>
+                        </div>
+                    </div>
+                    
+                    <!-- Famille -->
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label for="famille">Famille d'Articles</label>
+                            <select class="form-control" id="famille" name="famille">
+                                <option value="">Toutes les familles</option>
+                                {% for famille in familles %}
+                                    <option value="{{ famille.id }}">{{ famille.intitule }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Type de sélection -->
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label for="selection_articles">Sélection d'Articles</label>
+                            <select class="form-control" id="selection_articles" name="selection_articles">
+                                <option value="tous">Tous les articles</option>
+                                <option value="selectionnes">Articles sélectionnés</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section sélection d'articles -->
+                <div id="articles-selection-section" class="articles-selection" style="display: none;">
+                    <h6><i class="fas fa-list-check"></i> Sélectionner les Articles</h6>
+                    <p class="text-muted">Choisissez les articles spécifiques à inclure dans l'inventaire</p>
+                    
+                    <div id="articles-list" class="articles-list">
+                        <div class="no-articles">
+                            <i class="fas fa-box-open" style="font-size: 2em; margin-bottom: 15px; color: #dee2e6;"></i>
+                            <br>Sélectionnez une famille pour voir les articles
+                        </div>
+                    </div>
+                    
+                    <div id="selection-summary" class="selection-summary" style="display: none;">
+                        <i class="fas fa-info-circle"></i>
+                        <span id="selected-count">0</span> article(s) sélectionné(s)
+                    </div>
+                </div>
+
+                <!-- Bouton de génération -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <i class="fas fa-clipboard-list"></i> Générer l'Inventaire
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Résultats -->
+    <div id="results-section" class="card" style="display: none;">
+        <div class="card-header">
+            <h5><i class="fas fa-clipboard-check"></i> Inventaire Généré</h5>
+        </div>
+        <div class="card-body">
+            <div id="inventaire-summary" class="mb-4"></div>
+            
+            <div class="export-actions">
+                <a href="#" class="btn btn-success" id="export-excel" onclick="exportInventaire('excel')" target="_blank">
+                    <i class="fas fa-file-excel"></i> Exporter en Excel
+                </a>
+                <a href="#" class="btn btn-danger" id="export-pdf" onclick="exportInventaire('pdf')" target="_blank">
+                    <i class="fas fa-file-pdf"></i> Exporter en PDF
+                </a>
+                <a href="#" class="btn btn-info" id="export-csv" onclick="exportInventaire('csv')" target="_blank">
+                    <i class="fas fa-file-csv"></i> Exporter en CSV
+                </a>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table" id="inventaire-table">
+                    <thead>
+                        <tr>
+                            <th><i class="fas fa-barcode"></i> Référence</th>
+                            <th><i class="fas fa-box"></i> Désignation</th>
+                            <th><i class="fas fa-cubes"></i> Quantité Stock</th>
+                            <th><i class="fas fa-dollar-sign"></i> Prix Unitaire (FCFA)</th>
+                            <th><i class="fas fa-coins"></i> Valeur (FCFA)</th>
+                            <th><i class="fas fa-box-open"></i> Conditionnement</th>
+                            <th><i class="fas fa-comment"></i> Commentaire</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inventaire-tbody">
+                        <tr>
+                            <td colspan="7" class="text-center text-muted">
+                                <i class="fas fa-info-circle"></i> Génerez un inventaire pour voir les résultats
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Messages -->
+    <div id="messages-container"></div>
+</div>
+
+<script>
+// Variable globale pour stocker l'ID de l'inventaire
+let currentInventaireId = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialiser les dates
+    const today = new Date();
+    const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+    
+    document.getElementById('date_fin').value = today.toISOString().split('T')[0];
+    document.getElementById('date_debut').value = lastMonth.toISOString().split('T')[0];
+    
+    // Gestion du changement de famille
+    document.getElementById('famille').addEventListener('change', function() {
+        const familleId = this.value;
+        loadArticlesByFamille(familleId);
+    });
+    
+    // Gestion du changement de type de sélection
+    document.getElementById('selection_articles').addEventListener('change', function() {
+        const articlesSection = document.getElementById('articles-selection-section');
+        if (this.value === 'selectionnes') {
+            articlesSection.style.display = 'block';
+            // Charger les articles si une famille est sélectionnée
+            const familleId = document.getElementById('famille').value;
+            if (familleId) {
+                loadArticlesByFamille(familleId);
+            }
+        } else {
+            articlesSection.style.display = 'none';
+        }
+    });
+    
+    // Gestion du formulaire
+    document.getElementById('inventaireForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const dateDebut = document.getElementById('date_debut').value;
+        const dateFin = document.getElementById('date_fin').value;
+        const selectionType = document.getElementById('selection_articles').value;
+        
+        if (!dateDebut || !dateFin) {
+            showMessage('Veuillez sélectionner les dates de début et de fin.', 'warning');
+            return;
+        }
+        
+        if (new Date(dateDebut) > new Date(dateFin)) {
+            showMessage('La date de début doit être antérieure à la date de fin.', 'warning');
+            return;
+        }
+        
+        if (selectionType === 'selectionnes') {
+            const selectedArticles = document.querySelectorAll('input[name="articles_selectionnes[]"]:checked');
+            if (selectedArticles.length === 0) {
+                showMessage('Veuillez sélectionner au moins un article.', 'warning');
+                return;
+            }
+        }
+        
+        showLoading();
+        submitForm();
+    });
+});
+
+function loadArticlesByFamille(familleId) {
+    const articlesList = document.getElementById('articles-list');
+    const selectionType = document.getElementById('selection_articles').value;
+    
+    if (selectionType !== 'selectionnes') {
+        return;
+    }
+    
+    articlesList.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Chargement des articles...</div>';
+    
+    // Simuler le chargement des articles
+    setTimeout(() => {
+        let articlesHtml = '';
+        
+        if (familleId) {
+            // Simulation d'articles (en réalité, vous feriez un appel AJAX)
+            articlesHtml = `
+                <div class="article-item">
+                    <input type="checkbox" class="article-checkbox" 
+                           name="articles_selectionnes[]" 
+                           value="1" 
+                           onchange="updateSelectionSummary()">
+                    <div class="article-info">
+                        <div class="article-reference">ART001</div>
+                        <div class="article-designation">Article exemple de la famille sélectionnée</div>
+                        <div class="article-stock">Stock: 50 | Prix: 1,500 FCFA | Valeur: 75,000 FCFA</div>
+                    </div>
+                </div>
+                <div class="article-item">
+                    <input type="checkbox" class="article-checkbox" 
+                           name="articles_selectionnes[]" 
+                           value="2" 
+                           onchange="updateSelectionSummary()">
+                    <div class="article-info">
+                        <div class="article-reference">ART002</div>
+                        <div class="article-designation">Autre article de la famille</div>
+                        <div class="article-stock">Stock: 25 | Prix: 2,000 FCFA | Valeur: 50,000 FCFA</div>
+                    </div>
+                </div>
+            `;
+        } else {
+            articlesHtml = '<div class="no-articles">Sélectionnez une famille pour voir les articles</div>';
+        }
+        
+        articlesList.innerHTML = articlesHtml;
+    }, 300);
+}
+
+function updateSelectionSummary() {
+    const selectedArticles = document.querySelectorAll('input[name="articles_selectionnes[]"]:checked');
+    const summary = document.getElementById('selection-summary');
+    const count = document.getElementById('selected-count');
+    
+    if (selectedArticles.length > 0) {
+        count.textContent = selectedArticles.length;
+        summary.style.display = 'block';
+    } else {
+        summary.style.display = 'none';
+    }
+}
+
+function submitForm() {
+    const form = document.getElementById('inventaireForm');
+    const formData = new FormData(form);
+    
+    fetch('{% url "generer_inventaire" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        
+        if (data.success) {
+            displayInventaire(data);
+            showMessage('Inventaire généré avec succès !', 'success');
+        } else {
+            showMessage('Erreur: ' + data.error, 'danger');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        showMessage('Erreur lors de la génération de l\'inventaire.', 'danger');
+        console.error('Error:', error);
+    });
+}
+
+function displayInventaire(data) {
+    const resultsSection = document.getElementById('results-section');
+    const summaryDiv = document.getElementById('inventaire-summary');
+    const tbody = document.getElementById('inventaire-tbody');
+    
+    // Stocker l'ID de l'inventaire pour les exports
+    if (data.inventaire_id) {
+        currentInventaireId = data.inventaire_id;
+    }
+    
+    // Affichage des résultats
+    resultsSection.style.display = 'block';
+    
+    // Résumé
+    summaryDiv.innerHTML = `
+        <div class="alert alert-success">
+            <h6><i class="fas fa-check-circle"></i> Inventaire Généré avec Succès</h6>
+            <div class="row">
+                <div class="col-md-3">
+                    <strong>Numéro d'inventaire:</strong> ${data.numero_inventaire}
+                </div>
+                <div class="col-md-3">
+                    <strong>Total articles:</strong> ${data.total_articles}
+                </div>
+                <div class="col-md-3">
+                    <strong>Quantité totale:</strong> ${data.total_quantite}
+                </div>
+                <div class="col-md-3">
+                    <strong>Valeur totale:</strong> ${data.total_valeur.toLocaleString()} FCFA
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Tableau de l'inventaire (simulé - en réalité les données viendraient de la vue)
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="7" class="text-center text-muted">
+                <i class="fas fa-info-circle"></i> Les détails de l'inventaire seront chargés depuis la base de données
+            </td>
+        </tr>
+    `;
+    
+    // Faire défiler vers les résultats
+    resultsSection.scrollIntoView({ behavior: 'smooth' });
+}
+
+function exportInventaire(format) {
+    if (!currentInventaireId) {
+        showMessage('Aucun inventaire généré. Veuillez d\'abord générer un inventaire.', 'warning');
+        return;
+    }
+    
+    let url = '';
+    switch(format) {
+        case 'excel':
+            url = `{% url 'export_inventaire_excel' %}?inventaire_id=${currentInventaireId}`;
+            break;
+        case 'pdf':
+            url = `{% url 'export_inventaire_pdf' %}?inventaire_id=${currentInventaireId}`;
+            break;
+        case 'csv':
+            url = `{% url 'export_inventaire_csv' %}?inventaire_id=${currentInventaireId}`;
+            break;
+        default:
+            showMessage('Format d\'export non supporté.', 'error');
+            return;
+    }
+    
+    // Ouvrir le lien d'export
+    window.open(url, '_blank');
+}
+
+function showLoading() {
+    const loadingSpinner = document.createElement('div');
+    loadingSpinner.id = 'loading-spinner';
+    loadingSpinner.className = 'loading-spinner';
+    loadingSpinner.innerHTML = `
+        <div class="spinner-border text-primary" role="status">
+            <span class="sr-only">Chargement...</span>
+        </div>
+        <p class="mt-2">Génération de l'inventaire en cours...</p>
+    `;
+    
+    document.getElementById('inventaireForm').appendChild(loadingSpinner);
+    loadingSpinner.style.display = 'block';
+}
+
+function hideLoading() {
+    const loadingSpinner = document.getElementById('loading-spinner');
+    if (loadingSpinner) {
+        loadingSpinner.remove();
+    }
+}
+
+function showMessage(message, type) {
+    const messagesContainer = document.getElementById('messages-container');
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type}`;
+    alertDiv.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'warning' ? 'exclamation-triangle' : type === 'danger' ? 'exclamation-circle' : 'info-circle'}"></i>
+        ${message}
+    `;
+    
+    messagesContainer.appendChild(alertDiv);
+    
+    // Auto-supprimer après 5 secondes
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 5000);
+}
+</script>
+{% endblock %}

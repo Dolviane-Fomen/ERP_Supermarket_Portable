@@ -1,0 +1,31 @@
+{
+  "erp_launcher_sync": true,
+  "sync_interval": 180,
+  "machines": {
+    "CAISSE01": {
+      "agence_id": 8,
+      "local_sync_dir": "C:/erp_sync",
+      "remote_targets": [
+        {
+          "name": "COMPTA01",
+          "path": "\\\\COMPTA01\\erp_sync"
+        }
+      ]
+    },
+    "COMPTA01": {
+      "agence_id": 8,
+      "local_sync_dir": "C:/erp_sync",
+      "remote_targets": [
+        {
+          "name": "CAISSE01",
+          "path": "\\\\CAISSE01\\erp_sync"
+        }
+      ]
+    },
+    "default": {
+      "agence_id": 1,
+      "local_sync_dir": "C:/erp_sync",
+      "remote_targets": []
+    }
+  }
+}

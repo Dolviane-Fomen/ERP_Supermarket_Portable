@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rapport Livreur</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    {% load static %}
+
+    <style>
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container-fluid {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .page-header {
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 10px 30px rgba(6, 190, 182, 0.3);
+        }
+
+        .header-content h1 {
+            margin: 0;
+            font-size: 2.2em;
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header-content p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(6, 190, 182, 0.3);
+        }
+
+        .btn-success:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(6, 190, 182, 0.4);
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            color: white;
+            padding: 20px 30px;
+            border-bottom: none;
+        }
+
+        .card-header h5 {
+            margin: 0;
+            font-size: 1.3em;
+            font-weight: 600;
+        }
+
+        .card-body {
+            padding: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #2c3e50;
+            font-weight: 600;
+            font-size: 0.95em;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 0.95em;
+            transition: all 0.3s ease;
+            background: white;
+            font-family: inherit;
+            box-sizing: border-box;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #06beb6;
+            box-shadow: 0 0 0 3px rgba(6, 190, 182, 0.1);
+        }
+
+        .btn-block {
+            width: 100%;
+            display: block;
+        }
+
+        .alert {
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            border-color: #28a745;
+            color: #155724;
+        }
+
+        .alert-danger {
+            background: #f8d7da;
+            border-color: #dc3545;
+            color: #721c24;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            border-color: #17a2b8;
+            color: #0c5460;
+        }
+
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .loading-spinner.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #06beb6;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results-section {
+            display: none;
+        }
+
+        .results-section.active {
+            display: block;
+        }
+
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .summary-stat {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .summary-stat-number {
+            font-size: 2.5em;
+            font-weight: 700;
+            color: #06beb6;
+            margin-bottom: 10px;
+        }
+
+        .summary-stat-label {
+            color: #6c757d;
+            font-size: 1em;
+            font-weight: 500;
+        }
+
+        .livraison-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .livraison-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e1e8ed;
+        }
+
+        .livraison-info {
+            flex: 1;
+        }
+
+        .livraison-date {
+            font-size: 1.2em;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .livraison-client {
+            color: #6c757d;
+            font-size: 1em;
+        }
+
+        .livraison-etat {
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        .etat-livree {
+            background: #E8F5E9;
+            color: #28a745;
+        }
+
+        .etat-partielle {
+            background: #FFF9C4;
+            color: #ffc107;
+        }
+
+        .etat-pas-livree {
+            background: #FFEBEE;
+            color: #dc3545;
+        }
+
+        .articles-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        .articles-table th {
+            background: #E0F7FA;
+            color: #2c3e50;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9em;
+            border-bottom: 2px solid #06beb6;
+        }
+
+        .articles-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e1e8ed;
+        }
+
+        .articles-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .raison-non-livraison {
+            margin-top: 15px;
+            padding: 15px;
+            background: #FFEBEE;
+            border-left: 4px solid #dc3545;
+            border-radius: 5px;
+            color: #721c24;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- En-tête -->
+        <div class="page-header">
+            <div class="header-content">
+                <h1><i class="fas fa-truck"></i> Rapport Livreur</h1>
+                <p>Générez et exportez les rapports de livraison par livreur</p>
+            </div>
+            <div class="header-actions">
+                <a href="{% url 'dashboard_commandes' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Retour
+                </a>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Formulaire de génération -->
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-filter"></i> Critères de sélection</h5>
+            </div>
+            <div class="card-body">
+                <form id="rapportForm">
+                    {% csrf_token %}
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                        <div class="form-group">
+                            <label for="date_debut"><i class="fas fa-calendar-alt"></i> Date de début *</label>
+                            <input type="date" id="date_debut" name="date_debut" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="date_fin"><i class="fas fa-calendar-alt"></i> Date de fin *</label>
+                            <input type="date" id="date_fin" name="date_fin" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="livreur"><i class="fas fa-user-tie"></i> Livreur *</label>
+                            <select id="livreur" name="livreur" class="form-control" required>
+                                <option value="">Sélectionner un livreur</option>
+                                {% for livreur in livreurs %}
+                                    <option value="{{ livreur.id }}">{{ livreur.nom }} {{ livreur.prenom }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div style="margin-top: 25px; display: flex; gap: 15px;">
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <i class="fas fa-chart-bar"></i> Générer le rapport
+                        </button>
+                        <button type="button" id="exportBtn" class="btn btn-success" style="display: none;">
+                            <i class="fas fa-file-excel"></i> Exporter en Excel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Loading spinner -->
+        <div class="loading-spinner" id="loadingSpinner">
+            <div class="spinner"></div>
+            <p style="margin-top: 20px; color: #6c757d;">Génération du rapport en cours...</p>
+        </div>
+
+        <!-- Section des résultats -->
+        <div class="results-section" id="resultsSection">
+            <!-- Résumé -->
+            <div class="summary-stats" id="summaryStats">
+                <div class="summary-stat">
+                    <div class="summary-stat-number" id="totalLivraisons">0</div>
+                    <div class="summary-stat-label">Total Livraisons</div>
+                </div>
+                <div class="summary-stat">
+                    <div class="summary-stat-number" id="livrees" style="color: #28a745;">0</div>
+                    <div class="summary-stat-label">Livrées</div>
+                </div>
+                <div class="summary-stat">
+                    <div class="summary-stat-number" id="partielles" style="color: #ffc107;">0</div>
+                    <div class="summary-stat-label">Partielles</div>
+                </div>
+                <div class="summary-stat">
+                    <div class="summary-stat-number" id="nonLivrees" style="color: #dc3545;">0</div>
+                    <div class="summary-stat-label">Non Livrées</div>
+                </div>
+            </div>
+
+            <!-- Détails des livraisons -->
+            <div id="livraisonsDetails"></div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('rapportForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const resultsSection = document.getElementById('resultsSection');
+            const exportBtn = document.getElementById('exportBtn');
+            
+            // Afficher le spinner
+            loadingSpinner.classList.add('active');
+            resultsSection.classList.remove('active');
+            exportBtn.style.display = 'none';
+            
+            fetch('{% url "generer_rapport_livreur" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                loadingSpinner.classList.remove('active');
+                
+                if (data.success) {
+                    // Afficher les résultats
+                    displayResults(data);
+                    resultsSection.classList.add('active');
+                    exportBtn.style.display = 'inline-flex';
+                } else {
+                    alert('Erreur: ' + data.error);
+                }
+            })
+            .catch(error => {
+                loadingSpinner.classList.remove('active');
+                alert('Erreur lors de la génération du rapport: ' + error);
+            });
+        });
+        
+        function displayResults(data) {
+            // Mettre à jour les statistiques
+            document.getElementById('totalLivraisons').textContent = data.total;
+            document.getElementById('livrees').textContent = data.livrees;
+            document.getElementById('partielles').textContent = data.partielles;
+            document.getElementById('nonLivrees').textContent = data.non_livrees;
+            
+            // Afficher les détails des livraisons
+            const livraisonsDetails = document.getElementById('livraisonsDetails');
+            livraisonsDetails.innerHTML = '';
+            
+            if (data.livraisons && data.livraisons.length > 0) {
+                data.livraisons.forEach(livraison => {
+                    const card = document.createElement('div');
+                    card.className = 'livraison-card';
+                    
+                    let etatClass = '';
+                    if (livraison.etat === 'livree') {
+                        etatClass = 'etat-livree';
+                    } else if (livraison.etat === 'livree_partiellement') {
+                        etatClass = 'etat-partielle';
+                    } else if (livraison.etat === 'pas_livree') {
+                        etatClass = 'etat-pas-livree';
+                    }
+                    
+                    let articlesHtml = '';
+                    if (livraison.articles && livraison.articles.length > 0) {
+                        articlesHtml = '<table class="articles-table"><thead><tr><th>Référence</th><th>Désignation</th><th>Qté Commandée</th><th>Qté Livrée</th><th>Qté Non Livrée</th><th>Unité</th><th>Prix Unitaire</th><th>Prix Total</th></tr></thead><tbody>';
+                        livraison.articles.forEach(article => {
+                            articlesHtml += `<tr>
+                                <td>${article.reference}</td>
+                                <td>${article.designation}</td>
+                                <td>${article.quantite_commandee.toFixed(2)}</td>
+                                <td>${article.quantite_livree.toFixed(2)}</td>
+                                <td>${article.quantite_non_livree.toFixed(2)}</td>
+                                <td>${article.unite}</td>
+                                <td>${article.prix_unitaire.toFixed(2)} FCFA</td>
+                                <td>${article.prix_total.toFixed(2)} FCFA</td>
+                            </tr>`;
+                        });
+                        articlesHtml += '</tbody></table>';
+                    }
+                    
+                    let raisonHtml = '';
+                    if (livraison.raison_non_livraison) {
+                        raisonHtml = `<div class="raison-non-livraison">
+                            <strong>Raison non-livraison:</strong> ${livraison.raison_non_livraison}
+                        </div>`;
+                    }
+                    
+                    card.innerHTML = `
+                        <div class="livraison-header">
+                            <div class="livraison-info">
+                                <div class="livraison-date">${livraison.date} - ${livraison.heure_depart || ''} / ${livraison.heure_arrivee || ''}</div>
+                                <div class="livraison-client">${livraison.client} - ${livraison.telephone} - ${livraison.zone}</div>
+                            </div>
+                            <span class="livraison-etat ${etatClass}">${livraison.etat_display}</span>
+                        </div>
+                        <div><strong>ARTICLES:</strong></div>
+                        ${articlesHtml}
+                        ${raisonHtml}
+                    `;
+                    
+                    livraisonsDetails.appendChild(card);
+                });
+            } else {
+                livraisonsDetails.innerHTML = '<div class="alert alert-info">Aucune livraison trouvée pour cette période.</div>';
+            }
+        }
+        
+        // Export Excel
+        document.getElementById('exportBtn').addEventListener('click', function() {
+            window.location.href = '{% url "export_rapport_livreur_excel" %}';
+        });
+    </script>
+</body>
+</html>
+
+

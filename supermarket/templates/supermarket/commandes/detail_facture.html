@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Détail Facture</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            min-height: 100vh;
+            padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(6, 190, 182, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(72, 177, 191, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(26, 188, 156, 0.2) 0%, transparent 50%);
+            z-index: -1;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .main-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 
+                0 20px 40px rgba(0, 0, 0, 0.1),
+                0 0 0 1px rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .facture-header {
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            color: white;
+            padding: 30px 40px;
+            text-align: center;
+            position: relative;
+        }
+
+        .facture-header h2 {
+            margin: 0 0 10px 0;
+            font-size: 2em;
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .facture-header p {
+            margin: 0;
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .facture-content {
+            padding: 40px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .info-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+
+        .info-section:hover {
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            transform: translateY(-2px);
+        }
+
+        .info-section h3 {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: #495057;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e9ecef;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-section h3 i {
+            color: #06beb6;
+            font-size: 1.1em;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #f1f3f4;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #6c757d;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .info-value {
+            font-weight: 500;
+            color: #495057;
+            text-align: right;
+        }
+
+        .articles-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 40px;
+            border: 1px solid #e9ecef;
+        }
+
+        .articles-section h3 {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: #495057;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e9ecef;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .articles-section h3 i {
+            color: #28a745;
+            font-size: 1.1em;
+        }
+
+        .articles-table {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .articles-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .articles-table th {
+            background: linear-gradient(135deg, #495057 0%, #343a40 100%);
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 0.9em;
+        }
+
+        .articles-table td {
+            padding: 15px;
+            border-bottom: 1px solid #f1f3f4;
+            background: white;
+        }
+
+        .articles-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .articles-table tr:hover {
+            background: linear-gradient(135deg, rgba(6, 190, 182, 0.05) 0%, rgba(72, 177, 191, 0.05) 100%);
+        }
+
+        .total-section {
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            margin-top: 25px;
+            text-align: right;
+        }
+
+        .total-section h3 {
+            font-size: 1.5em;
+            margin: 0;
+            font-weight: 700;
+        }
+
+        .actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 2px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+            color: #212529;
+            box-shadow: 0 4px 15px rgba(255, 193, 7, 0.3);
+        }
+
+        .btn-warning:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(255, 193, 7, 0.4);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(108, 117, 125, 0.4);
+        }
+
+        @media (max-width: 768px) {
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .actions {
+                flex-direction: column;
+            }
+            
+            .facture-content {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="main-card">
+            <div class="facture-header">
+                <h2><i class="fas fa-file-invoice-dollar"></i> Détail de la Facture</h2>
+                <p>Informations complètes de la facture</p>
+            </div>
+
+            <div class="facture-content">
+                <!-- Informations générales -->
+                <div class="info-grid">
+                    <div class="info-section">
+                        <h3><i class="fas fa-info-circle"></i> Informations Facture</h3>
+                        <div class="info-row">
+                            <span class="info-label">Numéro</span>
+                            <span class="info-value">{{ facture.numero_facture }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Date</span>
+                            <span class="info-value">{{ facture.date_facture|date:"d/m/Y" }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Date de création</span>
+                            <span class="info-value">{{ facture.date_creation|date:"d/m/Y H:i" }}</span>
+                        </div>
+                    </div>
+
+                    <div class="info-section">
+                        <h3><i class="fas fa-user"></i> Informations Client</h3>
+                        {% if facture.commande %}
+                        <div class="info-row">
+                            <span class="info-label">Client</span>
+                            <span class="info-value">{{ facture.commande.client.intitule }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Date commande</span>
+                            <span class="info-value">{{ facture.commande.date|date:"d/m/Y" }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Heure commande</span>
+                            <span class="info-value">{{ facture.commande.heure|time:"H:i" }}</span>
+                        </div>
+                        {% else %}
+                        <div class="info-row">
+                            <span class="info-value">Aucune commande associée</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Articles de la facture -->
+                {% if commandes %}
+                <div class="articles-section">
+                    <h3><i class="fas fa-list"></i> Articles de la Facture</h3>
+                    <div class="articles-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Article</th>
+                                    <th>Référence</th>
+                                    <th>Quantité</th>
+                                    <th>Prix unitaire</th>
+                                    <th>Prix total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for commande in commandes %}
+                                <tr>
+                                    <td>{{ commande.article.designation }}</td>
+                                    <td>{{ commande.article.reference_article|default:"-" }}</td>
+                                    <td>{{ commande.quantite|floatformat:3 }}</td>
+                                    <td>{{ commande.article.prix_vente|floatformat:0 }} FCFA</td>
+                                    <td><strong>{{ commande.prix_total|floatformat:0 }} FCFA</strong></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="total-section">
+                        <h3>Total: {{ quantite_totale|floatformat:3 }} articles - {{ prix_total|floatformat:0 }} FCFA</h3>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Actions -->
+                <div class="actions">
+                    <a href="{% url 'modifier_facture_commande' facture.id %}" class="btn btn-warning">
+                        <i class="fas fa-edit"></i>
+                        Modifier
+                    </a>
+                    <a href="{% url 'imprimer_facture_commande' facture.id %}" class="btn btn-primary">
+                        <i class="fas fa-print"></i>
+                        Imprimer
+                    </a>
+                    <a href="{% url 'consulter_factures_commande' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i>
+                        Retour à la Liste
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

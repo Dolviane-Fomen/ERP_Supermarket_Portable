@@ -1,0 +1,656 @@
+{% extends 'supermarket/stock/base_stock.html' %}
+{% load static %}
+
+{% block title %}Créer un Article{% endblock %}
+
+{% block extra_css %}
+<style>
+    body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 0;
+        position: relative;
+        overflow-x: hidden;
+    }
+
+    body::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: 
+            radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.2) 0%, transparent 50%);
+        z-index: -1;
+    }
+
+    .container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .main-card {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 20px;
+        box-shadow: 
+            0 20px 40px rgba(0, 0, 0, 0.1),
+            0 0 0 1px rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+        overflow: hidden;
+        margin-bottom: 20px;
+    }
+
+    .form-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 30px 40px;
+        text-align: center;
+        position: relative;
+    }
+
+    .form-header h2 {
+        margin: 0;
+        font-size: 1.8em;
+        font-weight: 700;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .form-header p {
+        margin: 10px 0 0 0;
+        opacity: 0.9;
+        font-size: 1em;
+    }
+
+    .form-content {
+        padding: 40px;
+    }
+
+    .form-group {
+        margin-bottom: 35px;
+        background: #f8f9fa;
+        border-radius: 15px;
+        padding: 25px;
+        border: 1px solid #e9ecef;
+        position: relative;
+        transition: all 0.3s ease;
+    }
+
+    .form-group:hover {
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        transform: translateY(-2px);
+    }
+
+    .form-group-title {
+        font-size: 1.2em;
+        font-weight: 700;
+        color: #495057;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e9ecef;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .form-group-title i {
+        color: #667eea;
+        font-size: 1.1em;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 25px;
+        margin-bottom: 20px;
+    }
+
+    .form-row.single {
+        grid-template-columns: 1fr;
+    }
+
+    .form-row.triple {
+        grid-template-columns: 1fr 1fr 1fr;
+    }
+
+    .form-field {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .form-field label {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 8px;
+        font-size: 0.95em;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .form-field input,
+    .form-field select,
+    .form-field textarea {
+        padding: 12px 15px;
+        border: 2px solid #e1e8ed;
+        border-radius: 10px;
+        font-size: 0.95em;
+        transition: all 0.3s ease;
+        background: white;
+        font-family: inherit;
+    }
+
+    .form-field input:focus,
+    .form-field select:focus,
+    .form-field textarea:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        transform: translateY(-1px);
+    }
+    
+
+    .form-field textarea {
+        resize: vertical;
+        min-height: 100px;
+    }
+
+    .price-types-section {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border: 2px solid #dee2e6;
+        border-radius: 15px;
+        padding: 25px;
+        margin-top: 20px;
+    }
+
+    .price-types-title {
+        font-size: 1.3em;
+        font-weight: 700;
+        color: #495057;
+        margin-bottom: 20px;
+        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    .price-types-title i {
+        color: #28a745;
+        font-size: 1.2em;
+    }
+
+    .price-types-table {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .price-types-table table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .price-types-table th {
+        background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+        color: white;
+        padding: 18px 20px;
+        text-align: left;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-size: 0.9em;
+    }
+
+    .price-types-table td {
+        padding: 18px 20px;
+        border-bottom: 1px solid #f1f3f4;
+        background: white;
+    }
+
+    .price-types-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .price-types-table input {
+        width: 100%;
+        padding: 12px 15px;
+        border: 2px solid #e1e8ed;
+        border-radius: 8px;
+        font-size: 0.95em;
+        transition: all 0.3s ease;
+        background: rgba(255, 255, 255, 0.9);
+    }
+
+    .price-types-table input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        transform: translateY(-1px);
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 20px;
+        justify-content: center;
+        margin-top: 40px;
+        padding-top: 30px;
+        border-top: 2px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .btn {
+        padding: 15px 30px;
+        border: none;
+        border-radius: 12px;
+        font-size: 1em;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+        transition: left 0.5s;
+    }
+
+    .btn:hover::before {
+        left: 100%;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
+    }
+
+    .btn-secondary {
+        background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+    }
+
+    .btn-secondary:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(108, 117, 125, 0.4);
+    }
+
+    .required {
+        color: #dc3545;
+        margin-left: 5px;
+    }
+
+    .help-text {
+        font-size: 0.85em;
+        color: #6c757d;
+        margin-top: 5px;
+        font-style: italic;
+    }
+
+    .alert {
+        padding: 15px 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        border-left: 4px solid;
+    }
+
+    .alert-success {
+        background-color: #d4edda;
+        border-color: #28a745;
+        color: #155724;
+    }
+
+    .alert-danger {
+        background-color: #f8d7da;
+        border-color: #dc3545;
+        color: #721c24;
+    }
+
+    @media (max-width: 768px) {
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+        
+        .form-row.triple {
+            grid-template-columns: 1fr;
+        }
+        
+        .form-content {
+            padding: 20px;
+        }
+        
+        .form-actions {
+            flex-direction: column;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="main-card">
+        <div class="form-header">
+            <h2><i class="fas fa-plus-circle"></i> Créer un Nouvel Article</h2>
+            <p>Remplissez les informations ci-dessous pour ajouter un nouvel article à votre inventaire</p>
+        </div>
+
+        <div class="form-content">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <form method="post" id="articleForm">
+                {% csrf_token %}
+                
+                <!-- Informations Générales -->
+                <div class="form-group">
+                    <div class="form-group-title">
+                        <i class="fas fa-info-circle"></i>
+                        Informations Générales
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="reference_article">Référence Article</label>
+                            <input type="text" id="reference_article" name="reference_article" 
+                                   placeholder="Générée automatiquement" value="{{ request.POST.reference_article }}" readonly>
+                            <div class="help-text">Code unique généré automatiquement lors de l'enregistrement</div>
+                        </div>
+                        
+                        <div class="form-field">
+                            <label for="designation">Désignation <span class="required">*</span></label>
+                            <input type="text" id="designation" name="designation" required 
+                                   placeholder="Nom de l'article" value="{{ request.POST.designation }}">
+                            <div class="help-text">Nom complet de l'article</div>
+                        </div>
+                        
+                        <div class="form-field">
+                            <label for="agence">Agence <span class="required">*</span></label>
+                            <select id="agence" name="agence" required>
+                                <option value="">Sélectionner une agence</option>
+                                {% for agence in agences %}
+                                    <option value="{{ agence.id_agence }}" 
+                                            {% if request.POST.agence == agence.id_agence|stringformat:"s" %}selected{% endif %}>
+                                        {{ agence.nom_agence }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="famille">Famille d'Article <span class="required">*</span></label>
+                            <select id="famille" name="famille" required>
+                                <option value="">Sélectionner une famille</option>
+                                {% for famille in familles %}
+                                    <option value="{{ famille.id }}" 
+                                            {% if request.POST.famille == famille.id|stringformat:"s" %}selected{% endif %}>
+                                        {{ famille.intitule }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <div class="help-text">Catégorie de l'article</div>
+                        </div>
+                        
+                        <div class="form-field">
+                            <label for="unite_vente">Unité de Vente <span class="required">*</span></label>
+                            <select id="unite_vente" name="unite_vente" required>
+                                <option value="">Sélectionner une unité</option>
+                                <option value="Sac" {% if request.POST.unite_vente == "Sac" %}selected{% endif %}>Sac</option>
+                                <option value="Bouteille" {% if request.POST.unite_vente == "Bouteille" %}selected{% endif %}>Bouteille</option>
+                                <option value="Morceau" {% if request.POST.unite_vente == "Morceau" %}selected{% endif %}>Morceau</option>
+                                <option value="Bidon" {% if request.POST.unite_vente == "Bidon" %}selected{% endif %}>Bidon</option>
+                                <option value="kg" {% if request.POST.unite_vente == "kg" %}selected{% endif %}>Kilogramme (kg)</option>
+                                <option value="g" {% if request.POST.unite_vente == "g" %}selected{% endif %}>Gramme (g)</option>
+                                <option value="L" {% if request.POST.unite_vente == "L" %}selected{% endif %}>Litre (L)</option>
+                                <option value="ml" {% if request.POST.unite_vente == "ml" %}selected{% endif %}>Millilitre (ml)</option>
+                                <option value="pièce" {% if request.POST.unite_vente == "pièce" %}selected{% endif %}>Pièce</option>
+                                <option value="paquet" {% if request.POST.unite_vente == "paquet" %}selected{% endif %}>Paquet</option>
+                                <option value="boîte" {% if request.POST.unite_vente == "boîte" %}selected{% endif %}>Boîte</option>
+                                <option value="carton" {% if request.POST.unite_vente == "carton" %}selected{% endif %}>Carton</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="conditionnement">Conditionnement</label>
+                            <select id="conditionnement" name="conditionnement">
+                                <option value="">Sélectionner un conditionnement</option>
+                                <option value="Sac" {% if request.POST.conditionnement == "Sac" %}selected{% endif %}>Sac</option>
+                                <option value="Bouteille" {% if request.POST.conditionnement == "Bouteille" %}selected{% endif %}>Bouteille</option>
+                                <option value="Morceau" {% if request.POST.conditionnement == "Morceau" %}selected{% endif %}>Morceau</option>
+                                <option value="Bidon" {% if request.POST.conditionnement == "Bidon" %}selected{% endif %}>Bidon</option>
+                                <option value="carton" {% if request.POST.conditionnement == "carton" %}selected{% endif %}>Carton</option>
+                                <option value="pièce" {% if request.POST.conditionnement == "pièce" %}selected{% endif %}>Pièce</option>
+                                <option value="emballage" {% if request.POST.conditionnement == "emballage" %}selected{% endif %}>Emballage</option>
+                                <option value="sachet" {% if request.POST.conditionnement == "sachet" %}selected{% endif %}>Sachet</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tarification -->
+                <div class="form-group">
+                    <div class="form-group-title">
+                        <i class="fas fa-dollar-sign"></i>
+                        Tarification
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="prix_achat">Prix d'Achat <span class="required">*</span></label>
+                            <input type="number" id="prix_achat" name="prix_achat" step="0.01" min="0" required 
+                                   placeholder="0.00" value="{{ request.POST.prix_achat }}">
+                            <div class="help-text">Prix d'achat unitaire en FCFA</div>
+                        </div>
+                        
+                        <div class="form-field">
+                            <label for="dernier_prix_achat">Dernier Prix d'Achat</label>
+                            <input type="number" id="dernier_prix_achat" name="dernier_prix_achat" step="0.01" min="0" 
+                                   placeholder="0.00" value="{{ request.POST.dernier_prix_achat }}">
+                            <div class="help-text">Dernier prix d'achat enregistré en FCFA</div>
+                        </div>
+                        
+                        <div class="form-field">
+                            <label for="prix_vente">Prix de Vente <span class="required">*</span></label>
+                            <input type="number" id="prix_vente" name="prix_vente" step="0.01" min="0" required 
+                                   placeholder="0.00" value="{{ request.POST.prix_vente }}">
+                            <div class="help-text">Prix de vente unitaire en FCFA</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gestion du Stock -->
+                <div class="form-group">
+                    <div class="form-group-title">
+                        <i class="fas fa-warehouse"></i>
+                        Gestion du Stock
+                    </div>
+                    
+                    <div class="form-row triple">
+                        <div class="form-field">
+                            <label for="stock_actuel">Stock Actuel <span class="required">*</span></label>
+                            <input type="number" id="stock_actuel" name="stock_actuel" step="0.01" min="0" required 
+                                   placeholder="0.00" value="{{ request.POST.stock_actuel }}">
+                            <div class="help-text">Quantité en stock (décimaux autorisés)</div>
+                        </div>
+                        
+                        <div class="form-field">
+                            <label for="stock_minimum">Stock Minimum</label>
+                            <input type="number" id="stock_minimum" name="stock_minimum" min="0" 
+                                   placeholder="0" value="{{ request.POST.stock_minimum }}">
+                            <div class="help-text">Seuil d'alerte</div>
+                        </div>
+                        
+                    </div>
+                </div>
+
+                <!-- Types de Vente et Prix -->
+                <div class="price-types-section">
+                    <div class="price-types-title">
+                        <i class="fas fa-tags"></i>
+                        Types de Vente et Prix
+                    </div>
+                    
+                    <div class="price-types-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Type de Vente</th>
+                                    <th>Prix de Vente (FCFA)</th>
+                                    <th>Marge (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Gros</strong></td>
+                                    <td>
+                                        <input type="number" name="prix_gros" step="0.01" min="0" 
+                                               placeholder="0.00" value="{{ request.POST.prix_gros }}">
+                                    </td>
+                                    <td>
+                                        <input type="number" name="marge_gros" step="0.01" min="0" max="100" 
+                                               placeholder="0.00" value="{{ request.POST.marge_gros }}">
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Demi-Gros</strong></td>
+                                    <td>
+                                        <input type="number" name="prix_demi_gros" step="0.01" min="0" 
+                                               placeholder="0.00" value="{{ request.POST.prix_demi_gros }}">
+                                    </td>
+                                    <td>
+                                        <input type="number" name="marge_demi_gros" step="0.01" min="0" max="100" 
+                                               placeholder="0.00" value="{{ request.POST.marge_demi_gros }}">
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Détail</strong></td>
+                                    <td>
+                                        <input type="number" name="prix_detail" step="0.01" min="0" 
+                                               placeholder="0.00" value="{{ request.POST.prix_detail }}">
+                                    </td>
+                                    <td>
+                                        <input type="number" name="marge_detail" step="0.01" min="0" max="100" 
+                                               placeholder="0.00" value="{{ request.POST.marge_detail }}">
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i>
+                        Créer l'Article
+                    </button>
+                    <a href="{% url 'dashboard_stock' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i>
+                        Retour au Dashboard
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // Calcul automatique des marges
+    const prixAchat = document.getElementById('prix_achat');
+    const dernierPrixAchat = document.getElementById('dernier_prix_achat');
+    const prixVente = document.getElementById('prix_vente');
+    
+    // Synchroniser le dernier prix d'achat avec le prix d'achat
+    if (prixAchat && dernierPrixAchat) {
+        prixAchat.addEventListener('input', function() {
+            if (!dernierPrixAchat.value || dernierPrixAchat.value === '') {
+                dernierPrixAchat.value = prixAchat.value;
+            }
+        });
+    }
+    
+    function calculerMarge(prixAchat, prixVente) {
+        if (prixAchat && prixVente && prixAchat > 0) {
+            return ((prixVente - prixAchat) / prixAchat * 100).toFixed(2);
+        }
+        return 0;
+    }
+    
+    // Mise à jour automatique des prix de vente
+    prixAchat.addEventListener('input', function() {
+        const prix = parseFloat(this.value);
+        if (prix > 0) {
+            // Mettre à jour le prix de vente par défaut
+            prixVente.value = (prix * 1.3).toFixed(2);
+            
+            // Mettre à jour les marges
+            document.querySelectorAll('input[name^="prix_"]').forEach(input => {
+                if (input.name !== 'prix_achat' && input.value) {
+                    const margeInput = input.name.replace('prix_', 'marge_');
+                    const margeField = document.querySelector(`input[name="${margeInput}"]`);
+                    if (margeField) {
+                        margeField.value = calculerMarge(prix, parseFloat(input.value));
+                    }
+                }
+            });
+        }
+    });
+    
+    // Validation du formulaire
+    document.getElementById('articleForm').addEventListener('submit', function(e) {
+        const designation = document.getElementById('designation').value.trim();
+        const agence = document.getElementById('agence').value;
+        const prixAchat = document.getElementById('prix_achat').value;
+        const prixVente = document.getElementById('prix_vente').value;
+        const stockActuel = document.getElementById('stock_actuel').value;
+        
+        if (!designation || !agence || !prixAchat || !prixVente || !stockActuel) {
+            e.preventDefault();
+            alert('Veuillez remplir tous les champs obligatoires.');
+            return false;
+        }
+        
+        if (parseFloat(prixVente) <= parseFloat(prixAchat)) {
+            e.preventDefault();
+            alert('Le prix de vente doit être supérieur au prix d\'achat.');
+            return false;
+        }
+    });
+});
+</script>
+{% endblock %}

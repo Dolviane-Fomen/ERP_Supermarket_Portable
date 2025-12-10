@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planification Livraison</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { font-size: 1.8em; margin: 0; }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .btn-primary { background: #28a745; color: white; }
+        .btn-primary:hover { background: #218838; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover { background: #5a6268; }
+        .content { padding: 30px; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e1e8ed;
+        }
+        th {
+            background-color: #f8f9fa;
+            color: #2c3e50;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85em;
+        }
+        tr:hover { background-color: #f8f9fa; }
+        tr.disabled-row {
+            background-color: #e9ecef !important;
+            opacity: 0.6;
+            color: #6c757d;
+        }
+        tr.disabled-row:hover {
+            background-color: #dee2e6 !important;
+        }
+        tr.disabled-row td {
+            color: #6c757d;
+        }
+        .badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            color: white;
+        }
+        .badge-success { background: #28a745; }
+        .badge-danger { background: #dc3545; }
+        .badge-info { background: #17a2b8; }
+        .badge-warning { background: #ffc107; color: #212529; }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        .empty-state i { font-size: 3em; margin-bottom: 10px; }
+        .section-title {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: #2c3e50;
+            margin: 30px 0 20px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #06beb6;
+        }
+        .stock-alert {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .stock-alert.danger {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+        .stock-alert.success {
+            background: #d4edda;
+            border-left-color: #28a745;
+        }
+        .stock-alert h4 {
+            margin: 0 0 10px 0;
+            color: #856404;
+            font-size: 1em;
+        }
+        .stock-alert.danger h4 {
+            color: #721c24;
+        }
+        .stock-alert.success h4 {
+            color: #155724;
+        }
+        .stock-details {
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+        .stock-details ul {
+            margin: 5px 0 0 20px;
+            padding: 0;
+        }
+        .stock-details li {
+            margin: 5px 0;
+        }
+        .btn-disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-truck"></i> Planification Livraison</h1>
+            <div>
+                <a href="{% url 'creer_planification_livraison' %}" class="btn btn-primary" style="background: #28a745; margin-right: 10px;">
+                    <i class="fas fa-plus"></i> Nouvelle Planification
+                </a>
+                <a href="{% url 'dashboard_commandes' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Retour
+                </a>
+            </div>
+        </div>
+        <div class="content">
+            <!-- Section: Commandes à planifier -->
+            <h2 class="section-title">
+                <i class="fas fa-shopping-cart"></i> Commandes à Planifier
+            </h2>
+            
+            {% if commandes_a_planifier %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date/Heure</th>
+                        <th>Client</th>
+                        <th>Nombre d'articles</th>
+                        <th>Quantité totale</th>
+                        <th>Prix total</th>
+                        <th>État Stock</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for groupe in commandes_a_planifier %}
+                    <tr {% if groupe.deja_planifiee %}class="disabled-row"{% endif %}>
+                        <td>
+                            {{ groupe.date|date:"d/m/Y" }}<br>
+                            <small>{{ groupe.heure|time:"H:i" }}</small>
+                        </td>
+                        <td>{{ groupe.client_intitule }}</td>
+                        <td>{{ groupe.nombre_articles }}</td>
+                        <td>{{ groupe.quantite_totale|floatformat:2 }}</td>
+                        <td>{{ groupe.prix_total|floatformat:0 }} FCFA</td>
+                        <td>
+                            {% if groupe.stock_suffisant %}
+                                <span class="badge badge-success">
+                                    <i class="fas fa-check-circle"></i> Stock Suffisant
+                                </span>
+                            {% else %}
+                                <span class="badge badge-danger">
+                                    <i class="fas fa-exclamation-triangle"></i> Stock Insuffisant
+                                </span>
+                                <div class="stock-alert danger" style="margin-top: 10px; max-width: 400px;">
+                                    <h4><i class="fas fa-exclamation-circle"></i> Articles en rupture de stock :</h4>
+                                    <div class="stock-details">
+                                        <ul>
+                                            {% for article in groupe.articles_insuffisants %}
+                                            <li>
+                                                <strong>{{ article.article }}</strong> ({{ article.reference }})<br>
+                                                Stock disponible: <strong>{{ article.stock_disponible|floatformat:2 }}</strong><br>
+                                                Quantité commandée: <strong>{{ article.quantite_commande|floatformat:2 }}</strong><br>
+                                                <span style="color: #dc3545;">Manquant: {{ article.manquant|floatformat:2 }}</span>
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if groupe.deja_planifiee %}
+                                <span class="badge badge-info" style="padding: 5px 10px; font-size: 0.85em;">
+                                    <i class="fas fa-check-circle"></i> Déjà Planifiée
+                                </span>
+                            {% elif groupe.stock_suffisant %}
+                                <a href="{% url 'creer_planification_livraison' %}?commande_id={{ groupe.id }}" class="btn btn-primary" style="padding: 5px 10px; font-size: 0.85em;">
+                                    <i class="fas fa-calendar-plus"></i> Planifier
+                                </a>
+                            {% else %}
+                                <button class="btn btn-secondary btn-disabled" style="padding: 5px 10px; font-size: 0.85em;" disabled title="Stock insuffisant - Impossible de planifier">
+                                    <i class="fas fa-ban"></i> Stock Insuffisant
+                                </button>
+                            {% endif %}
+                            <a href="{% url 'detail_commande' groupe.id %}" class="btn btn-info" style="padding: 5px 10px; font-size: 0.85em; margin-left: 5px;">
+                                <i class="fas fa-eye"></i> Voir
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-shopping-cart"></i>
+                <p>Aucune commande à planifier</p>
+            </div>
+            {% endif %}
+            
+            <!-- Section: Livraisons déjà planifiées -->
+            {% if livraisons %}
+            <h2 class="section-title" style="margin-top: 50px;">
+                <i class="fas fa-truck"></i> Livraisons Planifiées
+            </h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Commande</th>
+                        <th>Client</th>
+                        <th>État</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for livraison in livraisons %}
+                    <tr>
+                        <td>{{ livraison.date_livraison|date:"d/m/Y" }}</td>
+                        <td>#{{ livraison.commande.id|default:"-" }}</td>
+                        <td>{{ livraison.commande.client.intitule|default:"-" }}</td>
+                        <td>
+                            <span class="badge badge-{% if livraison.etat_livraison == 'livree' %}success{% elif livraison.etat_livraison == 'annulee' %}danger{% else %}info{% endif %}">
+                                {{ livraison.get_etat_livraison_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{% url 'consulter_livraisons' %}" class="btn btn-secondary" style="padding: 5px 10px; font-size: 0.85em;">
+                                <i class="fas fa-eye"></i> Voir
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
+

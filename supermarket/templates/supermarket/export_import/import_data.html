@@ -1,0 +1,102 @@
+{% extends 'supermarket/base.html' %}
+
+{% block title %}Importer les Données - ERP Supermarket{% endblock %}
+
+{% block header_title %}Importer les Données{% endblock %}
+{% block header_subtitle %}Restaurer les données depuis un fichier d'export{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 800px; margin: 30px auto; padding: 20px;">
+    
+    <div class="card shadow-sm">
+        <div class="card-header bg-success text-white">
+            <h4 class="mb-0"><i class="fas fa-upload"></i> Importer un Fichier d'Export</h4>
+        </div>
+        <div class="card-body">
+            {% if confirm_needed %}
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i> <strong>ATTENTION :</strong> 
+                Vous avez choisi de supprimer les données existantes. Cette action est IRRÉVERSIBLE !
+            </div>
+            {% endif %}
+            
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                
+                <div class="form-group">
+                    <label for="agence_id"><i class="fas fa-building"></i> Agence Cible pour l'Import</label>
+                    <select class="form-control" id="agence_id" name="agence_id" required>
+                        <option value="">-- Sélectionner une agence --</option>
+                        {% for ag in agences %}
+                        <option value="{{ ag.id_agence }}" {% if agence and ag.id_agence == agence.id_agence %}selected{% endif %}>
+                            {{ ag.nom_agence }} (ID: {{ ag.id_agence }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <small class="form-text text-muted">
+                        Sélectionnez l'agence dans laquelle vous voulez importer les données.
+                        Les données seront importées dans cette agence.
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="file"><i class="fas fa-file"></i> Fichier JSON d'export</label>
+                    <input type="file" class="form-control-file" id="file" name="file" accept=".json" required>
+                    <small class="form-text text-muted">Sélectionnez le fichier JSON exporté précédemment</small>
+                </div>
+                
+                <div class="form-group">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="clear_existing" name="clear_existing" 
+                               {% if confirm_needed %}checked{% endif %}>
+                        <label class="form-check-label" for="clear_existing">
+                            Supprimer les données existantes avant l'import
+                        </label>
+                        <small class="form-text text-muted text-danger">
+                            ⚠️ Cette option supprimera toutes les données existantes avant d'importer les nouvelles données.
+                        </small>
+                    </div>
+                </div>
+                
+                {% if confirm_needed %}
+                <input type="hidden" name="agence_id" value="{{ selected_agence_id }}">
+                <div class="form-group">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="confirm_clear" name="confirm_clear" value="yes" required>
+                        <label class="form-check-label text-danger" for="confirm_clear">
+                            <strong>Je confirme que je veux supprimer toutes les données existantes de l'agence sélectionnée</strong>
+                        </label>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <div class="form-group mt-4">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="fas fa-upload"></i> Importer les Données
+                    </button>
+                    <a href="{% url 'export_import_page' %}" class="btn btn-secondary btn-lg">
+                        <i class="fas fa-arrow-left"></i> Retour
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="card shadow-sm mt-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0"><i class="fas fa-info-circle"></i> Informations</h5>
+        </div>
+        <div class="card-body">
+            <ul>
+                <li>Le fichier doit être au format JSON</li>
+                <li>Vous devez sélectionner une agence cible pour l'import</li>
+                <li>Les données seront importées dans l'agence sélectionnée</li>
+                <li>Si une option "Supprimer les données existantes" est cochée, toutes les données de l'agence seront supprimées avant l'import</li>
+                <li>Les erreurs d'import seront affichées après le traitement</li>
+            </ul>
+        </div>
+    </div>
+    
+</div>
+{% endblock %}
+

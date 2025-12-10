@@ -1,0 +1,11 @@
+ERREUR 500 - ENREGISTREMENT FACTURE
+==================================================
+
+Erreur: unsupported operand type(s) for -=: 'decimal.Decimal' and 'float'
+
+Traceback:
+Traceback (most recent call last):
+  File "C:\django erp\ERP_Supermarket_Portable\supermarket\views.py", line 1400, in enregistrer_facture
+    article.stock_actuel -= quantite_vendue
+TypeError: unsupported operand type(s) for -=: 'decimal.Decimal' and 'float'
+

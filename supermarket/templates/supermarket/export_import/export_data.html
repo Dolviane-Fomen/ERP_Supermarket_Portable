@@ -1,0 +1,64 @@
+{% extends 'supermarket/base.html' %}
+
+{% block title %}Exporter les Données - ERP Supermarket{% endblock %}
+
+{% block header_title %}Exporter les Données{% endblock %}
+{% block header_subtitle %}Sauvegarder les données d'une agence au format JSON{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 800px; margin: 30px auto; padding: 20px;">
+    
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0"><i class="fas fa-download"></i> Exporter les Données d'une Agence</h4>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="form-group">
+                    <label for="agence_id"><i class="fas fa-building"></i> Sélectionner l'Agence</label>
+                    <select class="form-control" id="agence_id" name="agence_id" required>
+                        <option value="">-- Sélectionner une agence --</option>
+                        {% for ag in agences %}
+                        <option value="{{ ag.id_agence }}" {% if agence and ag.id_agence == agence.id_agence %}selected{% endif %}>
+                            {{ ag.nom_agence }} (ID: {{ ag.id_agence }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <small class="form-text text-muted">
+                        Sélectionnez l'agence dont vous voulez exporter les données. 
+                        Si vous laissez vide, toutes les agences seront exportées.
+                    </small>
+                </div>
+                
+                <div class="alert alert-info mt-3">
+                    <i class="fas fa-info-circle"></i> <strong>Données qui seront exportées :</strong>
+                    <ul class="mb-0 mt-2">
+                        <li>Articles et stocks de l'agence</li>
+                        <li>Clients et fournisseurs de l'agence</li>
+                        <li>Factures (vente, achat, transfert) de l'agence</li>
+                        <li>Mouvements de stock de l'agence</li>
+                        <li>Caisses et sessions de caisse de l'agence</li>
+                        <li>Comptes utilisateurs liés à l'agence (sans mots de passe)</li>
+                    </ul>
+                </div>
+                
+                <div class="form-group mt-4">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-download"></i> Télécharger l'Export
+                    </button>
+                    <a href="{% url 'export_import_page' %}" class="btn btn-secondary btn-lg">
+                        <i class="fas fa-arrow-left"></i> Retour
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+</div>
+{% endblock %}
+
+
+
+

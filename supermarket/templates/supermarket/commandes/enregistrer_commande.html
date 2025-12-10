@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enregistrer une Commande</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(6, 190, 182, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(72, 177, 191, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(26, 188, 156, 0.2) 0%, transparent 50%);
+            z-index: -1;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .main-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 
+                0 20px 40px rgba(0, 0, 0, 0.1),
+                0 0 0 1px rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .form-header {
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            color: white;
+            padding: 30px 40px;
+            text-align: center;
+            position: relative;
+        }
+
+        .form-header h2 {
+            margin: 0;
+            font-size: 1.8em;
+            font-weight: 700;
+            color: white !important;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .form-header h2 i {
+            color: white !important;
+        }
+        
+        .form-header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+            font-size: 1em;
+        }
+
+        .form-content {
+            padding: 40px;
+        }
+
+        .form-group {
+            margin-bottom: 35px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid #e9ecef;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .form-group:hover {
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            transform: translateY(-2px);
+        }
+
+        .form-group-title {
+            font-size: 1.2em;
+            font-weight: 700;
+            color: #495057;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e9ecef;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group-title i {
+            color: #06beb6;
+            font-size: 1.1em;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            margin-bottom: 20px;
+        }
+        
+        .form-row.single {
+            grid-template-columns: 1fr;
+        }
+
+        .form-row.triple {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+
+        .form-field {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-field label {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 8px;
+            font-size: 0.95em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-field input,
+        .form-field select,
+        .form-field textarea {
+            padding: 12px 15px;
+            border: 2px solid #e1e8ed;
+            border-radius: 10px;
+            font-size: 0.95em;
+            transition: all 0.3s ease;
+            background: white;
+            font-family: inherit;
+        }
+        
+        .form-field input:focus,
+        .form-field select:focus,
+        .form-field textarea:focus {
+            outline: none;
+            border-color: #06beb6;
+            box-shadow: 0 0 0 3px rgba(6, 190, 182, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .form-field input[readonly] {
+            background-color: #f8f9fa;
+            color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .form-field select {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 16px;
+            padding-right: 40px;
+        }
+        
+        .client-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .articles-section {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: 2px solid #dee2e6;
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 20px;
+        }
+
+        .articles-section-title {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: #495057;
+            margin-bottom: 20px;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .articles-section-title i {
+            color: #06beb6;
+            font-size: 1.2em;
+        }
+
+        .articles-table {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .articles-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .articles-table th {
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            color: white;
+            padding: 18px 20px;
+            text-align: left;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 0.9em;
+        }
+
+        .articles-table td {
+            padding: 18px 20px;
+            border-bottom: 1px solid #f1f3f4;
+            background: white;
+        }
+
+        .articles-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .articles-table tr:hover {
+            background: linear-gradient(135deg, rgba(6, 190, 182, 0.05) 0%, rgba(72, 177, 191, 0.05) 100%);
+        }
+        
+        .quantity-input {
+            width: 100px;
+            text-align: center;
+            padding: 10px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-weight: 600;
+            color: #06beb6;
+            transition: all 0.3s ease;
+        }
+
+        .quantity-input:focus {
+            border-color: #06beb6;
+            box-shadow: 0 0 0 3px rgba(6, 190, 182, 0.1);
+        }
+        
+        .price-cell {
+            color: #dc3545;
+            font-weight: 600;
+        }
+        
+        .center-cell {
+            text-align: center;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 2px dashed #dee2e6;
+        }
+        
+        .summary {
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            padding: 25px;
+            border-radius: 15px;
+            margin-top: 25px;
+            text-align: right;
+        }
+
+        .summary p {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: white;
+            margin: 10px 0;
+        }
+
+        .summary span {
+            font-size: 1.2em;
+        }
+        
+        .summary-item {
+            margin-bottom: 15px;
+        }
+        
+        .summary-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 2px solid rgba(0, 0, 0, 0.05);
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        }
+        
+        .btn-success:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(108, 117, 125, 0.4);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+        }
+        
+        .btn-danger:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(220, 53, 69, 0.4);
+        }
+
+        .delete-button {
+            padding: 8px 15px;
+            font-size: 0.9em;
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .delete-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+        }
+
+        .required {
+            color: #dc3545;
+            margin-left: 5px;
+        }
+
+        .help-text {
+            font-size: 0.85em;
+            color: #6c757d;
+            margin-top: 5px;
+            font-style: italic;
+        }
+
+        .alert {
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid;
+        }
+
+        .alert-success {
+            background-color: #d4edda;
+            border-color: #28a745;
+            color: #155724;
+        }
+
+        .alert-error {
+            background-color: #f8d7da;
+            border-color: #dc3545;
+            color: #721c24;
+        }
+        
+        #toast-container {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 99999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .form-row.triple {
+                grid-template-columns: 1fr;
+            }
+            
+            .form-content {
+                padding: 20px;
+            }
+            
+            .form-actions {
+                flex-direction: column;
+            }
+            
+            .form-actions .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div id="toast-container"></div>
+
+    <div class="container">
+    <div class="main-card">
+        <div class="form-header">
+            <h2><i class="fas fa-shopping-cart"></i> Enregistrer une Commande</h2>
+            <p>Créez une nouvelle commande client en sélectionnant les articles souhaités</p>
+        </div>
+
+        <div class="form-content">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+    <form method="post" action="{% url 'sauvegarder_commande' %}" id="main-form">
+        {% csrf_token %}
+
+            <!-- Section Client -->
+                    <div class="form-group">
+                    <div class="form-group-title">
+                        <i class="fas fa-user"></i>
+                        Informations Client
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="client-select">Client <span class="required">*</span></label>
+            <select id="client-select" name="client_id" required onchange="chargerInfosClient(this.value)">
+                <option value="">-- Sélectionner un client --</option>
+                            {% for client in clients %}
+                                <option value="{{ client.id }}" {% if commande_temporaire and commande_temporaire.client_id == client.id %}selected{% endif %}>
+                                    {{ client.intitule }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        </div>
+                    </div>
+
+        <!-- Informations client (remplies automatiquement) -->
+        <div class="client-info" id="client-info" style="display: none;">
+            <div class="form-field">
+                <label for="client-adresse">Adresse</label>
+                <input type="text" id="client-adresse" name="adresse" readonly>
+            </div>
+            <div class="form-field">
+                <label for="client-telephone">Téléphone</label>
+                <input type="text" id="client-telephone" name="telephone" readonly>
+            </div>
+            <div class="form-field">
+                <label for="client-email">Email</label>
+                <input type="email" id="client-email" name="email" readonly>
+            </div>
+        </div>
+            </div>
+
+                <!-- Section Date et Heure -->
+            <div class="form-group">
+                    <div class="form-group-title">
+                        <i class="fas fa-calendar-alt"></i>
+                        Date et Heure de la Commande
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="date-commande">Date <span class="required">*</span></label>
+                <input type="date" id="date-commande" name="date" value="{{ today|date:'Y-m-d' }}" required>
+                </div>
+                        <div class="form-field">
+                            <label for="heure-commande">Heure <span class="required">*</span></label>
+                <input type="time" id="heure-commande" name="heure" value="{{ now|time:'H:i' }}" required>
+                        </div>
+                </div>
+            </div>
+
+                <!-- Section Recherche d'articles -->
+        <div class="form-group">
+                    <div class="form-group-title">
+                        <i class="fas fa-search"></i>
+                        Recherche d'Articles
+                    </div>
+                    
+                    <div class="form-row single">
+                        <div class="form-field">
+            <label for="article-search">Rechercher un Article</label>
+            <input type="text" id="article-search" name="search_term" placeholder="Tapez au moins deux lettres pour rechercher" onkeyup="searchArticles()">
+                            <div class="help-text">La fenêtre de recherche s'ouvrira automatiquement après 2 lettres</div>
+                        </div>
+                    </div>
+        </div>
+
+                <!-- Section Articles Sélectionnés -->
+                <div class="articles-section">
+                    <div class="articles-section-title">
+                        <i class="fas fa-list"></i>
+                        Articles Sélectionnés
+                    </div>
+                    
+                    <div class="articles-table">
+        <table id="articles-table">
+            <thead>
+                <tr>
+                    <th>Désignation</th>
+                    <th>Référence</th>
+                    <th>Quantité</th>
+                    <th>Prix Unitaire</th>
+                    <th>Prix Total</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                    {% if commande_temporaire and commande_temporaire.lignes %}
+                        {% for ligne in commande_temporaire.lignes %}
+                    <tr data-article-id="{{ ligne.article_id }}">
+                        <td>{{ ligne.designation }}</td>
+                        <td>{{ ligne.reference|default:"-" }}</td>
+                        <td class="center-cell">
+                            <input type="number" name="quantite_{{ forloop.counter0 }}" value="{{ ligne.quantite }}" step="0.001" class="quantity-input" data-index="{{ forloop.counter0 }}" data-article-id="{{ ligne.article_id }}" onchange="updatePrixTotal(this)" onkeydown="preventFormSubmit(event)">
+                        </td>
+                        <td class="price-cell" data-prix-unitaire="{{ ligne.prix_unitaire }}">{{ ligne.prix_unitaire|floatformat:2 }} FCFA</td>
+                        <td class="price-cell" data-prix-total="{{ ligne.prix_total }}">{{ ligne.prix_total|floatformat:2 }} FCFA</td>
+                        <td class="center-cell">
+                                                <button type="button" class="delete-button" data-index="{{ forloop.counter0 }}" data-article-id="{{ ligne.article_id }}" onclick="supprimerArticle(this)">
+                                                    <i class="fas fa-trash"></i> Supprimer
+                                                </button>
+                        </td>
+                    </tr>
+                        {% endfor %}
+                    {% else %}
+                    <tr>
+                                        <td colspan="6" class="empty-state">
+                                            <i class="fas fa-inbox" style="font-size: 2em; margin-bottom: 10px; display: block;"></i>
+                                            Sélectionnez un article pour commencer
+                                        </td>
+                    </tr>
+                    {% endif %}
+            </tbody>
+        </table>
+                    </div>
+
+        <!-- Résumé -->
+        <div class="summary">
+            <div class="summary-item">
+                <p>
+                    Quantité Totale: <span id="total-quantity">0</span>
+                </p>
+            </div>
+            <div class="summary-item">
+                <p>
+                    Prix Total: <span id="total-value">0</span> FCFA
+                </p>
+            </div>
+        </div>
+            </div>
+
+                <!-- Actions -->
+                <div class="form-actions">
+            <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save"></i>
+                        Enregistrer la Commande
+                </button>
+            <button type="button" class="btn btn-primary" onclick="genererFacture()">
+                        <i class="fas fa-file-invoice"></i>
+                        Générer Facture
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="annulerCommande()">
+                        <i class="fas fa-times"></i>
+                        Annuler
+                </button>
+            <a href="{% url 'dashboard_commandes' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i>
+                        Retour Dashboard
+            </a>
+            </div>
+    </form>
+        </div>
+    </div>
+    </div>
+
+    <script type="application/json" id="clients-data">{{ clients_json|safe|default:"[]" }}</script>
+    <script type="text/javascript">
+// Variables globales
+let searchTimeout;
+let searchWindow = null;
+
+// Données des clients depuis le serveur
+const clients = {};
+const clientsData = JSON.parse(document.getElementById('clients-data').textContent);
+if (clientsData && Array.isArray(clientsData)) {
+    clientsData.forEach(client => {
+        clients[client.id] = client;
+    });
+}
+
+// Fonction de recherche d'articles
+function searchArticles() {
+    const searchTerm = document.getElementById('article-search').value;
+    
+    clearTimeout(searchTimeout);
+    
+    searchTimeout = setTimeout(() => {
+        if (searchTerm.length >= 2) {
+            openSearchWindow(searchTerm);
+        } else if (searchWindow && !searchWindow.closed) {
+            searchWindow.close();
+        }
+    }, 300);
+}
+
+// Ouvrir la fenêtre de recherche
+function openSearchWindow(searchTerm) {
+    if (searchWindow && !searchWindow.closed) {
+        searchWindow.close();
+    }
+    
+    const searchUrl = '{% url "search_window_commande" %}?q=' + encodeURIComponent(searchTerm);
+    searchWindow = window.open(searchUrl, 'searchArticles', 'width=900,height=700,scrollbars=yes,resizable=yes');
+    
+    if (!searchWindow) {
+        window.location.href = searchUrl;
+    }
+}
+
+// Fonction appelée depuis la fenêtre de recherche
+function addArticleFromSearch(articleId, designation, reference, prixVente) {
+    console.log('addArticleFromSearch appelée avec:', {articleId, designation, reference, prixVente});
+    
+    // Ajouter l'article au tableau
+    addArticleToTable(articleId, designation, reference || '', prixVente, 0);
+    
+    // Envoyer la requête au serveur
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+            fetch('{% url "ajouter_article_commande" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken
+                },
+        body: `article_id=${articleId}&quantite=1&csrfmiddlewaretoken=${csrfToken}`
+            })
+            .then(response => response.json())
+            .then(data => {
+        if (data.success) {
+            showNotification('Article ajouté avec succès', 'success');
+        } else {
+            showNotification('Erreur: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Erreur réseau:', error);
+        showNotification('Erreur de connexion', 'error');
+    });
+}
+
+// Ajouter un article au tableau
+function addArticleToTable(articleId, designation, reference, price, stock) {
+    const tbody = document.querySelector('#articles-table tbody');
+    if (!tbody) return;
+    
+    // Vérifier si l'article existe déjà
+    const existingRow = tbody.querySelector(`tr[data-article-id="${articleId}"]`);
+    if (existingRow) {
+        // Augmenter la quantité
+        const quantiteInput = existingRow.querySelector('.quantity-input');
+        const currentQuantity = parseFloat(quantiteInput.value) || 1;
+        quantiteInput.value = currentQuantity + 1;
+        updatePrixTotal(quantiteInput);
+        return;
+    }
+    
+    // Supprimer le message "Aucun article sélectionné"
+    const emptyRow = tbody.querySelector('.empty-state');
+    if (emptyRow && emptyRow.closest('tr')) {
+        emptyRow.closest('tr').remove();
+    }
+    
+    // Créer une nouvelle ligne
+    const newRow = document.createElement('tr');
+    newRow.setAttribute('data-article-id', articleId);
+    
+    const prixUnitaire = parseFloat(price) || 0;
+    const prixTotal = prixUnitaire;
+    
+    const rowIndex = tbody.querySelectorAll('tr[data-article-id]').length;
+    
+    newRow.innerHTML = `
+        <td>${designation}</td>
+        <td>${reference || '-'}</td>
+        <td class="center-cell">
+            <input type="number" name="quantite_${rowIndex}" value="1" step="0.001" class="quantity-input" data-index="${rowIndex}" data-article-id="${articleId}" onchange="updatePrixTotal(this)" onkeydown="preventFormSubmit(event)">
+        </td>
+        <td class="price-cell" data-prix-unitaire="${prixUnitaire}">${prixUnitaire.toLocaleString('fr-FR')} FCFA</td>
+        <td class="price-cell" data-prix-total="${prixTotal}">${prixTotal.toLocaleString('fr-FR')} FCFA</td>
+        <td class="center-cell">
+            <button type="button" class="delete-button" data-index="${rowIndex}" data-article-id="${articleId}" onclick="supprimerArticle(this)">
+                <i class="fas fa-trash"></i> Supprimer
+            </button>
+        </td>
+    `;
+    
+    tbody.appendChild(newRow);
+    
+    // Ajouter le gestionnaire d'événement pour empêcher la soumission sur Entrée
+    const newQuantityInput = newRow.querySelector('.quantity-input');
+    if (newQuantityInput) {
+        newQuantityInput.addEventListener('keydown', preventFormSubmit);
+    }
+    
+    // Recalculer le total
+    updateTotalGeneral();
+    
+    // Mettre à jour les index
+    updateTableIndexes();
+}
+
+// Mettre à jour les index des lignes
+function updateTableIndexes() {
+    const rows = document.querySelectorAll('#articles-table tbody tr[data-article-id]');
+    rows.forEach((row, index) => {
+        const quantiteInput = row.querySelector('.quantity-input');
+        const deleteButton = row.querySelector('.delete-button');
+        
+        if (quantiteInput) {
+            quantiteInput.setAttribute('data-index', index);
+            quantiteInput.setAttribute('name', `quantite_${index}`);
+            // S'assurer que le gestionnaire d'événement est présent
+            quantiteInput.removeEventListener('keydown', preventFormSubmit);
+            quantiteInput.addEventListener('keydown', preventFormSubmit);
+        }
+        
+        if (deleteButton) {
+            deleteButton.setAttribute('data-index', index);
+        }
+    });
+}
+
+// Empêcher la soumission du formulaire quand on appuie sur Entrée dans les champs de quantité
+function preventFormSubmit(event) {
+    if (event.key === 'Enter' || event.keyCode === 13) {
+        event.preventDefault();
+        event.stopPropagation();
+        // Mettre à jour le prix total et perdre le focus
+        const input = event.target;
+        updatePrixTotal(input);
+        input.blur(); // Retirer le focus du champ
+        return false;
+    }
+    return true;
+}
+
+// Mettre à jour le prix total d'une ligne
+function updatePrixTotal(quantiteInput) {
+    const row = quantiteInput.closest('tr');
+    const prixUnitaire = parseFloat(row.querySelector('[data-prix-unitaire]').getAttribute('data-prix-unitaire')) || 0;
+    const quantite = parseFloat(quantiteInput.value) || 1;
+    const prixTotal = prixUnitaire * quantite;
+    
+    const prixTotalCell = row.querySelector('[data-prix-total]');
+    prixTotalCell.textContent = prixTotal.toLocaleString('fr-FR') + ' FCFA';
+    prixTotalCell.setAttribute('data-prix-total', prixTotal);
+    
+    // Mettre à jour côté serveur
+    const articleId = quantiteInput.getAttribute('data-article-id');
+    updateQuantityOnServer(articleId, quantite);
+    
+    // Recalculer le total général
+    updateTotalGeneral();
+}
+
+// Mettre à jour la quantité côté serveur
+function updateQuantityOnServer(articleId, quantite) {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+            fetch('{% url "mettre_a_jour_quantites_commande" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken
+                },
+        body: `article_id=${articleId}&quantite=${quantite}&csrfmiddlewaretoken=${csrfToken}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+            console.error('Erreur:', data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Erreur réseau:', error);
+    });
+}
+
+// Supprimer un article
+function supprimerArticle(button) {
+    const articleId = button.getAttribute('data-article-id');
+    const row = button.closest('tr');
+    
+    // Animation de suppression
+    row.style.transition = 'all 0.3s ease';
+    row.style.opacity = '0';
+    row.style.transform = 'translateX(-100%)';
+    
+    setTimeout(() => {
+        row.remove();
+        updateTableIndexes();
+        updateTotalGeneral();
+        
+        // Si plus d'articles, afficher le message
+        const tbody = document.querySelector('#articles-table tbody');
+        if (tbody.querySelectorAll('tr[data-article-id]').length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><i class="fas fa-inbox" style="font-size: 2em; margin-bottom: 10px; display: block;"></i>Sélectionnez un article pour commencer</td></tr>';
+        }
+    }, 300);
+    
+    // Envoyer la suppression au serveur
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+            fetch('{% url "supprimer_article_commande" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken
+                },
+        body: `article_id=${articleId}&csrfmiddlewaretoken=${csrfToken}`
+            })
+            .then(response => response.json())
+            .then(data => {
+        if (data.success) {
+            showNotification('Article supprimé', 'success');
+        } else {
+            showNotification('Erreur: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Erreur réseau:', error);
+    });
+}
+
+// Recalculer le total général
+function updateTotalGeneral() {
+    let totalGeneral = 0;
+    let totalQuantite = 0;
+    const rows = document.querySelectorAll('#articles-table tbody tr[data-article-id]');
+    
+    rows.forEach(row => {
+        // Calculer le prix total
+        const prixTotalText = row.querySelector('[data-prix-total]').getAttribute('data-prix-total');
+        const prixTotal = parseFloat(prixTotalText) || 0;
+        totalGeneral += prixTotal;
+        
+        // Calculer la quantité totale
+        const quantiteInput = row.querySelector('.quantity-input');
+        if (quantiteInput) {
+            const quantite = parseFloat(quantiteInput.value) || 0;
+            totalQuantite += quantite;
+        }
+    });
+    
+    // Mettre à jour l'affichage du prix total
+    const totalValue = document.getElementById('total-value');
+    if (totalValue) {
+        totalValue.textContent = totalGeneral.toLocaleString('fr-FR');
+    }
+    
+    // Mettre à jour l'affichage de la quantité totale
+    const totalQuantity = document.getElementById('total-quantity');
+    if (totalQuantity) {
+        totalQuantity.textContent = totalQuantite.toLocaleString('fr-FR', {minimumFractionDigits: 3, maximumFractionDigits: 3});
+    }
+}
+
+// Charger les informations d'un client
+function chargerInfosClient(clientId) {
+    if (!clientId) {
+        document.getElementById('client-info').style.display = 'none';
+        return;
+    }
+    
+    const client = clients[clientId];
+    if (client) {
+        document.getElementById('client-adresse').value = client.adresse || '';
+        document.getElementById('client-telephone').value = client.telephone || '';
+        document.getElementById('client-email').value = client.email || '';
+        document.getElementById('client-info').style.display = 'grid';
+    }
+}
+
+// Générer une facture
+function genererFacture() {
+    const clientId = document.getElementById('client-select').value;
+            if (!clientId) {
+        showNotification('Veuillez sélectionner un client', 'error');
+                return;
+            }
+    
+    const rows = document.querySelectorAll('#articles-table tbody tr[data-article-id]');
+    if (rows.length === 0) {
+        showNotification('Veuillez ajouter au moins un article', 'error');
+                return;
+            }
+
+    if (confirm('Générer une facture pour cette commande ?')) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+        form.action = '{% url "generer_facture_commande" %}';
+            
+            const csrf = document.createElement('input');
+            csrf.type = 'hidden';
+            csrf.name = 'csrfmiddlewaretoken';
+        csrf.value = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            form.appendChild(csrf);
+
+            const client = document.createElement('input');
+            client.type = 'hidden';
+            client.name = 'client_id';
+            client.value = clientId;
+            form.appendChild(client);
+
+        const date = document.createElement('input');
+        date.type = 'hidden';
+        date.name = 'date';
+        date.value = document.getElementById('date-commande').value;
+        form.appendChild(date);
+        
+        const heure = document.createElement('input');
+        heure.type = 'hidden';
+        heure.name = 'heure';
+        heure.value = document.getElementById('heure-commande').value;
+        form.appendChild(heure);
+
+            document.body.appendChild(form);
+            form.submit();
+    }
+}
+
+// Annuler la commande
+function annulerCommande() {
+    if (confirm('Êtes-vous sûr de vouloir annuler cette commande ?')) {
+        window.location.href = '{% url "dashboard_commandes" %}';
+    }
+}
+
+// Afficher une notification
+function showNotification(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    
+    const toast = document.createElement('div');
+    const colors = {
+        success: {bg: '#d4edda', border: '#c3e6cb', color: '#155724'},
+        error: {bg: '#f8d7da', border: '#f5c6cb', color: '#721c24'},
+        warning: {bg: '#fff3cd', border: '#ffeaa7', color: '#856404'},
+        info: {bg: '#d1ecf1', border: '#bee5eb', color: '#0c5460'}
+    };
+    const c = colors[type] || colors.info;
+    
+    toast.style.cssText = `min-width:260px; max-width:380px; padding:12px 14px; border-radius:10px; background:${c.bg}; color:${c.color}; border:1px solid ${c.border}; box-shadow:0 8px 24px rgba(0,0,0,0.12); margin-bottom:10px; transform:translateX(400px); opacity:0; transition:all .3s ease;`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.transform = 'translateX(0)';
+        toast.style.opacity = '1';
+    }, 10);
+    
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(400px)';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// Initialisation
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('article-search');
+    if (searchInput) {
+        searchInput.focus();
+    }
+
+    // Ajouter le gestionnaire d'événement pour empêcher la soumission sur Entrée pour tous les champs de quantité existants
+    document.querySelectorAll('.quantity-input').forEach(input => {
+        input.addEventListener('keydown', preventFormSubmit);
+    });
+    
+    // Empêcher la soumission du formulaire si on appuie sur Entrée dans un champ de quantité
+    const mainForm = document.getElementById('main-form');
+    if (mainForm) {
+        mainForm.addEventListener('keydown', function(event) {
+            // Si on appuie sur Entrée et que le focus est sur un champ de quantité, empêcher la soumission
+            if ((event.key === 'Enter' || event.keyCode === 13) && event.target.classList.contains('quantity-input')) {
+                event.preventDefault();
+                event.stopPropagation();
+                return false;
+            }
+        });
+    }
+
+    // Calculer le total initial
+    updateTotalGeneral();
+    
+    // Charger les infos client si un client est déjà sélectionné
+    const clientSelect = document.getElementById('client-select');
+    if (clientSelect && clientSelect.value) {
+        chargerInfosClient(clientSelect.value);
+    }
+    
+    // Restaurer les articles depuis la session si nécessaire
+    // Vérifier si des lignes existent dans le tableau
+    const tableBody = document.querySelector('#articles-table tbody');
+    if (tableBody && tableBody.querySelectorAll('tr[data-article-id]').length > 0) {
+        updateTotalGeneral();
+    }
+});
+    </script>
+
+</body>
+</html>

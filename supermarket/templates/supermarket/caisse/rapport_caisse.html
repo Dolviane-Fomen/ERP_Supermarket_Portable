@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rapport de Caisse</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background: rgba(255,255,255,0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header { 
+            background: linear-gradient(135deg, #d74123 0%, #ff6b35 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 { 
+            font-size: 2.5em; 
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+        .header .subtitle { 
+            font-size: 1.1em; 
+            opacity: 0.9;
+        }
+        .content { padding: 40px; }
+        .kpis { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
+            gap: 25px; 
+            margin-bottom: 40px;
+        }
+        .kpi { 
+            background: white;
+            border-radius: 15px; 
+            padding: 25px; 
+            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+            border: 1px solid #f0f0f0;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .kpi:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.12);
+        }
+        .kpi::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #d74123, #ff6b35);
+        }
+        .kpi .icon {
+            font-size: 2.5em;
+            margin-bottom: 15px;
+            opacity: 0.7;
+        }
+        .kpi .label { 
+            color: #666; 
+            font-size: 0.95em; 
+            margin-bottom: 10px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .kpi .value { 
+            color: #2c3e50; 
+            font-weight: 700; 
+            font-size: 1.8em;
+            line-height: 1.2;
+        }
+        .actions { 
+            display: flex; 
+            gap: 15px; 
+            justify-content: center;
+            margin-top: 30px;
+        }
+        .btn { 
+            display: inline-flex; 
+            align-items: center; 
+            gap: 10px; 
+            padding: 15px 30px; 
+            border: none; 
+            border-radius: 50px; 
+            cursor: pointer; 
+            font-weight: 600;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            min-width: 150px;
+            justify-content: center;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+        .btn-primary { 
+            background: linear-gradient(135deg, #d74123, #ff6b35);
+            color: white;
+        }
+        .btn-secondary { 
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+        .status-info {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-left: 4px solid #d74123;
+        }
+        .status-info .title {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        .status-info .details {
+            color: #666;
+            font-size: 0.95em;
+            line-height: 1.5;
+        }
+        @media (max-width: 768px) {
+            .kpis { grid-template-columns: 1fr; }
+            .actions { flex-direction: column; }
+            .btn { width: 100%; }
+            .header h1 { font-size: 2em; }
+            .content { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Messages Django -->
+{% if messages %}
+    {% for message in messages %}
+        <div style="margin: 10px 0; padding: 10px; border-radius: 5px; background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;">
+            {{ message }}
+        </div>
+    {% endfor %}
+{% endif %}
+
+<div class="container">
+    <div class="header">
+        <h1><i class="fas fa-chart-line"></i> Rapport de Caisse</h1>
+        <div class="subtitle">Résumé des activités du {{ date_aujourd_hui|date:"d/m/Y"|default:"aujourd'hui" }}</div>
+    </div>
+    
+    <div class="content">
+        <div class="status-info">
+            <div class="title"><i class="fas fa-info-circle"></i> Informations de Session</div>
+            <div class="details">
+                {% for session in sessions_jour %}
+                    <div>Session {{ forloop.counter }}: Ouverture {{ session.date_ouverture|time:"H:i" }}
+                        {% if session.employe and session.employe.compte %} par {{ session.employe.compte.nom_complet }}{% endif %}
+                        {% if session.date_fermeture %}
+                            • Fermeture {{ session.date_fermeture|time:"H:i" }}
+                        {% endif %}
+                    </div>
+                {% empty %}
+                    <div>Aucune session enregistrée aujourd'hui</div>
+                {% endfor %}
+                <div style="margin-top: 10px; font-weight: 600;">
+                    {% if caisse_ouverte %}
+                        <i class="fas fa-circle" style="color: #28a745;"></i> Caisse actuellement OUVERTE
+                    {% else %}
+                        <i class="fas fa-circle" style="color: #dc3545;"></i> Caisse FERMÉE
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="kpis">
+            <div class="kpi">
+                <div class="icon"><i class="fas fa-user"></i></div>
+                <div class="label">Vendeuse</div>
+                <div class="value">{{ vendeuse_nom|default:"-" }}</div>
+            </div>
+            <div class="kpi">
+                <div class="icon"><i class="fas fa-calendar"></i></div>
+                <div class="label">Date</div>
+                <div class="value">{{ date_aujourd_hui|date:"d/m/Y"|default:"Aujourd'hui" }}</div>
+            </div>
+            <div class="kpi">
+                <div class="icon"><i class="fas fa-clock"></i></div>
+                <div class="label">Heure d'ouverture</div>
+                <div class="value">
+                    {% if sessions_jour.first %}
+                        {{ sessions_jour.first.date_ouverture|time:"H:i" }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
+            </div>
+            <div class="kpi">
+                <div class="icon"><i class="fas fa-clock"></i></div>
+                <div class="label">Heure de fermeture</div>
+                <div class="value">
+                    {% if sessions_jour.first.date_fermeture %}
+                        {{ sessions_jour.first.date_fermeture|time:"H:i" }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
+            </div>
+            <div class="kpi">
+                <div class="icon"><i class="fas fa-money-bill-wave"></i></div>
+                <div class="label">Chiffre d'affaires</div>
+                <div class="value">{{ chiffre_affaires|default:0|floatformat:2 }} FCFA</div>
+            </div>
+            <div class="kpi">
+                <div class="icon"><i class="fas fa-shopping-cart"></i></div>
+                <div class="label">Nombre de ventes</div>
+                <div class="value">{{ nombre_ventes|default:0 }}</div>
+            </div>
+        </div>
+        
+        <div class="actions">
+            <a href="{% url 'dashboard_caisse' %}" class="btn btn-secondary">
+                <i class="fas fa-home"></i> Retour à l'accueil
+            </a>
+            <button class="btn btn-primary" onclick="window.print()">
+                <i class="fas fa-print"></i> Imprimer le rapport
+            </button>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

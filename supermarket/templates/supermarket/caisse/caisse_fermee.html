@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caisse Fermée</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<style>
+    .message-container {
+        text-align: center;
+        padding: 60px 40px;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+        margin: 40px 0;
+    }
+    
+    .message-icon {
+        font-size: 4em;
+        color: #dc3545;
+        margin-bottom: 20px;
+    }
+    
+    .message-text {
+        font-size: 1.2em;
+        color: #666;
+        margin-bottom: 30px;
+        line-height: 1.6;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 15px 30px;
+        border: none;
+        border-radius: 50px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 1em;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        min-width: 150px;
+        justify-content: center;
+    }
+    
+    .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, #d74123, #ff6b35);
+        color: white;
+    }
+    
+    .btn-secondary {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+    }
+    
+    .info-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-top: 40px;
+    }
+    
+    .info-card {
+        background: #f8f9fa;
+        border-radius: 15px;
+        padding: 25px;
+        text-align: center;
+        border-left: 4px solid #d74123;
+    }
+    
+    .info-card .icon {
+        font-size: 2.5em;
+        color: #d74123;
+        margin-bottom: 15px;
+    }
+    
+    .info-card .title {
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 10px;
+        font-size: 1.1em;
+    }
+    
+    .info-card .description {
+        color: #666;
+        font-size: 0.9em;
+        line-height: 1.5;
+    }
+</style>
+</head>
+<body>
+
+<!-- Messages Django -->
+{% if messages %}
+    {% for message in messages %}
+        <div style="margin: 10px 0; padding: 10px; border-radius: 5px; background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;">
+            {{ message }}
+        </div>
+    {% endfor %}
+{% endif %}
+
+<header style="background: linear-gradient(135deg, #d74123 0%, #b8351e 100%); padding: 20px; color: white; text-align: center; border-radius: 10px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(215, 65, 35, 0.3);">
+    <h1 style="font-size: 2.5em; margin: 0; color: white; font-weight: 700; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);">
+        <i class="fas fa-lock"></i> Caisse Fermée
+    </h1>
+    <p style="margin: 10px 0 0 0; opacity: 0.9;">{{ message }}</p>
+</header>
+<div class="message-container">
+    <div class="message-icon">
+        <i class="fas fa-cash-register"></i>
+    </div>
+    
+    <div class="message-text">
+        {{ message }}
+    </div>
+    
+    <div class="action-buttons">
+        <a href="{% url 'dashboard_caisse' %}" class="btn btn-primary">
+            <i class="fas fa-home"></i> Retour au Dashboard
+        </a>
+        <button class="btn btn-secondary" onclick="ouvrirCaisse()">
+            <i class="fas fa-unlock"></i> Ouvrir la Caisse
+        </button>
+    </div>
+</div>
+
+<div class="info-cards">
+    <div class="info-card">
+        <div class="icon"><i class="fas fa-info-circle"></i></div>
+        <div class="title">Pourquoi la caisse est fermée ?</div>
+        <div class="description">
+            La caisse doit être ouverte avant de pouvoir effectuer des ventes. 
+            Cela permet de suivre les sessions de travail et de générer des rapports précis.
+        </div>
+    </div>
+    
+    <div class="info-card">
+        <div class="icon"><i class="fas fa-key"></i></div>
+        <div class="title">Comment ouvrir la caisse ?</div>
+        <div class="description">
+            Cliquez sur "Ouvrir la Caisse" ou utilisez le bouton correspondant 
+            dans le dashboard pour démarrer une nouvelle session de vente.
+        </div>
+    </div>
+    
+    <div class="info-card">
+        <div class="icon"><i class="fas fa-shield-alt"></i></div>
+        <div class="title">Sécurité</div>
+        <div class="description">
+            L'ouverture et la fermeture de caisse sont tracées pour assurer 
+            la sécurité et la transparence des opérations.
+        </div>
+    </div>
+</div>
+
+<script>
+    function ouvrirCaisse() {
+        fetch('{% url "ouvrir_caisse" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                window.location.href = '{% url "facturation_vente" %}';
+            } else {
+                alert('Erreur: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            alert('Erreur lors de l\'ouverture de la caisse');
+        });
+    }
+</script>
+
+</body>
+</html>
+
+

@@ -1,0 +1,607 @@
+{% extends 'supermarket/stock/base_stock.html' %}
+{% load static %}
+
+{% block title %}Créer un Taux de Taxe - Gestion des Stocks{% endblock %}
+
+{% block extra_css %}
+<style>
+    body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 0;
+        position: relative;
+        overflow-x: hidden;
+    }
+
+    body::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: 
+            radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.2) 0%, transparent 50%);
+        z-index: -1;
+    }
+
+    .container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .main-card {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 20px;
+        box-shadow: 
+            0 20px 40px rgba(0, 0, 0, 0.1),
+            0 0 0 1px rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+        overflow: hidden;
+        margin-bottom: 20px;
+    }
+
+    .card-header {
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        color: white;
+        padding: 30px 40px;
+        text-align: center;
+        position: relative;
+    }
+
+    .card-header h2 {
+        margin: 0 0 10px 0;
+        font-size: 2em;
+        font-weight: 700;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .card-header p {
+        margin: 0;
+        opacity: 0.9;
+        font-size: 1.1em;
+    }
+
+    .card-body {
+        background: rgba(255, 255, 255, 0.95);
+        padding: 40px;
+    }
+
+    .form-container {
+        background: #f8f9fa;
+        border-radius: 15px;
+        padding: 30px;
+        border: 1px solid #e9ecef;
+    }
+
+    .form-section {
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .form-section:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+    }
+
+    .form-section h3 {
+        font-size: 1.2em;
+        font-weight: 700;
+        color: #495057;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e9ecef;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .form-section h3 i {
+        color: #dc3545;
+        font-size: 1.1em;
+    }
+
+    .form-group {
+        margin-bottom: 25px;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 8px;
+        font-size: 0.95em;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .required {
+        color: #dc3545;
+        font-weight: 700;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 12px 15px;
+        border: 2px solid #e1e8ed;
+        border-radius: 10px;
+        font-size: 0.95em;
+        transition: all 0.3s ease;
+        background: white;
+        font-family: inherit;
+        box-sizing: border-box;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: #dc3545;
+        box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+        transform: translateY(-1px);
+    }
+
+    .form-group textarea {
+        min-height: 100px;
+        resize: vertical;
+    }
+
+    .help-text {
+        font-size: 0.8em;
+        color: #6c757d;
+        margin-top: 5px;
+        font-style: italic;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+
+    .form-row-3 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 20px;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 20px;
+        justify-content: center;
+        margin-top: 40px;
+        padding-top: 30px;
+        border-top: 2px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .btn {
+        padding: 15px 30px;
+        border: none;
+        border-radius: 12px;
+        font-size: 1em;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        position: relative;
+        overflow: hidden;
+        min-width: 150px;
+        justify-content: center;
+    }
+
+    .btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+        transition: left 0.5s;
+    }
+
+    .btn:hover::before {
+        left: 100%;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4);
+    }
+
+    .btn-secondary {
+        background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+    }
+
+    .btn-secondary:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(108, 117, 125, 0.4);
+    }
+
+    .alert {
+        padding: 15px 20px;
+        border-radius: 10px;
+        margin-bottom: 25px;
+        border: 1px solid transparent;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .alert-success {
+        background: #d4edda;
+        border-color: #c3e6cb;
+        color: #155724;
+    }
+
+    .alert-error,
+    .alert-danger {
+        background: #f8d7da;
+        border-color: #f5c6cb;
+        color: #721c24;
+    }
+
+    .alert-warning {
+        background: #fff3cd;
+        border-color: #ffeaa7;
+        color: #856404;
+    }
+
+    .alert-info {
+        background: #d1ecf1;
+        border-color: #bee5eb;
+        color: #0c5460;
+    }
+
+    .taxe-preview {
+        background: white;
+        border: 2px solid #e9ecef;
+        border-radius: 10px;
+        padding: 20px;
+        margin-top: 20px;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+
+    .taxe-preview:hover {
+        border-color: #dc3545;
+        transform: translateY(-2px);
+    }
+
+    .taxe-preview h4 {
+        color: #495057;
+        margin-bottom: 10px;
+        font-size: 1.1em;
+    }
+
+    .taxe-preview .taux-value {
+        font-size: 2em;
+        font-weight: 700;
+        color: #dc3545;
+        margin: 10px 0;
+    }
+
+    .taxe-preview .taux-details {
+        color: #6c757d;
+        font-size: 0.9em;
+    }
+
+    @media (max-width: 768px) {
+        .form-row,
+        .form-row-3 {
+            grid-template-columns: 1fr;
+        }
+        
+        .form-actions {
+            flex-direction: column;
+        }
+        
+        .card-body {
+            padding: 20px;
+        }
+        
+        .form-container {
+            padding: 20px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="main-card">
+        <div class="card-header">
+            <h2><i class="fas fa-percentage"></i> Créer un Taux de Taxe</h2>
+            <p>Ajoutez un nouveau taux de taxe à votre système</p>
+        </div>
+
+        <div class="card-body">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">
+                        <i class="fas fa-{% if message.tags == 'error' %}exclamation-triangle{% elif message.tags == 'success' %}check-circle{% elif message.tags == 'warning' %}exclamation-circle{% else %}info-circle{% endif %}"></i>
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <form method="post" class="form-container" id="tauxTaxeForm">
+                {% csrf_token %}
+                
+                <!-- Informations générales -->
+                <div class="form-section">
+                    <h3><i class="fas fa-info-circle"></i> Informations Générales</h3>
+                    
+                    <div class="form-row">
+                    <div class="form-group">
+                        <label for="code">Code <span class="required">*</span></label>
+                            <input type="text" id="code" name="code" required 
+                                   placeholder="Ex: TVA18, TPS5, EXO0..." 
+                                   pattern="[A-Z0-9]{3,10}"
+                                   title="Code en majuscules, 3-10 caractères">
+                        <div class="help-text">Code unique du taux de taxe</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="intitule">Intitulé <span class="required">*</span></label>
+                            <input type="text" id="intitule" name="intitule" required 
+                                   placeholder="Nom du taux de taxe">
+                        <div class="help-text">Nom complet du taux de taxe</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Configuration de la taxe -->
+                <div class="form-section">
+                    <h3><i class="fas fa-cogs"></i> Configuration de la Taxe</h3>
+                    
+                    <div class="form-row-3">
+                        <div class="form-group">
+                            <label for="taux">Taux (%) <span class="required">*</span></label>
+                            <input type="number" id="taux" name="taux" step="0.01" min="0" max="100" required 
+                                   placeholder="0.00">
+                            <div class="help-text">Pourcentage de la taxe</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="type">Type de taxe</label>
+                            <select id="type" name="type">
+                                <option value="">Sélectionner un type</option>
+                                <option value="TVA">TVA (Taxe sur la Valeur Ajoutée)</option>
+                                <option value="TPS">TPS (Taxe sur les Prestations de Services)</option>
+                                <option value="EXONERE">Exonéré</option>
+                                <option value="REDUIT">Taux réduit</option>
+                                <option value="NORMAL">Taux normal</option>
+                                <option value="SUPER_REDUIT">Super réduit</option>
+                            </select>
+                            <div class="help-text">Type de taxe</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="sens">Sens</label>
+                            <select id="sens" name="sens">
+                                <option value="">Sélectionner un sens</option>
+                                <option value="debit">Débit</option>
+                                <option value="credit">Crédit</option>
+                                <option value="neutre">Neutre</option>
+                            </select>
+                            <div class="help-text">Sens de la taxe</div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="compte_comptable">Compte comptable</label>
+                            <input type="text" id="compte_comptable" name="compte_comptable" 
+                                   placeholder="Ex: 445710">
+                            <div class="help-text">Numéro du compte comptable pour cette taxe</div>
+                    </div>
+
+                    <div class="form-group">
+                            <label for="agence">Agence <span class="required">*</span></label>
+                            <select id="agence" name="agence" required>
+                                <option value="">Sélectionner une agence</option>
+                                {% for agence in agences %}
+                                    <option value="{{ agence.id_agence }}">
+                                        {{ agence.nom_agence }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Configuration avancée -->
+                <div class="form-section">
+                    <h3><i class="fas fa-sliders-h"></i> Configuration Avancée</h3>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="actif">Statut</label>
+                            <select id="actif" name="actif">
+                                <option value="true">Actif</option>
+                                <option value="false">Inactif</option>
+                            </select>
+                            <div class="help-text">Statut du taux de taxe</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="defaut">Taux par défaut</label>
+                            <select id="defaut" name="defaut">
+                                <option value="false">Non</option>
+                                <option value="true">Oui</option>
+                            </select>
+                            <div class="help-text">Utiliser comme taux par défaut</div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="description">Description</label>
+                        <textarea id="description" name="description" 
+                                  placeholder="Description détaillée du taux de taxe"></textarea>
+                        <div class="help-text">Description optionnelle du taux de taxe</div>
+                    </div>
+                </div>
+
+                <!-- Aperçu du taux -->
+                <div class="form-section">
+                    <h3><i class="fas fa-eye"></i> Aperçu</h3>
+                    <div class="taxe-preview" id="taxePreview">
+                        <h4>Aperçu du taux de taxe</h4>
+                        <div class="taux-value" id="tauxValue">0%</div>
+                        <div class="taux-details" id="tauxDetails">
+                            <div>Code: <span id="codePreview">-</span></div>
+                            <div>Intitulé: <span id="intitulePreview">-</span></div>
+                            <div>Type: <span id="typePreview">-</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i>
+                        Créer le Taux
+                    </button>
+                    <a href="{% url 'consulter_taux_taxe' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i>
+                        Retour à la Liste
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Éléments du formulaire
+    const codeInput = document.getElementById('code');
+    const intituleInput = document.getElementById('intitule');
+    const tauxInput = document.getElementById('taux');
+    const typeSelect = document.getElementById('type');
+    const sensSelect = document.getElementById('sens');
+    const agenceSelect = document.getElementById('agence');
+    const form = document.getElementById('tauxTaxeForm');
+
+    // Éléments de l'aperçu
+    const tauxValue = document.getElementById('tauxValue');
+    const codePreview = document.getElementById('codePreview');
+    const intitulePreview = document.getElementById('intitulePreview');
+    const typePreview = document.getElementById('typePreview');
+
+    // Fonction pour mettre à jour l'aperçu
+    function updatePreview() {
+        const code = codeInput.value || '-';
+        const intitule = intituleInput.value || '-';
+        const taux = tauxInput.value || '0';
+        const type = typeSelect.value || '-';
+
+        tauxValue.textContent = taux + '%';
+        codePreview.textContent = code;
+        intitulePreview.textContent = intitule;
+        typePreview.textContent = type;
+    }
+
+    // Écouteurs d'événements pour l'aperçu
+    if (codeInput) codeInput.addEventListener('input', updatePreview);
+    if (intituleInput) intituleInput.addEventListener('input', updatePreview);
+    if (tauxInput) tauxInput.addEventListener('input', updatePreview);
+    if (typeSelect) typeSelect.addEventListener('change', updatePreview);
+
+    // Validation du code (majuscules uniquement)
+    if (codeInput) {
+        codeInput.addEventListener('input', function() {
+            this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        });
+    }
+
+    // Validation du taux
+    if (tauxInput) {
+        tauxInput.addEventListener('input', function() {
+            let value = parseFloat(this.value);
+            if (isNaN(value)) value = 0;
+            if (value < 0) value = 0;
+            if (value > 100) value = 100;
+            this.value = value;
+            updatePreview();
+        });
+    }
+
+    // Validation du formulaire
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const code = codeInput.value.trim();
+            const intitule = intituleInput.value.trim();
+            const taux = parseFloat(tauxInput.value);
+            const agence = agenceSelect.value;
+
+            if (!code) {
+                e.preventDefault();
+                alert('Le code est obligatoire.');
+                return false;
+            }
+
+            if (code.length < 3) {
+                e.preventDefault();
+                alert('Le code doit contenir au moins 3 caractères.');
+                return false;
+            }
+
+            if (!intitule) {
+                e.preventDefault();
+                alert('L\'intitulé est obligatoire.');
+                return false;
+            }
+
+            if (isNaN(taux) || taux < 0 || taux > 100) {
+                e.preventDefault();
+                alert('Le taux doit être un nombre entre 0 et 100.');
+                return false;
+            }
+
+            if (!agence) {
+                e.preventDefault();
+                alert('L\'agence est obligatoire.');
+                return false;
+            }
+
+            // Confirmation si le taux est très élevé
+            if (taux > 50) {
+                if (!confirm(`Êtes-vous sûr de vouloir créer un taux de ${taux}% ? Ce taux semble très élevé.`)) {
+                    e.preventDefault();
+                    return false;
+                }
+            }
+        });
+    }
+
+    // Initialiser l'aperçu
+    updatePreview();
+});
+</script>
+{% endblock %}

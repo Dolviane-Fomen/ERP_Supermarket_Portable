@@ -1,0 +1,489 @@
+{% load dict_filters %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suivi Client</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            color: white;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 1.8em;
+        }
+        .filter-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .filter-section label {
+            font-weight: 600;
+            margin-right: 10px;
+            color: #2c3e50;
+        }
+        .filter-section select {
+            padding: 10px 15px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 1em;
+            min-width: 250px;
+        }
+        .filter-section select:focus {
+            outline: none;
+            border-color: #06beb6;
+        }
+        .table-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        thead {
+            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            color: white;
+        }
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #e1e8ed;
+        }
+        tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+        .action-input {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid #e1e8ed;
+            border-radius: 5px;
+            font-size: 0.9em;
+            min-height: 50px;
+            resize: vertical;
+        }
+        .action-input:focus {
+            outline: none;
+            border-color: #06beb6;
+        }
+        .heure-appel-input {
+            padding: 5px;
+            border: 1px solid #e1e8ed;
+            border-radius: 5px;
+            width: 100px;
+            font-size: 0.9em;
+        }
+        .heure-appel-input:focus {
+            outline: none;
+            border-color: #06beb6;
+        }
+        .btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+        }
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(40, 167, 69, 0.3);
+        }
+        .btn-save {
+            background: #17a2b8;
+            color: white;
+            font-size: 0.85em;
+            padding: 5px 10px;
+            margin-bottom: 5px;
+            width: 100%;
+        }
+        .btn-save:hover {
+            background: #138496;
+        }
+        .btn-edit {
+            background: #ffc107;
+            color: #212529;
+            font-size: 0.85em;
+            padding: 5px 10px;
+            margin-bottom: 5px;
+            width: 100%;
+        }
+        .btn-edit:hover {
+            background: #e0a800;
+        }
+        .no-clients {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #06beb6;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .row-critical {
+            background-color: #ffebee !important;
+        }
+        .row-critical:hover {
+            background-color: #ffcdd2 !important;
+        }
+        .row-special {
+            background-color: #f3e5f5 !important;
+        }
+        .row-special:hover {
+            background-color: #e1bee7 !important;
+        }
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 10000;
+            display: none;
+            animation: slideInRight 0.3s ease-out;
+            min-width: 300px;
+        }
+        .toast.error {
+            background: #dc3545;
+        }
+        .toast.show {
+            display: block;
+        }
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        .saving-indicator {
+            display: inline-block;
+            margin-left: 10px;
+            color: #17a2b8;
+        }
+        .saving-indicator i {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .saved-check {
+            display: inline-block;
+            margin-left: 10px;
+            color: #28a745;
+            font-size: 1.2em;
+        }
+        .action-display {
+            color: #2c3e50;
+        }
+        .heure-display {
+            color: #6c757d;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <!-- Toast de notification -->
+    <div id="toast" class="toast">
+        <i class="fas fa-check-circle"></i> <span id="toast-message">Action enregistrée avec succès !</span>
+    </div>
+    
+    <div class="container">
+        <a href="{% url 'dashboard_commandes' %}" class="back-link">
+            <i class="fas fa-arrow-left"></i> Retour au dashboard
+        </a>
+        
+        <div class="header">
+            <h1><i class="fas fa-user-check"></i> Suivi Client</h1>
+            <p>Gérez le suivi des clients par zone - Enregistrez chaque appel avec son heure et son action</p>
+        </div>
+        
+        <div class="filter-section">
+            <form method="get" action="{% url 'suivi_client' %}" id="filterForm">
+                <div style="display: flex; gap: 20px; align-items: end; flex-wrap: wrap;">
+                    <div>
+                        <label for="zone-select" style="display: block; margin-bottom: 5px;">
+                            <i class="fas fa-map-marker-alt"></i> Zone :
+                        </label>
+                        <select id="zone-select" name="zone" style="padding: 10px 15px; border: 2px solid #e1e8ed; border-radius: 8px; font-size: 1em; min-width: 250px;">
+                            <option value="">-- Toutes les zones --</option>
+                            {% for zone in zones %}
+                                <option value="{{ zone }}" {% if zone_selectionnee == zone %}selected{% endif %}>
+                                    {{ zone }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="date-select" style="display: block; margin-bottom: 5px;">
+                            <i class="fas fa-calendar-alt"></i> Date de suivi :
+                        </label>
+                        <input 
+                            type="date" 
+                            id="date-select" 
+                            name="date" 
+                            value="{{ date_selectionnee }}"
+                            style="padding: 10px 15px; border: 2px solid #e1e8ed; border-radius: 8px; font-size: 1em;"
+                            onchange="document.getElementById('filterForm').submit()"
+                        />
+                    </div>
+                    <div>
+                        <button type="submit" class="btn btn-success" style="padding: 10px 20px;">
+                            <i class="fas fa-filter"></i> Filtrer
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        
+        <div class="table-container">
+            {% if clients %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>NOMS</th>
+                        <th>TELEPHONES</th>
+                        <th>06h30-08h30</th>
+                        <th>Commandes</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for client in clients %}
+                        {% if client.id in actions_dict %}
+                            {% for action_data in actions_dict|get_item:client.id %}
+                            <tr id="row_{{ client.id }}_{{ action_data.id }}" class="{% if action_data.action %}{% if 'ne plus rappeler' in action_data.action|lower %}row-critical{% elif 'pas de commande' in action_data.action|lower or 'n\'appel plus' in action_data.action|lower %}row-special{% endif %}{% endif %}">
+                                <td><strong>{{ client.intitule }}</strong></td>
+                                <td>{{ client.telephone }}</td>
+                                <td>
+                                    <span class="heure-display">
+                                        {% if action_data.heure_appel %}{{ action_data.heure_appel|time:'H:i' }}{% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="action-display">
+                                        {{ action_data.action }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <a 
+                                        href="{% url 'enregistrer_commande' %}?client_id={{ client.id }}" 
+                                        class="btn btn-success"
+                                        style="display: block; width: 100%; text-align: center;"
+                                    >
+                                        <i class="fas fa-shopping-cart"></i> Passer Commande
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% endif %}
+                        <!-- Ligne pour nouveau appel -->
+                        <tr id="row_new_{{ client.id }}">
+                            <td><strong>{{ client.intitule }}</strong></td>
+                            <td>{{ client.telephone }}</td>
+                            <td>
+                                <input 
+                                    type="time" 
+                                    id="heure_appel_new_{{ client.id }}" 
+                                    class="heure-appel-input"
+                                    placeholder="HH:MM"
+                                />
+                            </td>
+                            <td>
+                                <textarea 
+                                    class="action-input" 
+                                    id="action_new_{{ client.id }}" 
+                                    placeholder="Saisir l'action après l'appel (ex: pas de reponse, pas de commande, ne plus rappeler...)"
+                                    rows="2"
+                                ></textarea>
+                            </td>
+                            <td>
+                                <button 
+                                    class="btn btn-save" 
+                                    id="btn_save_new_{{ client.id }}"
+                                    onclick="sauvegarderAction({{ client.id }})"
+                                >
+                                    <i class="fas fa-save"></i> Enregistrer
+                                    <span id="saving_new_{{ client.id }}" class="saving-indicator" style="display: none;">
+                                        <i class="fas fa-spinner"></i>
+                                    </span>
+                                    <span id="saved_new_{{ client.id }}" class="saved-check" style="display: none;">
+                                        <i class="fas fa-check-circle"></i>
+                                    </span>
+                                </button>
+                                <a 
+                                    href="{% url 'enregistrer_commande' %}?client_id={{ client.id }}" 
+                                    class="btn btn-success"
+                                    style="display: block; width: 100%; text-align: center; margin-top: 5px;"
+                                >
+                                    <i class="fas fa-shopping-cart"></i> Passer Commande
+                                </a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="no-clients">
+                <i class="fas fa-info-circle" style="font-size: 3em; color: #6c757d; margin-bottom: 20px;"></i>
+                <p>Aucun client trouvé pour cette zone.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <script>
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+            toastMessage.textContent = message;
+            
+            if (isError) {
+                toast.classList.add('error');
+                toast.innerHTML = '<i class="fas fa-exclamation-circle"></i> <span id="toast-message">' + message + '</span>';
+            } else {
+                toast.classList.remove('error');
+                toast.innerHTML = '<i class="fas fa-check-circle"></i> <span id="toast-message">' + message + '</span>';
+            }
+            
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+        
+        function sauvegarderAction(clientId) {
+            const actionInput = document.getElementById('action_new_' + clientId);
+            const heureAppelInput = document.getElementById('heure_appel_new_' + clientId);
+            const saveButton = document.getElementById('btn_save_new_' + clientId);
+            const savingIndicator = document.getElementById('saving_new_' + clientId);
+            const savedCheck = document.getElementById('saved_new_' + clientId);
+            
+            const action = actionInput.value.trim();
+            const heureAppel = heureAppelInput.value;
+            
+            // Vérifier qu'au moins l'heure ou l'action est remplie
+            if (!action && !heureAppel) {
+                showToast('Veuillez remplir au moins l\'heure d\'appel ou l\'action.', true);
+                return;
+            }
+            
+            // Afficher l'indicateur de chargement
+            saveButton.disabled = true;
+            savingIndicator.style.display = 'inline-block';
+            savedCheck.style.display = 'none';
+            
+            // Récupérer la date sélectionnée dans le filtre
+            const dateSelectionnee = document.getElementById('date-select').value;
+            
+            const formData = new FormData();
+            formData.append('client_id', clientId);
+            formData.append('action', action);
+            formData.append('heure_appel', heureAppel);
+            formData.append('date_action', dateSelectionnee); // Envoyer la date sélectionnée
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            
+            fetch('{% url "sauvegarder_action_client" %}', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Masquer l'indicateur de chargement
+                savingIndicator.style.display = 'none';
+                saveButton.disabled = false;
+                
+                if (data.success) {
+                    // Afficher le check de succès
+                    savedCheck.style.display = 'inline-block';
+                    setTimeout(() => {
+                        savedCheck.style.display = 'none';
+                    }, 2000);
+                    
+                    // Afficher le toast de confirmation
+                    showToast('✓ Appel enregistré avec succès !');
+                    
+                    // Animation de confirmation sur les champs
+                    actionInput.style.borderColor = '#28a745';
+                    actionInput.style.backgroundColor = '#d4edda';
+                    heureAppelInput.style.borderColor = '#28a745';
+                    heureAppelInput.style.backgroundColor = '#d4edda';
+                    
+                    setTimeout(() => {
+                        // Réinitialiser les champs pour permettre une nouvelle saisie
+                        actionInput.value = '';
+                        heureAppelInput.value = '';
+                        
+                        // Remettre les styles par défaut
+                        actionInput.style.borderColor = '#e1e8ed';
+                        actionInput.style.backgroundColor = 'white';
+                        heureAppelInput.style.borderColor = '#e1e8ed';
+                        heureAppelInput.style.backgroundColor = 'white';
+                        
+                        // Recharger la page pour afficher la nouvelle action en conservant les filtres
+                        const zone = document.getElementById('zone-select').value;
+                        const date = document.getElementById('date-select').value;
+                        let url = '{% url "suivi_client" %}?';
+                        if (zone) url += 'zone=' + encodeURIComponent(zone) + '&';
+                        if (date) url += 'date=' + encodeURIComponent(date);
+                        window.location.href = url;
+                    }, 1500);
+                } else {
+                    showToast('Erreur : ' + data.error, true);
+                }
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                savingIndicator.style.display = 'none';
+                saveButton.disabled = false;
+                showToast('Une erreur est survenue lors de l\'enregistrement.', true);
+            });
+        }
+    </script>
+</body>
+</html>
