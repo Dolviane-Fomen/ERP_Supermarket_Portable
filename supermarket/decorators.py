@@ -44,9 +44,9 @@ PERMISSIONS = {
         'login_url': 'login_caisse'
     },
     
-    # Module STOCK - Comptable et admin
+    # Module STOCK - Comptable, assistant_comptable et admin
     'stock': {
-        'allowed_types': ['comptable', 'admin'],
+        'allowed_types': ['comptable', 'assistant_comptable', 'admin'],
         'name': 'Gestion de Stock',
         'login_url': 'login_stock'
     },
@@ -252,8 +252,44 @@ def require_caisse_access(view_func):
     return require_module_access('caisse')(view_func)
 
 def require_stock_access(view_func):
-    """Décorateur pour l'accès au module Stock (comptable uniquement)"""
+    """Décorateur pour l'accès au module Stock (comptable, assistant_comptable et admin)"""
     return require_module_access('stock')(view_func)
+
+def require_stock_modify_access(view_func):
+    """Décorateur pour l'accès à la modification d'article (comptable et admin uniquement, exclut assistant_comptable)"""
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect('login_stock')
+        
+        compte = get_user_compte(request)
+        if not compte:
+            messages.error(request, 'Votre compte n\'est pas configuré correctement ou est inactif.')
+            return redirect('login_stock')
+        
+        # Exclure assistant_comptable de la modification d'article
+        if compte.type_compte == 'assistant_comptable':
+            messages.error(
+                request, 
+                'Accès refusé à la modification d\'article. '
+                'Votre type de compte (Assistant Comptable) n\'a pas les permissions nécessaires pour modifier les articles.'
+            )
+            return redirect('consulter_articles')
+        
+        # Autoriser comptable et admin
+        if compte.type_compte not in ['comptable', 'admin']:
+            type_display = compte.get_type_compte_display()
+            messages.error(
+                request, 
+                f'Accès refusé à la modification d\'article. '
+                f'Votre type de compte ({type_display}) n\'a pas les permissions nécessaires. '
+                f'Types autorisés : Comptable, Administrateur'
+            )
+            return redirect('consulter_articles')
+        
+        request.compte = compte
+        return view_func(request, *args, **kwargs)
+    return wrapper
 
 def require_comptes_access(view_func):
     """Décorateur pour l'accès au module Comptes"""

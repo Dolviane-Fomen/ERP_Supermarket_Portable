@@ -20,6 +20,7 @@ from .models import (
     Livreur, SuiviClientAction
 )
 from .decorators import (
+    require_stock_modify_access,
     require_commandes_feature, require_module_access, require_compte_type,
     require_caisse_access, require_stock_access, require_comptes_access,
     get_user_compte, get_user_livreur
@@ -4668,9 +4669,9 @@ def login_stock(request):
                 try:
                     compte = Compte.objects.get(user=user, actif=True)
                     if compte.agence:
-                        # Vérifier que l'utilisateur est un comptable ou admin
-                        if compte.type_compte not in ['comptable', 'admin']:
-                            messages.error(request, 'Accès refusé. Ce module est réservé aux comptables et aux administrateurs.')
+                        # Vérifier que l'utilisateur est un comptable, assistant_comptable ou admin
+                        if compte.type_compte not in ['comptable', 'assistant_comptable', 'admin']:
+                            messages.error(request, 'Accès refusé. Ce module est réservé aux comptables, assistants comptables et aux administrateurs.')
                         else:
                             login(request, user)
                             # Stocker l'agence dans la session
@@ -9740,6 +9741,7 @@ def supprimer_taux_taxe(request, taux_id):
     return redirect('consulter_taux_taxe')
 
 @login_required
+@require_stock_modify_access
 def modifier_article(request, article_id):
     """Vue pour modifier un article existant"""
     try:
@@ -13544,9 +13546,9 @@ def login_stock(request):
                 try:
                     compte = Compte.objects.get(user=user, actif=True)
                     if compte.agence:
-                        # Vérifier que l'utilisateur est un comptable ou admin
-                        if compte.type_compte not in ['comptable', 'admin']:
-                            messages.error(request, 'Accès refusé. Ce module est réservé aux comptables et aux administrateurs.')
+                        # Vérifier que l'utilisateur est un comptable, assistant_comptable ou admin
+                        if compte.type_compte not in ['comptable', 'assistant_comptable', 'admin']:
+                            messages.error(request, 'Accès refusé. Ce module est réservé aux comptables, assistants comptables et aux administrateurs.')
                         else:
                             login(request, user)
                             # Stocker l'agence dans la session
@@ -14319,6 +14321,7 @@ def supprimer_taux_taxe(request, taux_id):
     return redirect('consulter_taux_taxe')
 
 @login_required
+@require_stock_modify_access
 def modifier_article(request, article_id):
     """Vue pour modifier un article existant"""
     try:

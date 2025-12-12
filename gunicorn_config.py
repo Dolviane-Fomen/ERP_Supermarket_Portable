@@ -41,3 +41,5 @@ preload_app = True
 # Worker class (par défaut: sync, peut utiliser gevent pour async)
 worker_class = "sync"
 
+
+

@@ -529,3 +529,4 @@ python manage.py createsuperuser --settings=erp_project.settings_production
 
 **Votre ERP est maintenant prêt pour la production sur Azure ! 🚀**
 
+
