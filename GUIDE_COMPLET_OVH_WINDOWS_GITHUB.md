@@ -16,7 +16,7 @@
 12. [Étape 10 : Configurer Nginx](#etape10)
 13. [Étape 11 : Configurer SSL/HTTPS](#etape11)
 14. [Étape 12 : Configurer le déploiement automatique depuis GitHub](#etape12)
-15. [Étape 13 : Migrer les données](#etape13)
+15. [Étape 13 : Migrer les données SQLite vers PostgreSQL](#etape13)
 16. [Maintenance et mises à jour](#maintenance)
 
 ---
@@ -411,6 +411,8 @@ python manage.py createsuperuser --settings=erp_project.settings_production
 
 ✅ **Django est configuré !**
 
+> ⚠️ **IMPORTANT** : Si vous avez des données dans votre base SQLite locale, vous devrez les migrer vers PostgreSQL. Voir **[Étape 13 : Migrer les données SQLite vers PostgreSQL](#etape13)** pour les instructions complètes.
+
 ---
 
 ## 🔧 ÉTAPE 9 : Configurer Gunicorn {#etape9}
@@ -690,6 +692,17 @@ Copier la clé privée et l'ajouter dans GitHub Secrets.
 ---
 
 ## 📊 ÉTAPE 13 : Migrer les Données depuis SQLite vers PostgreSQL {#etape13}
+
+> 🔄 **MIGRATION DES DONNÉES SQLITE → POSTGRESQL**
+> 
+> **Cette étape est OBLIGATOIRE si vous avez des données dans votre base SQLite locale** (comptes utilisateurs, clients, commandes, factures, etc.).
+> 
+> **Méthode rapide :**
+> 1. Sur Windows : `python manage.py dumpdata > export_data.json`
+> 2. Transférer vers OVH : Via WinSCP ou SCP
+> 3. Sur OVH : `python manage.py loaddata export_data.json --settings=erp_project.settings_production`
+> 
+> **Voir ci-dessous pour les détails complets.**
 
 **OUI, c'est tout à fait possible !** Voici plusieurs méthodes pour migrer vos données SQLite vers PostgreSQL sur OVH.
 
@@ -1096,7 +1109,7 @@ sudo tail -f /var/log/nginx/erp_error.log
 - [ ] Nginx configuré
 - [ ] SSL/HTTPS configuré
 - [ ] Déploiement automatique configuré (optionnel)
-- [ ] Données migrées (si nécessaire)
+- [ ] **Données SQLite migrées vers PostgreSQL** (voir Étape 13)
 - [ ] Application testée et fonctionnelle
 
 ---

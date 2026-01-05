@@ -1657,6 +1657,8 @@ def enregistrer_facture(request):
                 
                 # Réduire le stock (sécurisé par validations plus haut)
                 article.stock_actuel -= quantite_vendue
+                # Le suivi de stock est toujours activé automatiquement lors de toute modification du stock
+                article.suivi_stock = True
                 article.save()
                 print(f"🛒 STOCK VENTE - Article: {article.designation}")
                 print(f"🛒 STOCK VENTE - Quantité vendue: {quantite_vendue}")
@@ -2057,11 +2059,27 @@ def detail_factures(request):
     print(f"DEBUG: Statistiques - Total factures: {total_factures}, CA total: {chiffre_affaires_total}")
     print(f"DEBUG: Aujourd'hui - Factures: {factures_aujourd_hui}, CA: {ca_aujourd_hui}")
     
+    # Vérifier si l'utilisateur a accès à la défacturation orange
+    # Seulement pour admin1 dans l'agence MARCHE HUITIEME
+    # Masquer pour TOUS les autres utilisateurs, même ceux de l'agence MARCHE HUITIEME
+    can_defacturer_sans_retour = False
+    if request.user.username == 'admin1':
+        # Vérifier que l'agence est bien MARCHE HUITIEME
+        if agence and 'huitieme' in agence.nom_agence.lower():
+            can_defacturer_sans_retour = True
+            print(f"[ACCÈS] Utilisateur {request.user.username} autorisé pour défacturation orange")
+        else:
+            print(f"[ACCÈS] Utilisateur {request.user.username} non autorisé - Agence: {agence.nom_agence if agence else 'None'}")
+    else:
+        print(f"[ACCÈS] Utilisateur {request.user.username} non autorisé - Seul admin1 peut accéder")
+    
     context = {
 
         'factures': factures,
 
         'total_factures': total_factures,
+        'can_defacturer_sans_retour': can_defacturer_sans_retour,
+        'user': request.user,
 
         'chiffre_affaires_total': chiffre_affaires_total,
 
@@ -2083,6 +2101,50 @@ def detail_factures(request):
 
     print("DEBUG: Rendu du template detail_factures.html")
     return render(request, 'supermarket/caisse/detail_factures.html', context)
+
+
+@login_required
+def liste_utilisateurs_huitieme(request):
+    """Vue temporaire pour lister tous les utilisateurs de l'agence MARCHE HUITIEME"""
+    try:
+        agence = Agence.objects.filter(nom_agence__icontains='huitieme').first()
+        
+        if not agence:
+            messages.error(request, 'Agence MARCHE HUITIEME non trouvée.')
+            return redirect('detail_factures')
+        
+        comptes = Compte.objects.filter(agence=agence, actif=True).select_related('user').order_by('user__username')
+        
+        print(f"\n{'='*60}")
+        print(f"AGENCE: {agence.nom_agence}")
+        print(f"Nombre d'utilisateurs actifs: {comptes.count()}")
+        print(f"{'-'*60}")
+        print("LISTE DES UTILISATEURS:")
+        print(f"{'-'*60}")
+        
+        for compte in comptes:
+            print(f"Username: {compte.user.username}")
+            print(f"  Nom complet: {compte.nom_complet}")
+            print(f"  Type: {compte.type_compte}")
+            print(f"  Email: {compte.email}")
+            print()
+        
+        print(f"{'='*60}\n")
+        
+        context = {
+            'agence': agence,
+            'comptes': comptes,
+            'total': comptes.count(),
+        }
+        
+        # Retourner un message simple
+        messages.info(request, f'Liste des utilisateurs de {agence.nom_agence}: {comptes.count()} utilisateur(s) actif(s). Voir la console pour les détails.')
+        return redirect('detail_factures')
+        
+    except Exception as e:
+        print(f"[ERREUR] Erreur lors de la liste: {e}")
+        messages.error(request, f'Erreur: {str(e)}')
+        return redirect('detail_factures')
 
 
 
@@ -4050,7 +4112,7 @@ def creer_article(request):
             stock_minimum = request.POST.get('stock_minimum', 0)
             unite_vente = request.POST.get('unite_vente')
             conditionnement = request.POST.get('conditionnement')
-            suivi_stock_value = request.POST.get('suivi_stock', 'true')
+            # Le suivi de stock est toujours activé automatiquement (non modifiable par l'utilisateur)
             agence_id = request.POST.get('agence')
             famille_id = request.POST.get('famille')
             # Debug des champs reçus
@@ -4111,6 +4173,7 @@ def creer_article(request):
             print(f"[SEARCH] DEBUG: [OK] Référence générée: {reference_article}")
             
             # Créer l'article
+            # Le suivi de stock est toujours activé automatiquement
             article = Article.objects.create(
                 reference_article=reference_article,
                 designation=designation,
@@ -4122,7 +4185,8 @@ def creer_article(request):
                 unite_vente=unite_vente,
                 conditionnement=conditionnement,
                 agence=agence,
-                categorie=famille
+                categorie=famille,
+                suivi_stock=True  # Toujours activé automatiquement
             )
             
             # Créer les types de vente avec leurs prix spécifiques
@@ -5220,7 +5284,8 @@ def sauvegarder_commande(request):
                 messages.success(request, 'Commande enregistrée avec succès et facture générée automatiquement!')
             else:
                 messages.success(request, 'Commande enregistrée avec succès!')
-            return redirect('dashboard_commandes')
+            # Rediriger vers la page de suivi client
+            return redirect('suivi_client')
             
         except Exception as e:
             messages.error(request, f'Erreur lors de l\'enregistrement: {str(e)}')
@@ -5530,7 +5595,7 @@ def consulter_commandes(request):
         return {
         'commandes': [],
         'premiere_commande': None,
-        'nombre_articles': 0,
+        'articles_uniques': set(),  # Set pour compter les articles uniques
         'quantite_totale': Decimal('0'),
         'prix_total': Decimal('0'),
         }
@@ -5545,25 +5610,35 @@ def consulter_commandes(request):
         if groupes_dict[cle_groupe]['premiere_commande'] is None:
             groupes_dict[cle_groupe]['premiere_commande'] = cmd
         
-        groupes_dict[cle_groupe]['nombre_articles'] += 1
+        # Ajouter l'ID de l'article au set pour compter les articles uniques
+        if cmd.article:
+            groupes_dict[cle_groupe]['articles_uniques'].add(cmd.article.id)
+        
         groupes_dict[cle_groupe]['quantite_totale'] += cmd.quantite
         groupes_dict[cle_groupe]['prix_total'] += cmd.prix_total
     
-    # Créer la liste finale des groupes
+    # Créer la liste finale des groupes (sans doublons)
     commandes_list_final = []
+    groupes_vus = set()  # Pour éviter les doublons
+    
     for cle_groupe, groupe_data in groupes_dict.items():
         premiere_commande = groupe_data['premiere_commande']
         if premiere_commande:
-            commandes_list_final.append({
-                'id': premiere_commande.id,  # ID de la première commande pour les liens
-                'client': premiere_commande.client,
-                'date': premiere_commande.date,
-                'heure': premiere_commande.heure,
-                'etat_commande': premiere_commande.etat_commande,
-                'nombre_articles': groupe_data['nombre_articles'],
-                'quantite_totale': groupe_data['quantite_totale'],
-                'prix_total': groupe_data['prix_total'],
-            })
+            # Créer une clé unique pour éviter les doublons
+            cle_unique = (premiere_commande.client.id, premiere_commande.date, premiere_commande.heure)
+            
+            if cle_unique not in groupes_vus:
+                groupes_vus.add(cle_unique)
+                commandes_list_final.append({
+                    'id': premiere_commande.id,  # ID de la première commande pour les liens
+                    'client': premiere_commande.client,
+                    'date': premiere_commande.date,
+                    'heure': premiere_commande.heure,
+                    'etat_commande': premiere_commande.etat_commande,
+                    'nombre_articles': len(groupe_data['articles_uniques']),  # Nombre d'articles uniques
+                    'quantite_totale': groupe_data['quantite_totale'],
+                    'prix_total': groupe_data['prix_total'],
+                })
     
     # Trier par date et heure décroissantes
     commandes_list_final.sort(key=lambda x: (x['date'], x['heure']), reverse=True)
@@ -5621,12 +5696,49 @@ def detail_commande(request, commande_id):
             client__agence=agence
         ).select_related('article').order_by('id')
         
+        # Regrouper les commandes par article pour éviter les doublons
+        from collections import defaultdict
+        from decimal import Decimal
+        commandes_grouped = defaultdict(lambda: {
+            'article': None,
+            'quantite': Decimal('0'),
+            'prix_total': Decimal('0'),
+            'prix_unitaire': Decimal('0')
+        })
+        
+        for cmd in commandes_groupe:
+            article_id = cmd.article.id
+            if commandes_grouped[article_id]['article'] is None:
+                commandes_grouped[article_id]['article'] = cmd.article
+                commandes_grouped[article_id]['prix_unitaire'] = Decimal(str(cmd.article.prix_vente or 0))
+            
+            commandes_grouped[article_id]['quantite'] += cmd.quantite
+            commandes_grouped[article_id]['prix_total'] += cmd.prix_total
+        
+        # Créer une classe simple pour permettre l'accès par point dans le template
+        class CommandeGroupee:
+            def __init__(self, article, quantite, prix_total, prix_unitaire):
+                self.article = article
+                self.quantite = quantite
+                self.prix_total = prix_total
+                self.prix_unitaire = prix_unitaire
+        
+        # Convertir en liste d'objets pour le template
+        commandes_groupe_final = []
+        for article_id, data in commandes_grouped.items():
+            commandes_groupe_final.append(CommandeGroupee(
+                article=data['article'],
+                quantite=data['quantite'],
+                prix_total=data['prix_total'],
+                prix_unitaire=data['prix_unitaire']
+            ))
+        
+        # Trier par ID d'article pour un affichage cohérent
+        commandes_groupe_final.sort(key=lambda x: x.article.id)
+        
         # Calculer les totaux du groupe
-        from django.db.models import Sum
-        totaux = commandes_groupe.aggregate(
-            quantite_totale=Sum('quantite'),
-            prix_total=Sum('prix_total')
-        )
+        quantite_totale = sum(cmd['quantite'] for cmd in commandes_groupe_final)
+        prix_total = sum(cmd['prix_total'] for cmd in commandes_groupe_final)
         
         # Vérifier s'il y a une facture associée (prendre la première commande du groupe)
         facture = None
@@ -6945,8 +7057,13 @@ def modifier_client_commandes(request, client_id):
     return render(request, 'supermarket/commandes/modifier_client.html', context)
 
 @login_required
+@require_commandes_feature('gestion_client')
 def supprimer_client_commandes(request, client_id):
     """Vue pour supprimer un client dans le module commandes"""
+    if request.method != 'POST':
+        messages.error(request, 'Méthode non autorisée.')
+        return redirect('consulter_clients_commandes')
+    
     agence = get_user_agence(request)
     if not agence:
         messages.error(request, 'Votre compte n\'est pas correctement lié à une agence.')
@@ -8238,25 +8355,88 @@ def suivi_client(request):
     clients = clients.order_by('intitule')
     
     # Récupérer les actions des clients pour la date sélectionnée uniquement
+    # Organiser par client puis par plage horaire
     actions_dict = {}
     suivi_actions = SuiviClientAction.objects.filter(
         agence=agence,
         client__in=clients,
         date_action__date=date_selectionnee  # Filtrer par date uniquement
-    ).select_related('client').order_by('client', '-date_action', '-heure_appel')
+    ).select_related('client').order_by('client', 'plage_horaire', '-date_action', '-heure_appel')
     
     # Filtrer selon l'utilisateur (ACM voit seulement ses actions)
     suivi_actions = filter_suivi_client_by_user(suivi_actions, compte)
     
     for action in suivi_actions:
-        if action.client.id not in actions_dict:
-            actions_dict[action.client.id] = []
-        actions_dict[action.client.id].append({
+        client_id = action.client.id
+        plage = action.plage_horaire or ''
+        
+        if client_id not in actions_dict:
+            actions_dict[client_id] = {}
+        
+        if plage not in actions_dict[client_id]:
+            actions_dict[client_id][plage] = []
+        
+        actions_dict[client_id][plage].append({
             'action': action.action or '',
             'heure_appel': action.heure_appel,
             'date_action': action.date_action,
             'id': action.id
         })
+    
+    # Définir les plages horaires
+    plages_horaires = SuiviClientAction.PLAGE_HORAIRE_CHOICES
+    
+    # Fonction pour déterminer la plage horaire à partir d'une heure
+    def get_plage_from_heure(heure_obj):
+        if not heure_obj:
+            return ''
+        from datetime import time
+        for plage_code, plage_label in plages_horaires:
+            debut_str, fin_str = plage_code.split('-')
+            try:
+                debut_h, debut_m = map(int, debut_str.replace('h', ':').split(':'))
+                fin_h, fin_m = map(int, fin_str.replace('h', ':').split(':'))
+                debut = time(debut_h, debut_m)
+                fin = time(fin_h, fin_m)
+                if debut <= heure_obj <= fin:
+                    return plage_code
+            except:
+                continue
+        return ''
+    
+    # Récupérer les commandes avec leurs détails (articles, quantités, heures)
+    commandes_dict = {}
+    commandes_totaux = {}
+    commandes = Commande.objects.filter(
+        agence=agence,
+        client__in=clients,
+        date=date_selectionnee
+    ).select_related('client', 'article').order_by('client', 'heure')
+    
+    for cmd in commandes:
+        client_id = cmd.client.id
+        if client_id not in commandes_dict:
+            commandes_dict[client_id] = {}
+            commandes_totaux[client_id] = 0
+        
+        # Déterminer la plage horaire de la commande
+        plage_code = get_plage_from_heure(cmd.heure) if cmd.heure else ''
+        
+        if plage_code not in commandes_dict[client_id]:
+            commandes_dict[client_id][plage_code] = []
+        
+        # Formater les informations de la commande
+        quantite_int = int(cmd.quantite) if cmd.quantite else 0
+        article_str = f"{cmd.article.designation if cmd.article else 'N/A'}*{quantite_int}PCS (Qté: {float(cmd.quantite)}) ({cmd.date.strftime('%d/%m/%Y')} {cmd.heure.strftime('%H:%M') if cmd.heure else ''})"
+        
+        commandes_dict[client_id][plage_code].append({
+            'article': article_str,
+            'heure': cmd.heure.strftime('%H:%M') if cmd.heure else '',
+            'quantite': float(cmd.quantite),
+            'prix_total': float(cmd.prix_total),
+        })
+        
+        commandes_totaux[client_id] += float(cmd.prix_total)
     
     context = {
         'agence': agence,
@@ -8265,6 +8445,9 @@ def suivi_client(request):
         'date_selectionnee': date_selectionnee.strftime('%Y-%m-%d'),
         'clients': clients,
         'actions_dict': actions_dict,
+        'plages_horaires': plages_horaires,
+        'commandes_dict': commandes_dict,
+        'commandes_totaux': commandes_totaux,
     }
     return render(request, 'supermarket/commandes/suivi_client.html', context)
 
@@ -8441,25 +8624,42 @@ def generer_rapport_acm(request):
             
             clients = clients_query.select_related('agence').order_by('ref', 'detail', 'intitule')
             
+            # Définir les plages horaires
+            PLAGES_HORAIRES = [
+                ('06h30-08h30', '06h30-08h30'),
+                ('08h30-10h00', '08h30-10h00'),
+                ('10h00-11h30', '10h00-11h30'),
+                ('14h30-16h00', '14h30-16h00'),
+                ('16h00-17h30', '16h00-17h30'),
+            ]
+            
             # Récupérer toutes les actions de suivi dans la période (plusieurs par client)
             suivi_actions = SuiviClientAction.objects.filter(
                 agence=agence,
                 client__in=clients,
                 date_action__date__range=[date_debut_obj, date_fin_obj]
-            ).select_related('client').order_by('client', '-date_action', '-heure_appel')
+            ).select_related('client').order_by('client', 'plage_horaire', '-date_action', '-heure_appel')
             
             # Filtrer selon l'utilisateur (ACM voit seulement ses actions)
             compte = get_user_compte(request)
             if compte:
                 suivi_actions = filter_suivi_client_by_user(suivi_actions, compte)
             
+            # Organiser les actions par client et par plage horaire
             actions_dict = {}
             for action in suivi_actions:
-                if action.client.id not in actions_dict:
-                    actions_dict[action.client.id] = []
-                actions_dict[action.client.id].append({
+                client_id = action.client.id
+                plage = action.plage_horaire or ''
+                
+                if client_id not in actions_dict:
+                    actions_dict[client_id] = {}
+                
+                if plage not in actions_dict[client_id]:
+                    actions_dict[client_id][plage] = []
+                
+                actions_dict[client_id][plage].append({
                     'action': action.action or '',
-                    'heure_appel': action.heure_appel,
+                    'heure_appel': action.heure_appel.strftime('%H:%M') if action.heure_appel else '',
                     'date_action': action.date_action
                 })
             
@@ -8497,49 +8697,81 @@ def generer_rapport_acm(request):
                         'total': total_commande,
                     })
             
-            # Calculer les totaux par client
+            # Fonction pour déterminer la plage horaire à partir d'une heure
+            def get_plage_from_heure(heure_str):
+                if not heure_str:
+                    return ''
+                try:
+                    from datetime import time
+                    heure_obj = datetime.strptime(heure_str, '%H:%M').time()
+                    for plage_code, plage_label in PLAGES_HORAIRES:
+                        debut_str, fin_str = plage_code.split('-')
+                        debut = datetime.strptime(debut_str, '%Hh%M').time()
+                        fin = datetime.strptime(fin_str, '%Hh%M').time()
+                        if debut <= heure_obj <= fin:
+                            return plage_code
+                except:
+                    pass
+                return ''
+            
+            # Calculer les totaux par client et organiser par plage horaire
             clients_data = []
             for client in clients:
-                actions_list = actions_dict.get(client.id, [])
+                actions_par_plage = actions_dict.get(client.id, {})
                 commandes_client = commandes_grouped.get(client.id, [])
+                
+                # Organiser les commandes par plage horaire
+                commandes_par_plage = {}
+                for cmd in commandes_client:
+                    plage = get_plage_from_heure(cmd['heure'])
+                    if plage:
+                        if plage not in commandes_par_plage:
+                            commandes_par_plage[plage] = []
+                        commandes_par_plage[plage].append(cmd)
+                
+                # Calculer les totaux par plage horaire
+                totaux_par_plage = {}
+                for plage_code, plage_label in PLAGES_HORAIRES:
+                    total_plage = sum(cmd['total'] for cmd in commandes_par_plage.get(plage_code, []))
+                    totaux_par_plage[plage_code] = total_plage
+                
                 total_commandes = sum(cmd['total'] for cmd in commandes_client)
                 
-                # Si le client a des actions, créer une ligne par action
-                if actions_list:
-                    for action_data in actions_list:
-                        clients_data.append({
-                            'id': client.id,
-                            'detail': client.detail or '',
-                            'ref': client.ref or '',
-                            'potentiel': client.potentiel or '',
-                            'nom': client.intitule,
-                            'telephone': client.telephone,
-                            'heure_appel': action_data.get('heure_appel').strftime('%H:%M') if action_data.get('heure_appel') else '',
-                            'action': action_data.get('action', ''),
-                            'commandes': commandes_client if action_data == actions_list[0] else [],  # Commandes seulement sur la première ligne
-                            'total': total_commandes if action_data == actions_list[0] else 0,  # Total seulement sur la première ligne
-                        })
-                else:
-                    # Client sans action
-                    clients_data.append({
+                # Créer UNE SEULE ligne par client avec toutes les données organisées par plage horaire
+                client_json = {
                         'id': client.id,
                         'detail': client.detail or '',
                         'ref': client.ref or '',
                         'potentiel': client.potentiel or '',
                         'nom': client.intitule,
                         'telephone': client.telephone,
-                        'heure_appel': '',
-                        'action': '',
-                        'commandes': commandes_client,
-                        'total': total_commandes,
-                    })
+                    'actions_par_plage': actions_par_plage,
+                    'commandes_par_plage': commandes_par_plage,
+                    'totaux_par_plage': totaux_par_plage,
+                    'total': float(total_commandes),
+                }
+                clients_data.append(client_json)
             
             # Convertir les données pour la session (sérialisation JSON)
             clients_data_json = []
             for client_data in clients_data:
-                commandes_json = []
-                for cmd in client_data['commandes']:
-                    commandes_json.append({
+                # Sérialiser les actions par plage
+                actions_par_plage_json = {}
+                for plage, actions_list in client_data['actions_par_plage'].items():
+                    actions_par_plage_json[plage] = []
+                    for action in actions_list:
+                        actions_par_plage_json[plage].append({
+                            'action': action['action'],
+                            'heure_appel': action['heure_appel'],
+                            'date_action': action['date_action'].strftime('%Y-%m-%d %H:%M:%S') if hasattr(action['date_action'], 'strftime') else str(action['date_action'])
+                        })
+                
+                # Sérialiser les commandes par plage
+                commandes_par_plage_json = {}
+                for plage, commandes_list in client_data['commandes_par_plage'].items():
+                    commandes_par_plage_json[plage] = []
+                    for cmd in commandes_list:
+                        commandes_par_plage_json[plage].append({
                         'date': cmd['date'],
                         'heure': cmd['heure'],
                         'articles': cmd['articles'],
@@ -8553,9 +8785,9 @@ def generer_rapport_acm(request):
                     'potentiel': client_data['potentiel'],
                     'nom': client_data['nom'],
                     'telephone': client_data['telephone'],
-                    'heure_appel': client_data['heure_appel'],
-                    'action': client_data['action'],
-                    'commandes': commandes_json,
+                    'actions_par_plage': actions_par_plage_json,
+                    'commandes_par_plage': commandes_par_plage_json,
+                    'totaux_par_plage': {k: float(v) for k, v in client_data['totaux_par_plage'].items()},
                     'total': float(client_data['total']),
                 }
                 clients_data_json.append(client_json)
@@ -8596,6 +8828,8 @@ def export_rapport_acm_excel(request):
         if not rapport_data:
             messages.error(request, 'Aucun rapport à exporter. Veuillez générer un rapport d\'abord.')
             return redirect('rapport_acm')
+        
+        print(f"[DEBUG EXPORT] Données de session récupérées: {len(rapport_data.get('clients_data', []))} clients")
         
         from openpyxl import Workbook
         from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
@@ -8694,41 +8928,88 @@ def export_rapport_acm_excel(request):
         
         start_row = row_num + 1
         
+        # Définir les plages horaires
+        PLAGES_HORAIRES = [
+            ('06h30-08h30', '06h30-08h30'),
+            ('08h30-10h00', '08h30-10h00'),
+            ('10h00-11h30', '10h00-11h30'),
+            ('14h30-16h00', '14h30-16h00'),
+            ('16h00-17h30', '16h00-17h30'),
+        ]
+        
         # En-têtes de colonnes avec meilleur style
-        headers = ['DETAIL', 'REF', 'POTENTIEL /5', 'NOMS', 'TELEPHONES', '06h30-08h30', 'Commandes', 'Total']
-        for col, header in enumerate(headers, 1):
+        # Première ligne : colonnes fixes + plages horaires fusionnées
+        headers_fixed = ['DETAIL', 'REF', 'POTENTIEL /5', 'NOMS', 'TELEPHONES']
+        col = 1
+        for header in headers_fixed:
+            ws.merge_cells(f'{get_column_letter(col)}{start_row}:{get_column_letter(col)}{start_row + 1}')
             cell = ws.cell(row=start_row, column=col)
             cell.value = header
             cell.font = header_font_bold
             cell.fill = header_fill
             cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
             cell.border = border
-            # Hauteur de ligne pour les en-têtes
-            ws.row_dimensions[start_row].height = 25
+            col += 1
         
-        # Grouper les clients par ID pour gérer plusieurs appels
-        clients_grouped = {}
+        # Pour chaque plage horaire : 3 colonnes (Heure, Commandes, Total)
+        for plage_code, plage_label in PLAGES_HORAIRES:
+            # Fusionner les 3 colonnes pour le titre de la plage
+            ws.merge_cells(f'{get_column_letter(col)}{start_row}:{get_column_letter(col + 2)}{start_row}')
+            cell = ws.cell(row=start_row, column=col)
+            cell.value = plage_label
+            cell.font = header_font_bold
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.border = border
+            
+            # Sous-colonnes : Heure, Commandes, Total
+            sub_headers = ['Heure', 'Commandes', 'Total']
+            for sub_header in sub_headers:
+                cell = ws.cell(row=start_row + 1, column=col)
+                cell.value = sub_header
+                cell.font = header_font_bold
+                cell.fill = header_fill
+                cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+                cell.border = border
+                col += 1
+        
+        # Colonne Total général
+        ws.merge_cells(f'{get_column_letter(col)}{start_row}:{get_column_letter(col)}{start_row + 1}')
+        cell = ws.cell(row=start_row, column=col)
+        cell.value = 'TOTAL'
+        cell.font = header_font_bold
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        cell.border = border
+        
+        # Hauteur de ligne pour les en-têtes
+        ws.row_dimensions[start_row].height = 25
+        ws.row_dimensions[start_row + 1].height = 25
+        
+        # Ajuster start_row pour les données (après les 2 lignes d'en-têtes)
+        start_row = start_row + 2
+        
+        # Récupérer les données des clients avec la nouvelle structure
         clients_data = rapport_data.get('clients_data', [])
+        print(f"[DEBUG EXPORT] Nombre de clients à exporter: {len(clients_data)}")
         
+        # Créer une structure pour l'export avec les plages horaires
+        clients_export = []
         for client_data in clients_data:
-            client_id = client_data['id']
-            if client_id not in clients_grouped:
-                clients_grouped[client_id] = {
-                    'detail': client_data['detail'],
-                    'ref': client_data['ref'],
-                    'potentiel': client_data['potentiel'],
-                    'nom': client_data['nom'],
-                    'telephone': client_data['telephone'],
-                    'commandes': client_data.get('commandes', []),
-                    'total': client_data.get('total', 0),
-                    'appels': []
-                }
-            # Ajouter l'appel à la liste
-            if client_data.get('heure_appel') or client_data.get('action'):
-                clients_grouped[client_id]['appels'].append({
-                    'heure_appel': client_data.get('heure_appel', ''),
-                    'action': client_data.get('action', '')
-                })
+            clients_export.append({
+                'id': client_data['id'],
+                'detail': client_data.get('detail', ''),
+                'ref': client_data.get('ref', ''),
+                'potentiel': client_data.get('potentiel', ''),
+                'nom': client_data.get('nom', ''),
+                'telephone': client_data.get('telephone', ''),
+                'actions_par_plage': client_data.get('actions_par_plage', {}),
+                'commandes_par_plage': client_data.get('commandes_par_plage', {}),
+                'totaux_par_plage': client_data.get('totaux_par_plage', {}),
+                'total': client_data.get('total', 0),
+            })
+        
+        print(f"[DEBUG EXPORT] Clients export préparés: {len(clients_export)}")
         
         # Police pour les cellules de données
         data_font = Font(size=10, name='Calibri')
@@ -8810,64 +9091,11 @@ def export_rapport_acm_excel(request):
             # Blanc par défaut pour les autres cas
             return fill_blanc
         
-        # Données
+        # Données - UNE SEULE LIGNE PAR CLIENT avec toutes les plages horaires
         row = start_row + 1
-        for client_id, client in clients_grouped.items():
-            # Afficher chaque appel avec sa couleur selon l'action
-            for index, appel in enumerate(client['appels']):
-                # Déterminer la couleur selon l'action de cette ligne spécifique
-                action_text = appel.get('action', '') or ''
-                row_fill = get_action_color(action_text)
-                
-                # Debug : afficher la couleur détectée (peut être retiré après test)
-                if action_text:
-                    print(f"[DEBUG EXPORT] Action: '{action_text}' -> Couleur: {row_fill.start_color if hasattr(row_fill, 'start_color') else 'N/A'}")
-                
-                # Remplir les cellules avec les données
-                ws.cell(row=row, column=1, value=client['detail'] if index == 0 else '').border = border
-                ws.cell(row=row, column=1).fill = row_fill
-                ws.cell(row=row, column=1).font = data_font
-                ws.cell(row=row, column=1).alignment = Alignment(horizontal='left', vertical='center')
-                
-                ws.cell(row=row, column=2, value=client['ref'] if index == 0 else '').border = border
-                ws.cell(row=row, column=2).fill = row_fill
-                ws.cell(row=row, column=2).font = data_font
-                ws.cell(row=row, column=2).alignment = Alignment(horizontal='left', vertical='center')
-                
-                ws.cell(row=row, column=3, value=client['potentiel'] if index == 0 else '').border = border
-                ws.cell(row=row, column=3).fill = row_fill
-                ws.cell(row=row, column=3).font = data_font
-                ws.cell(row=row, column=3).alignment = Alignment(horizontal='left', vertical='center')
-                
-                ws.cell(row=row, column=4, value=client['nom'] if index == 0 else '').border = border
-                ws.cell(row=row, column=4).fill = row_fill
-                ws.cell(row=row, column=4).font = Font(bold=True, size=10, name='Calibri') if index == 0 else data_font
-                ws.cell(row=row, column=4).alignment = Alignment(horizontal='left', vertical='center')
-                
-                ws.cell(row=row, column=5, value=client['telephone'] if index == 0 else '').border = border
-                ws.cell(row=row, column=5).fill = row_fill
-                ws.cell(row=row, column=5).font = data_font
-                ws.cell(row=row, column=5).alignment = Alignment(horizontal='left', vertical='center')
-                
-                ws.cell(row=row, column=6, value=appel['heure_appel'] or '').border = border
-                ws.cell(row=row, column=6).fill = row_fill
-                ws.cell(row=row, column=6).font = data_font
-                ws.cell(row=row, column=6).alignment = Alignment(horizontal='center', vertical='center')
-                
-                ws.cell(row=row, column=7, value=appel['action']).border = border
-                ws.cell(row=row, column=7).fill = row_fill
-                ws.cell(row=row, column=7).font = data_font
-                ws.cell(row=row, column=7).alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
-                
-                ws.cell(row=row, column=8, value=client['total'] if index == 0 else '').border = border
-                ws.cell(row=row, column=8).fill = row_fill
-                ws.cell(row=row, column=8).font = Font(bold=True, size=10, name='Calibri') if index == 0 and client['total'] else data_font
-                ws.cell(row=row, column=8).alignment = Alignment(horizontal='right', vertical='center')
-                
-                row += 1
-            
-            # Si pas d'appels mais des commandes, afficher quand même
-            if len(client['appels']) == 0 and len(client['commandes']) > 0:
+        for client in clients_export:
+            try:
+                # Colonnes fixes
                 ws.cell(row=row, column=1, value=client['detail']).border = border
                 ws.cell(row=row, column=1).fill = fill_blanc
                 ws.cell(row=row, column=1).font = data_font
@@ -8893,77 +9121,331 @@ def export_rapport_acm_excel(request):
                 ws.cell(row=row, column=5).font = data_font
                 ws.cell(row=row, column=5).alignment = Alignment(horizontal='left', vertical='center')
                 
-                ws.cell(row=row, column=6).border = border
-                ws.cell(row=row, column=6).fill = fill_blanc
+                # Pour chaque plage horaire, créer 3 colonnes : Heure, Commandes, Total
+                col = 6
+                actions_par_plage = client.get('actions_par_plage', {})
+                commandes_par_plage = client.get('commandes_par_plage', {})
+                totaux_par_plage = client.get('totaux_par_plage', {})
                 
-                ws.cell(row=row, column=7).border = border
-                ws.cell(row=row, column=7).fill = fill_blanc
+                for plage_code, plage_label in PLAGES_HORAIRES:
+                    # Récupérer les actions et commandes pour cette plage
+                    actions_list = actions_par_plage.get(plage_code, [])
+                    commandes_list = commandes_par_plage.get(plage_code, [])
+                    
+                    # Colonne Heure : concaténer toutes les heures (actions + commandes)
+                    heures_set = set()
+                    for action in actions_list:
+                        if action.get('heure_appel'):
+                            heures_set.add(action['heure_appel'])
+                    for cmd in commandes_list:
+                        if cmd.get('heure'):
+                            heures_set.add(cmd['heure'])
+                    heures_str = ', '.join(sorted(heures_set)) if heures_set else ''
+                    
+                    # Colonne Commandes : concaténer toutes les actions et commandes
+                    commandes_str_parts = []
+                    for action in actions_list:
+                        if action.get('action'):
+                            commandes_str_parts.append(action['action'])
+                    for cmd in commandes_list:
+                        if cmd.get('articles'):
+                            commandes_str_parts.append(cmd['articles'])
+                    commandes_str = ' | '.join(commandes_str_parts) if commandes_str_parts else ''
+                    
+                    # Déterminer la couleur selon les actions
+                    row_fill = fill_blanc
+                    for action in actions_list:
+                        if action.get('action'):
+                            action_fill = get_action_color(action['action'])
+                            if action_fill != fill_blanc:
+                                row_fill = action_fill
+                                break
+                    
+                    # Colonne Heure
+                    ws.cell(row=row, column=col, value=heures_str).border = border
+                    ws.cell(row=row, column=col).fill = row_fill
+                    ws.cell(row=row, column=col).font = data_font
+                    ws.cell(row=row, column=col).alignment = Alignment(horizontal='center', vertical='center')
+                    col += 1
+                    
+                    # Colonne Commandes
+                    ws.cell(row=row, column=col, value=commandes_str).border = border
+                    ws.cell(row=row, column=col).fill = row_fill
+                    ws.cell(row=row, column=col).font = data_font
+                    ws.cell(row=row, column=col).alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
+                    col += 1
+                    
+                    # Colonne Total pour cette plage
+                    total_plage = totaux_par_plage.get(plage_code, 0)
+                    ws.cell(row=row, column=col, value=float(total_plage) if total_plage > 0 else '').border = border
+                    ws.cell(row=row, column=col).fill = row_fill
+                    ws.cell(row=row, column=col).font = data_font
+                    ws.cell(row=row, column=col).alignment = Alignment(horizontal='right', vertical='center')
+                    col += 1
                 
-                ws.cell(row=row, column=8, value=client['total']).border = border
-                ws.cell(row=row, column=8).fill = fill_blanc
-                ws.cell(row=row, column=8).font = Font(bold=True, size=10, name='Calibri')
-                ws.cell(row=row, column=8).alignment = Alignment(horizontal='right', vertical='center')
+                # Colonne Total général
+                total_client = client.get('total', 0)
+                ws.cell(row=row, column=col, value=float(total_client) if total_client > 0 else '').border = border
+                ws.cell(row=row, column=col).fill = fill_blanc
+                ws.cell(row=row, column=col).font = Font(bold=True, size=10, name='Calibri')
+                ws.cell(row=row, column=col).alignment = Alignment(horizontal='right', vertical='center')
                 
                 row += 1
-            
-            # Afficher les commandes (seulement après le premier appel ou si pas d'appels)
-            # Les articles d'une même commande sont sur une seule ligne
-            if client['commandes']:
-                # Déterminer la couleur de base selon les actions du client
-                # Utiliser la couleur de la première action critique trouvée, sinon la première action
-                base_fill = fill_blanc
-                if client['appels']:
-                    # Prioriser les couleurs critiques (rouge) puis spéciales (violet)
-                    for appel in client['appels']:
-                        action_fill = get_action_color(appel.get('action', ''))
-                        if action_fill == fill_rouge_fonce or action_fill == fill_rouge_clair:
-                            base_fill = action_fill
-                            break
-                    # Si pas de couleur critique, prendre la première couleur spéciale
-                    if base_fill == fill_blanc:
-                        for appel in client['appels']:
-                            action_fill = get_action_color(appel.get('action', ''))
-                            if action_fill != fill_blanc:
-                                base_fill = action_fill
-                                break
                 
-                for cmd in client['commandes']:
-                    ws.cell(row=row, column=1).border = border
-                    ws.cell(row=row, column=1).fill = base_fill
-                    
-                    ws.cell(row=row, column=2).border = border
-                    ws.cell(row=row, column=2).fill = base_fill
-                    
-                    ws.cell(row=row, column=3).border = border
-                    ws.cell(row=row, column=3).fill = base_fill
-                    
-                    ws.cell(row=row, column=4, value=f"  → {cmd['date']} {cmd['heure']}").border = border
-                    ws.cell(row=row, column=4).fill = base_fill
-                    ws.cell(row=row, column=4).font = Font(italic=True, size=10, name='Calibri')
-                    ws.cell(row=row, column=4).alignment = Alignment(horizontal='left', vertical='center')
-                    
-                    ws.cell(row=row, column=5).border = border
-                    ws.cell(row=row, column=5).fill = base_fill
-                    
-                    ws.cell(row=row, column=6).border = border
-                    ws.cell(row=row, column=6).fill = base_fill
-                    
-                    ws.cell(row=row, column=7, value=cmd['articles']).border = border
-                    ws.cell(row=row, column=7).fill = base_fill
-                    ws.cell(row=row, column=7).font = data_font
-                    ws.cell(row=row, column=7).alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
-                    
-                    ws.cell(row=row, column=8, value=cmd['total']).border = border
-                    ws.cell(row=row, column=8).fill = base_fill
-                    ws.cell(row=row, column=8).font = data_font
-                    ws.cell(row=row, column=8).alignment = Alignment(horizontal='right', vertical='center')
-                    
-                    row += 1
+            except Exception as client_error:
+                print(f"[DEBUG EXPORT] Erreur client {client.get('id', 'N/A')}: {str(client_error)}")
+                import traceback
+                traceback.print_exc()
+                continue
+        
+        # Ajouter les statistiques par vague
+        # Utiliser les mêmes plages horaires que dans les données
+        # Calculer les statistiques par vague
+        stats_par_vague = {}
+        for plage_code, plage_label in PLAGES_HORAIRES:
+            stats_par_vague[plage_code] = {
+                'nb_appels': 0,
+                'nb_reponses': 0,
+                'nb_commandes': 0,
+                'total_commandes': 0.0
+            }
+        
+        # Parcourir les clients pour calculer les stats
+        for client in clients_export:
+            actions_par_plage = client.get('actions_par_plage', {})
+            commandes_par_plage = client.get('commandes_par_plage', {})
+            totaux_par_plage = client.get('totaux_par_plage', {})
+            
+            # Compter les appels et réponses par plage horaire
+            for plage_code, plage_label in PLAGES_HORAIRES:
+                actions_list = actions_par_plage.get(plage_code, [])
+                commandes_list = commandes_par_plage.get(plage_code, [])
+                
+                # Compter les appels
+                # 1. Compter toutes les actions enregistrées (chaque action = un appel)
+                nb_appels_actions = len(actions_list)
+                
+                # 2. Compter toutes les commandes (une commande = un appel, car il faut appeler pour passer une commande)
+                nb_appels_commandes = len(commandes_list)
+                
+                # 3. Total des appels = actions + commandes
+                # MAIS : si une action et une commande sont liées (même client, même plage), on ne compte qu'un seul appel
+                # Pour simplifier, on prend le maximum entre actions et commandes, ou la somme si elles sont indépendantes
+                # Ici, on va compter : max(actions, commandes) pour éviter de compter deux fois le même appel
+                # Mais si on a des actions ET des commandes séparées, on les additionne
+                # Solution : compter toutes les actions + les commandes qui n'ont pas d'action associée
+                nb_appels = nb_appels_actions
+                if commandes_list:
+                    # Si on a des commandes mais pas d'actions, on compte les commandes comme appels
+                    if not actions_list:
+                        nb_appels = nb_appels_commandes
+                    # Si on a des actions ET des commandes, on compte les deux (car ce sont des appels différents)
+                    else:
+                        nb_appels = nb_appels_actions + nb_appels_commandes
+                
+                stats_par_vague[plage_code]['nb_appels'] += nb_appels
+                
+                # Calculer le nombre de réponses selon la logique :
+                # Nombre de réponses = (Actions avec réponse + Commandes) - (Actions "pas de réponse")
+                
+                # 1. Compter les actions qui sont des réponses (pas "pas de réponse")
+                nb_reponses_actions = 0
+                nb_pas_de_reponse = 0
+                for action in actions_list:
+                    action_text = (action.get('action') or '').lower().strip()
+                    # Vérifier si c'est "pas de réponse"
+                    if any(mot in action_text for mot in [
+                        'pas de reponse', 'pas de réponse', 'pas reponse', 'pas réponse',
+                        'ne decroche pas', 'ne décroche pas', 'ne decroche', 'ne décroche',
+                        'ne repond pas', 'ne répond pas', 'ne repond', 'ne répond',
+                        'sonne occupé', 'sonne occupe', 'ligne occupee', 'ligne occupée',
+                        'pas disponible', 'indisponible'
+                    ]):
+                        nb_pas_de_reponse += 1
+                    elif action_text:  # Si l'action a du texte et n'est pas "pas de réponse", c'est une réponse
+                        nb_reponses_actions += 1
+                    # Si l'action n'a pas de texte mais a une heure, on ne la compte pas comme réponse
+                
+                # 2. Compter toutes les commandes (une commande = une réponse)
+                nb_reponses_commandes = len(commandes_list)
+                
+                # 3. Calculer le nombre total de réponses
+                # Nombre de réponses = Actions avec réponse + Commandes
+                nb_reponses = nb_reponses_actions + nb_reponses_commandes
+                
+                # IMPORTANT : Le nombre de réponses ne peut pas dépasser le nombre d'appels
+                if nb_reponses > nb_appels:
+                    # Si on a plus de réponses que d'appels, on limite au nombre d'appels
+                    nb_reponses = nb_appels
+                
+                if nb_reponses > 0:
+                    stats_par_vague[plage_code]['nb_reponses'] += nb_reponses
+                
+                # Compter les commandes par plage horaire
+                if commandes_list:
+                    stats_par_vague[plage_code]['nb_commandes'] += len(commandes_list)
+                    # Ajouter le total des commandes de cette plage pour ce client
+                    total_plage_client = float(totaux_par_plage.get(plage_code, 0))
+                    stats_par_vague[plage_code]['total_commandes'] += total_plage_client
+        
+        # Ajouter le tableau des statistiques
+        stats_row = row + 2
+        stats_start_col = 1
+        
+        # Titre du tableau de statistiques - Première ligne
+        # Colonne A avec "RAPPORT JOURNALIER-DATE" qui span 2 lignes (rowspan=2)
+        # Écrire AVANT de fusionner pour que le texte soit visible
+        cell_title = ws.cell(row=stats_row, column=stats_start_col)
+        cell_title.value = 'RAPPORT JOURNALIER-DATE'
+        cell_title.font = Font(bold=True, size=12, name='Calibri')
+        cell_title.fill = PatternFill(start_color="FFC0CB", end_color="FFC0CB", fill_type="solid")
+        cell_title.alignment = Alignment(horizontal='left', vertical='center')
+        cell_title.border = border
+        ws.merge_cells(f'{get_column_letter(stats_start_col)}{stats_row}:{get_column_letter(stats_start_col)}{stats_row + 1}')
+        
+        # En-têtes des vagues - Première ligne (fusionnés verticalement sur 2 lignes)
+        col = stats_start_col + 1
+        vague_names = ['PREMIERE', 'DEUXIEME VAGUE', 'TROISIEME VAGUE', 'QUATRIEME VAGUE', 'CINQUIEME VAGUE']
+        for idx, (plage_code, plage_label) in enumerate(PLAGES_HORAIRES):
+            vague_name = vague_names[idx] if idx < len(vague_names) else plage_label
+            # Écrire AVANT de fusionner pour que le texte soit visible
+            cell = ws.cell(row=stats_row, column=col)
+            cell.value = vague_name
+            cell.font = header_font_bold
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.border = border
+            ws.merge_cells(f'{get_column_letter(col)}{stats_row}:{get_column_letter(col)}{stats_row + 1}')
+            col += 1
+        
+        # Colonne Total (fusionnée verticalement sur 2 lignes)
+        # Écrire AVANT de fusionner pour que le texte soit visible
+        cell = ws.cell(row=stats_row, column=col)
+        cell.value = 'TOTAL COMMANDES JOURNALIERES'
+        cell.font = header_font_bold
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        cell.border = border
+        ws.merge_cells(f'{get_column_letter(col)}{stats_row}:{get_column_letter(col)}{stats_row + 1}')
+        
+        # Lignes de statistiques - Style exact comme l'image
+        # "Nombre de Comm" : colonne A violet clair ET toutes les cellules de données violet clair
+        # "Total comman" : colonne A rose clair ET toutes les cellules de données rose clair
+        metrics = [
+            ('Nombre d\'app', 'nb_appels', 'blanc', 'blanc'),  # (label, key, couleur_col_A, couleur_cells)
+            ('Nombre de rép', 'nb_reponses', 'blanc', 'blanc'),
+            ('Nombre de Comm', 'nb_commandes', 'violet', 'violet'),  # Violet clair pour colonne A ET toutes les cellules
+            ('Total comman', 'total_commandes', 'rose', 'rose'),  # Rose clair pour colonne A ET toutes les cellules
+        ]
+        
+        fill_rose = PatternFill(start_color="FFC0CB", end_color="FFC0CB", fill_type="solid")  # Rose clair
+        fill_violet = PatternFill(start_color="F3E5F5", end_color="F3E5F5", fill_type="solid")  # Violet clair
+        fill_blanc = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
+        
+        stats_data_row = stats_row + 2  # Ligne pour les données (après l'en-tête fusionné)
+        
+        for metric_label, metric_key, couleur_col_a, couleur_cells in metrics:
+            col = stats_start_col
+            # Colonne A avec le label - gérer les cellules fusionnées
+            cell = ws.cell(row=stats_data_row, column=col)
+            from openpyxl.cell.cell import MergedCell
+            if isinstance(cell, MergedCell):
+                # Utiliser la cellule principale (première ligne de la fusion)
+                cell = ws.cell(row=stats_row, column=col)
+            cell.value = metric_label
+            cell.font = Font(bold=True, size=10, name='Calibri')
+            if couleur_col_a == 'rose':
+                cell.fill = fill_rose
+            elif couleur_col_a == 'violet':
+                cell.fill = fill_violet
+            else:
+                cell.fill = fill_blanc
+            cell.border = border
+            cell.alignment = Alignment(horizontal='left', vertical='center')
+            col += 1
+            
+            # Une colonne par vague
+            for plage_code, plage_label in PLAGES_HORAIRES:
+                value = stats_par_vague[plage_code][metric_key]
+                if metric_key == 'total_commandes':
+                    # Format avec point comme séparateur de milliers (ex: 32.800)
+                    if value > 0:
+                        value_str = f"{value:,.0f}".replace(',', '.')
+                    else:
+                        value_str = ""
+                else:
+                    value_str = str(int(value)) if value > 0 else ""
+                
+                # Cellule de données pour cette vague - gérer les cellules fusionnées
+                cell_data = ws.cell(row=stats_data_row, column=col)
+                from openpyxl.cell.cell import MergedCell
+                if isinstance(cell_data, MergedCell):
+                    # Utiliser la cellule principale (première ligne de la fusion)
+                    cell_data = ws.cell(row=stats_row, column=col)
+                cell_data.value = value_str
+                cell_data.border = border
+                cell_data.font = data_font
+                if metric_key == 'total_commandes':
+                    cell_data.alignment = Alignment(horizontal='right', vertical='center')
+                else:
+                    cell_data.alignment = Alignment(horizontal='center', vertical='center')
+                # Appliquer la couleur selon la métrique
+                if couleur_cells == 'rose':
+                    cell_data.fill = fill_rose
+                elif couleur_cells == 'violet':
+                    cell_data.fill = fill_violet
+                else:
+                    cell_data.fill = fill_blanc
+                col += 1
+            
+            # Total journalier (dans la colonne TOTAL COMMANDES JOURNALIERES)
+            # Cette colonne affiche UNIQUEMENT le chiffre d'affaire total (total_commandes)
+            # Pour les autres métriques (nb_appels, nb_reponses, nb_commandes), cette colonne reste vide
+            if metric_key == 'total_commandes':
+                # Somme de tous les total_commandes de toutes les vagues = chiffre d'affaire total
+                total_journalier = sum(stats_par_vague[p[0]]['total_commandes'] for p in PLAGES_HORAIRES)
+                if total_journalier > 0:
+                    # Format avec point comme séparateur de milliers (ex: 1.154.150)
+                    value_str = f"{total_journalier:,.0f}".replace(',', '.')
+                else:
+                    value_str = ""
+            else:
+                # Pour les autres métriques, la colonne TOTAL COMMANDES JOURNALIERES reste vide
+                value_str = ""
+            
+            cell_total = ws.cell(row=stats_data_row, column=col)
+            from openpyxl.cell.cell import MergedCell
+            if isinstance(cell_total, MergedCell):
+                # Utiliser la cellule principale (première ligne de la fusion)
+                cell_total = ws.cell(row=stats_row, column=col)
+            cell_total.value = value_str
+            cell_total.border = border
+            cell_total.font = Font(bold=True, size=10, name='Calibri')
+            if metric_key == 'total_commandes':
+                cell_total.alignment = Alignment(horizontal='right', vertical='center')
+            else:
+                cell_total.alignment = Alignment(horizontal='center', vertical='center')
+            # Appliquer la couleur selon la métrique
+            if couleur_cells == 'rose':
+                cell_total.fill = fill_rose
+            elif couleur_cells == 'violet':
+                cell_total.fill = fill_violet
+            else:
+                cell_total.fill = fill_blanc
+            
+            stats_data_row += 1
         
         # Ajuster les largeurs de colonnes pour un meilleur affichage
-        column_widths = [30, 18, 30, 25, 18, 18, 50, 18]
-        for col, width in enumerate(column_widths, 1):
-            ws.column_dimensions[get_column_letter(col)].width = width
+        # Colonnes fixes : DETAIL, REF, POTENTIEL, NOMS, TELEPHONES
+        column_widths = [30, 18, 15, 25, 18]
+        # Pour chaque plage horaire : Heure, Commandes, Total
+        for _ in PLAGES_HORAIRES:
+            column_widths.extend([15, 40, 15])
+        # Colonne Total général
+        column_widths.append(18)
+        
+        for col_idx, width in enumerate(column_widths, 1):
+            ws.column_dimensions[get_column_letter(col_idx)].width = width
         
         # Ajuster la hauteur des lignes de données
         for r in range(start_row + 1, row + 1):
@@ -9762,7 +10244,7 @@ def modifier_article(request, article_id):
             unite_vente = request.POST.get('unite_vente')
             conditionnement = request.POST.get('conditionnement')
             famille_id = request.POST.get('famille')
-            suivi_stock_value = request.POST.get('suivi_stock', 'true')
+            # Le suivi de stock est toujours activé automatiquement (non modifiable par l'utilisateur)
             
             ancien_stock = article.stock_actuel
             
@@ -9803,13 +10285,15 @@ def modifier_article(request, article_id):
             article.unite_vente = unite_vente
             article.conditionnement = conditionnement
             article.categorie = categorie
-            article.suivi_stock = (suivi_stock_value.lower() == 'true')
+            # Le suivi de stock est toujours activé automatiquement
+            article.suivi_stock = True
             article.save()
             
             nouveau_stock = article.stock_actuel
             difference_stock = nouveau_stock - ancien_stock
             
-            if difference_stock != Decimal('0') and article.suivi_stock:
+            # Créer un mouvement pour TOUS les changements de stock (même si différence = 0 pour traçabilité complète)
+            if article.suivi_stock:
                 try:
                     numero_piece = f"AJUST-{article.id}-{timezone.now().strftime('%Y%m%d%H%M%S')}"
                     MouvementStock.objects.create(
@@ -9821,10 +10305,10 @@ def modifier_article(request, article_id):
                         quantite_stock=nouveau_stock,
                         stock_initial=ancien_stock,
                         solde=nouveau_stock,
-                        quantite=abs(difference_stock),
+                        quantite=abs(difference_stock) if difference_stock != Decimal('0') else Decimal('0'),
                         cout_moyen_pondere=float(article.prix_achat),
                         stock_permanent=float(nouveau_stock * article.prix_achat),
-                        commentaire=f"Ajustement manuel via modification d'article par {request.user.username}"
+                        commentaire=f"Ajustement manuel via modification d'article par {request.user.username}" + (f" (différence: {difference_stock})" if difference_stock != Decimal('0') else " (vérification)")
                     )
                     print(f"[STOCK] Ajustement manuel enregistré: {article.designation} {ancien_stock} -> {nouveau_stock}")
                 except Exception as movement_error:
@@ -9910,10 +10394,8 @@ def detail_article(request, article_id):
     try:
         article = Article.objects.get(id=article_id, agence=get_user_agence(request))
         types_vente = TypeVente.objects.filter(article=article)
-        mouvements_query = MouvementStock.objects.filter(article=article)
-        if not article.suivi_stock:
-            mouvements_query = mouvements_query.exclude(type_mouvement__iexact='ajustement')
-        mouvements = mouvements_query.order_by('-date_mouvement')[:10]
+        # Le suivi de stock est toujours activé, donc on affiche tous les mouvements
+        mouvements = MouvementStock.objects.filter(article=article).order_by('-date_mouvement')[:10]
         
         # Calculer les marges
         marge_unitaire = float(article.prix_vente) - float(article.prix_achat) if article.prix_achat > 0 else 0
@@ -10235,96 +10717,290 @@ def modifier_facture_achat(request, facture_id):
                 return redirect('modifier_facture_achat', facture_id=facture_id)
             
             # Mettre à jour la facture d'achat
-            facture.numero_fournisseur = numero_fournisseur
-            facture.date_achat = date_achat
-            facture.heure = heure
-            facture.reference_achat = reference_achat
-            facture.prix_total_global = float(prix_total_global)
-            facture.statut = statut
-            facture.commentaire = commentaire
-            facture.save()
+            # IMPORTANT : Utiliser update() pour éviter que la méthode save() du modèle
+            # n'appelle mettre_a_jour_stock() automatiquement, car on gère manuellement
+            # la logique de modification (annulation + nouvelle quantité avec différence)
+            # 
+            # ATTENTION : Ne pas changer le statut si la facture est déjà validée,
+            # car cela pourrait déclencher mettre_a_jour_stock() qui réappliquerait la quantité totale
+            statut_avant = facture.statut
+            if statut != statut_avant and statut_avant == 'validee' and statut == 'validee':
+                # Si le statut reste 'validee', on ne change pas le statut pour éviter de déclencher mettre_a_jour_stock()
+                print(f"[DEBUG] Statut inchangé (validee), on ne modifie pas le statut pour éviter mettre_a_jour_stock()")
+                statut_a_sauvegarder = statut_avant
+            else:
+                statut_a_sauvegarder = statut
+            
+            FactureAchat.objects.filter(id=facture.id).update(
+                numero_fournisseur=numero_fournisseur,
+                date_achat=date_achat,
+                heure=heure,
+                reference_achat=reference_achat,
+                prix_total_global=float(prix_total_global),
+                statut=statut_a_sauvegarder,
+                commentaire=commentaire
+            )
+            # Recharger la facture pour avoir les valeurs à jour
+            facture.refresh_from_db()
 
-            # 1) Suppression d'une ligne existante (si demandée) avec déstockage
-            if ligne_supprimee_id:
-                try:
-                    ligne_obj = LigneFactureAchat.objects.get(id=int(ligne_supprimee_id), facture_achat=facture)
-                    article = ligne_obj.article
-                    if article:
-                        ancien_stock = getattr(article, 'stock_actuel', 0)
-                        article.stock_actuel = max(0, ancien_stock - int(ligne_obj.quantite))
-                        article.save()
-                        # Supprimer mouvements liés à cette ligne et facture
-                        try:
-                            MouvementStock.objects.filter(facture_achat=facture, article=article).delete()
-                        except Exception:
-                            pass
-                    ligne_obj.delete()
-                    messages.info(request, "Ligne supprimée et stock ajusté.")
-                except LigneFactureAchat.DoesNotExist:
-                    messages.warning(request, "Ligne à supprimer introuvable.")
-
-            # 2) Ajout de nouvelles lignes comme dans la création
-            if articles_data:
-                import json
-                try:
-                    articles = json.loads(articles_data)
-                    for a in articles:
-                        # a: {id, prix_achat, quantite}
-                        article = Article.objects.get(id=a['id'])
-                        ligne = LigneFactureAchat.objects.create(
-                            facture_achat=facture,
-                            article=article,
-                            reference_article=article.reference_article,
-                            designation=article.designation,
-                            prix_unitaire=float(a['prix_achat']),
-                            quantite=int(a['quantite']),
-                            prix_total_article=float(a['prix_achat']) * int(a['quantite'])
-                        )
-                        # Mise à jour stock et dernier prix d'achat
-                        ancien_stock = article.stock_actuel
-                        article.stock_actuel = ancien_stock + int(a['quantite'])
-                        article.dernier_prix_achat = float(a['prix_achat'])
-                        article.save()
-                        # Mouvement de stock (entrée)
-                        try:
-                            MouvementStock.objects.create(
-                                article=article,
-                                agence=agence,
-                                type_mouvement='entree',
-                                date_mouvement=timezone.now(),
-                                numero_piece=facture.reference_achat,
-                                quantite_stock=article.stock_actuel,
-                                stock_initial=ancien_stock,
-                                solde=article.stock_actuel,
-                                quantite=int(a['quantite']),
-                                cout_moyen_pondere=float(article.prix_achat),
-                                stock_permanent=float(article.stock_actuel * article.prix_achat),
+            # Nouvelle logique : Annuler d'abord l'effet de l'ancienne facture, puis appliquer la nouvelle
+            # 1. Soustraire les anciennes quantités du stock
+            # 2. Ajouter les nouvelles quantités au stock
+            # 3. Créer un seul mouvement de stock qui reflète le changement net
+            from datetime import timedelta
+            with transaction.atomic():
+                # 1) Récupérer les anciennes lignes AVANT de les supprimer
+                lignes_existantes = LigneFactureAchat.objects.select_related('article').filter(facture_achat=facture)
+                
+                # Créer un dictionnaire des anciennes quantités par article
+                anciennes_quantites = {}
+                
+                print(f"[DEBUG] Récupération des anciennes lignes: {lignes_existantes.count()} lignes trouvées")
+                for ligne in lignes_existantes:
+                    if ligne.article:
+                        article_id = ligne.article.id
+                        anciennes_quantites[article_id] = Decimal(str(ligne.quantite))
+                        print(f"  [DEBUG] Ancienne ligne - Article ID: {article_id}, Quantité: {ligne.quantite}")
+                
+                # 2) Supprimer toutes les anciennes lignes
+                LigneFactureAchat.objects.filter(facture_achat=facture).delete()
+                print(f"[DEBUG] Anciennes lignes supprimées")
+                
+                # 3) Traiter les nouvelles lignes : annuler l'ancienne puis appliquer la nouvelle
+                if articles_data:
+                    import json
+                    try:
+                        articles = json.loads(articles_data)
+                        print(f"[DEBUG] Articles reçus du formulaire: {articles}")
+                        for a in articles:
+                            # Convertir l'ID en entier (peut être string ou int selon le JSON)
+                            article_id = int(a.get('id', 0)) if a.get('id') else None
+                            # Normaliser les valeurs numériques (gérer les virgules, etc.)
+                            quantite_str = str(a.get('quantite', 0)).replace(',', '.')
+                            prix_str = str(a.get('prix_achat', 0)).replace(',', '.')
+                            quantite_nouvelle = Decimal(quantite_str)
+                            prix_achat_nouveau = Decimal(prix_str)
+                            
+                            print(f"[DEBUG] Article ID: {article_id}, Quantité: {quantite_nouvelle}, Prix: {prix_achat_nouveau}")
+                            
+                            if not article_id or quantite_nouvelle <= 0:
+                                print(f"[DEBUG] Article ignoré: ID={article_id}, Quantité={quantite_nouvelle}")
+                                continue
+                            
+                            try:
+                                article = Article.objects.get(id=article_id)
+                                article.refresh_from_db()
+                            except Article.DoesNotExist:
+                                messages.error(request, f"Article introuvable (ID: {article_id}).")
+                                continue
+                            
+                            # Stock AVANT modification
+                            # IMPORTANT : Le stock actuel contient déjà l'ancienne quantité de la facture
+                            stock_avant_modification = article.stock_actuel
+                            
+                            # Quantité de l'ancienne facture
+                            quantite_ancienne = anciennes_quantites.get(article_id, Decimal('0'))
+                            
+                            # Calcul de la différence entre nouvelle et ancienne quantité
+                            difference = quantite_nouvelle - quantite_ancienne
+                            
+                            # DEBUG : Afficher les valeurs pour vérification
+                            print(f"[DEBUG MODIFICATION FACTURE ACHAT]")
+                            print(f"  Article: {article.designation} (ID: {article_id})")
+                            print(f"  Stock avant modification: {stock_avant_modification}")
+                            print(f"  Quantité ancienne (dans facture): {quantite_ancienne}")
+                            print(f"  Quantité nouvelle (dans facture): {quantite_nouvelle}")
+                            print(f"  Différence calculée: {difference} (nouvelle {quantite_nouvelle} - ancienne {quantite_ancienne})")
+                            
+                            # LOGIQUE CORRIGÉE : Calculer le stock final avec la différence
+                            # Le stock actuel contient déjà l'effet de l'ancienne facture
+                            # Pour modifier : stock_final = stock_actuel - ancienne_quantité + nouvelle_quantité
+                            # Ce qui équivaut à : stock_final = stock_actuel + différence
+                            # 
+                            # Exemples :
+                            # - Stock = 30, ancienne = 10, nouvelle = 20 → différence = +10 → stock final = 30 + 10 = 40 ✓
+                            # - Stock = 30, ancienne = 20, nouvelle = 10 → différence = -10 → stock final = 30 - 10 = 20 ✓
+                            # - Stock = 30, ancienne = 10, nouvelle = 10 → différence = 0 → stock final = 30 + 0 = 30 ✓
+                            
+                            # Calculer le stock final
+                            stock_final = stock_avant_modification + difference
+                            
+                            # S'assurer que le stock ne devient pas négatif
+                            if stock_final < 0:
+                                messages.error(request, f'Stock insuffisant pour l\'article {article.designation}. Stock actuel: {stock_avant_modification}, différence: {difference}')
+                                raise ValueError(f"Stock insuffisant: {stock_avant_modification} + {difference} = {stock_final} < 0")
+                            
+                            # Stock après annulation (pour information, mais on utilise directement la différence)
+                            stock_apres_annulation = stock_avant_modification - quantite_ancienne
+                            
+                            print(f"  Stock avant modification: {stock_avant_modification}")
+                            print(f"  Différence: {difference} (nouvelle {quantite_nouvelle} - ancienne {quantite_ancienne})")
+                            print(f"  Stock final: {stock_final} = {stock_avant_modification} + {difference}")
+                            
+                            # Créer la nouvelle ligne
+                            # IMPORTANT : La création de la ligne ne doit PAS déclencher de mise à jour du stock
+                            # car on gère manuellement la logique avec la différence
+                            ligne = LigneFactureAchat.objects.create(
                                 facture_achat=facture,
-                                fournisseur=facture.fournisseur,
-                                commentaire=f"Achat - Facture {facture.reference_achat} (modif)"
+                                article=article,
+                                reference_article=article.reference_article,
+                                designation=article.designation,
+                                prix_unitaire=float(prix_achat_nouveau),
+                                quantite=int(quantite_nouvelle),
+                                prix_total_article=float(prix_achat_nouveau * quantite_nouvelle)
                             )
-                        except Exception:
-                            pass
-                except Exception as e:
-                    messages.error(request, f'Erreur lignes ajoutées: {str(e)}')
+                            print(f"  ✅ Ligne créée avec quantité: {quantite_nouvelle} (mais le stock sera mis à jour avec différence: {difference})")
+                            
+                            # Mettre à jour le stock avec le nouveau stock calculé
+                            # Le stock final = stock_initial + différence (augmentation ou diminution selon le signe)
+                            # IMPORTANT : On utilise stock_final qui est calculé avec la différence, JAMAIS quantite_nouvelle
+                            ancien_stock_pour_verif = article.stock_actuel
+                            
+                            # VÉRIFICATION CRITIQUE : S'assurer qu'on utilise bien la différence et non quantite_nouvelle
+                            if stock_final != stock_avant_modification + difference:
+                                print(f"[ERREUR] Calcul incorrect du stock final!")
+                                raise ValueError(f"Stock final incorrect: {stock_final} != {stock_avant_modification} + {difference}")
+                            
+                            # Mettre à jour le stock avec le stock final calculé
+                            article.stock_actuel = stock_final
+                            
+                            # Vérification : le stock doit être égal à stock_avant_modification + difference
+                            if abs(article.stock_actuel - (stock_avant_modification + difference)) > Decimal('0.01'):
+                                raise ValueError(f"Stock incorrect: {article.stock_actuel} != {stock_avant_modification} + {difference}")
+                            
+                            print(f"  ✅ Stock mis à jour: {ancien_stock_pour_verif} → {article.stock_actuel}")
+                            print(f"  ✅ Différence appliquée au stock: {article.stock_actuel - ancien_stock_pour_verif} (doit être {difference}, PAS {quantite_nouvelle})")
+                            print(f"  ✅ Vérification: stock_initial ({stock_avant_modification}) + différence ({difference}) = solde ({stock_final})")
+                            
+                            # Vérification finale
+                            if abs((article.stock_actuel - ancien_stock_pour_verif) - difference) > Decimal('0.01'):
+                                print(f"[ERREUR CRITIQUE] La différence appliquée ({article.stock_actuel - ancien_stock_pour_verif}) ne correspond pas à la différence calculée ({difference})!")
+                                raise ValueError(f"Différence incorrecte appliquée au stock!")
+                            
+                            # La différence a déjà été calculée plus haut pour clarifier la logique
+                            
+                            # Déterminer le type de mouvement et le commentaire selon la différence
+                            if difference > 0:
+                                # Augmentation : nouvelle quantité > ancienne quantité
+                                # Exemple : ancienne = 10, nouvelle = 20, différence = +10, stock augmente de 10
+                                type_mouvement = 'entree'
+                                quantite_mouvement = difference  # Utiliser la différence réelle (positive)
+                                commentaire = f"Achat - Facture {facture.reference_achat} (modification - augmentation: {quantite_ancienne} → {quantite_nouvelle}, +{difference})"
+                            elif difference < 0:
+                                # Diminution : nouvelle quantité < ancienne quantité
+                                # Exemple : ancienne = 20, nouvelle = 10, différence = -10, stock diminue de 10
+                                type_mouvement = 'sortie'  # Changé de 'ajustement' à 'sortie' pour refléter la diminution
+                                quantite_mouvement = abs(difference)  # Utiliser la valeur absolue de la différence
+                                commentaire = f"Achat - Facture {facture.reference_achat} (modification - diminution: {quantite_ancienne} → {quantite_nouvelle}, -{abs(difference)})"
+                            else:
+                                # Quantité inchangée : nouvelle quantité = ancienne quantité, différence = 0
+                                # Pas de mouvement de stock nécessaire car le stock ne change pas
+                                type_mouvement = None
+                                quantite_mouvement = Decimal('0')
+                                commentaire = f"Achat - Facture {facture.reference_achat} (modification - quantité inchangée: {quantite_nouvelle})"
+                            
+                            article.dernier_prix_achat = float(prix_achat_nouveau)
+                            # Le suivi de stock est toujours activé automatiquement lors de toute modification du stock
+                            article.suivi_stock = True
+                            article.save()
+                            
+                            # IMPORTANT : Ne pas supprimer les anciens mouvements pour garder la traçabilité complète
+                            # Tous les mouvements effectués doivent être conservés pour l'audit
+                            
+                            # Créer un mouvement de stock pour refléter le changement net
+                            # IMPORTANT : quantite_mouvement = différence (ex: 50 → 70, différence = 20, mouvement = +20)
+                            # Le stock_initial est le stock AVANT la modification
+                            # Le solde est le stock APRÈS la modification = stock_initial + différence
+                            # La quantité du mouvement = différence (pas la quantité totale)
+                            # Exemple : stock_initial = 100, différence = +20, solde = 120 (pas 170)
+                            # On crée un mouvement seulement si il y a un changement (quantite_mouvement > 0)
+                            if quantite_mouvement > 0 and type_mouvement:
+                                try:
+                                    # IMPORTANT : Le mouvement doit refléter la différence, pas la quantité totale
+                                    # Exemple : stock avant modification = 21, ancienne quantité = 20, nouvelle quantité = 30
+                                    # différence = 30 - 20 = 10
+                                    # stock final = 21 + 10 = 31
+                                    # Pour le mouvement : stock_initial = 21, quantite = 10 (différence), solde = 31
+                                    # Vérification : 21 + 10 = 31 ✓
+                                    # VÉRIFICATION CRITIQUE : quantite_mouvement doit être égal à difference (ou abs(difference))
+                                    if difference > 0 and quantite_mouvement != difference:
+                                        raise ValueError(f"ERREUR: quantite_mouvement ({quantite_mouvement}) != difference ({difference})")
+                                    elif difference < 0 and quantite_mouvement != abs(difference):
+                                        raise ValueError(f"ERREUR: quantite_mouvement ({quantite_mouvement}) != abs(difference) ({abs(difference)})")
+                                    
+                                    print(f"  [DEBUG] Création mouvement - quantite_mouvement: {quantite_mouvement}, difference: {difference}, quantite_nouvelle: {quantite_nouvelle}")
+                                    
+                                    MouvementStock.objects.create(
+                                        article=article,
+                                        agence=agence,
+                                        type_mouvement=type_mouvement,
+                                        date_mouvement=timezone.now(),
+                                        numero_piece=facture.reference_achat,
+                                        quantite_stock=article.stock_actuel,
+                                        stock_initial=stock_avant_modification,  # Stock AVANT modification (effet net)
+                                        solde=stock_final,  # Stock APRÈS modification = stock_initial + différence
+                                        quantite=quantite_mouvement,  # La DIFFÉRENCE (ex: 10 si 20→30, pas 30)
+                                        cout_moyen_pondere=float(article.prix_achat),
+                                        stock_permanent=float(article.stock_actuel * article.prix_achat),
+                                        facture_achat=facture,
+                                        fournisseur=facture.fournisseur,
+                                        commentaire=commentaire
+                                    )
+                                    print(f"  ✅ Mouvement de stock créé - stock_initial: {stock_avant_modification}, quantite: {quantite_mouvement} (DIFFÉRENCE), solde: {stock_final}")
+                                    print(f"  ✅ Vérification: {stock_avant_modification} + {quantite_mouvement} = {stock_avant_modification + quantite_mouvement} (doit être {stock_final})")
+                                except Exception as e:
+                                    print(f"[WARNING] Erreur création mouvement stock: {e}")
+                                    import traceback
+                                    traceback.print_exc()
+                    except json.JSONDecodeError:
+                        messages.error(request, 'Format des articles invalide.')
+                    except Exception as e:
+                        messages.error(request, f'Erreur lors de la modification des lignes: {str(e)}')
+                else:
+                    # Si aucun article n'est fourni, la facture est vide (toutes les lignes ont été supprimées)
+                    messages.info(request, "Toutes les lignes ont été supprimées. La facture est maintenant vide.")
+            
+            # IMPORTANT: Ne JAMAIS appeler facture.save() après une modification
+            # car cela déclencherait mettre_a_jour_stock() qui réappliquerait la quantité totale
+            # au lieu de respecter la différence que nous avons calculée manuellement
+            # La facture a déjà été mise à jour avec update() plus haut, donc pas besoin de save()
+            
+            print(f"[DEBUG] Modification terminée - Stock mis à jour avec la DIFFÉRENCE, pas la quantité totale")
+            print(f"[DEBUG] Ne pas appeler facture.save() pour éviter mettre_a_jour_stock()")
             
             messages.success(request, f'Facture d\'achat "{reference_achat}" modifiée avec succès!')
-            return redirect('consulter_factures_achat')
+            # Rediriger vers le détail de la facture pour voir les modifications
+            return redirect('detail_facture_achat', facture_id=facture.id)
             
         except Exception as e:
             messages.error(request, f'Erreur lors de la modification de la facture: {str(e)}')
             return redirect('modifier_facture_achat', facture_id=facture_id)
     
     # GET - Afficher le formulaire pré-rempli
+    import json
     statut_choices = FactureAchat.STATUT_CHOICES
     
     # Récupérer les lignes d'articles de la facture
-    lignes = LigneFactureAchat.objects.filter(facture_achat=facture)
+    lignes = LigneFactureAchat.objects.select_related('article').filter(facture_achat=facture)
+    
+    # Préparer les données initiales pour le template (comme dans modifier_facture_transfert)
+    initial_articles = []
+    for ligne in lignes:
+        if ligne.article:
+            initial_articles.append({
+                'id': ligne.article.id,
+                'designation': ligne.article.designation,
+                'reference_article': ligne.article.reference_article,
+                'stock_actuel': float(ligne.article.stock_actuel),
+                'prix_achat': float(ligne.prix_unitaire),
+                'quantite': float(ligne.quantite)  # Convertir Decimal en float pour JSON
+            })
     
     context = {
         'facture': facture,
         'statut_choices': statut_choices,
         'lignes': lignes,
+        'initial_articles_json': json.dumps(initial_articles),
     }
     return render(request, 'supermarket/stock/modifier_facture_achat.html', context)
 
@@ -10347,7 +11023,7 @@ def supprimer_facture_achat(request, facture_id):
         facture = FactureAchat.objects.get(id=facture_id, agence=agence)
         print(f"[LIST] Facture trouvée: {facture.reference_achat}")
         
-        # Restocker: retirer les quantités ajoutées par cette facture
+        # Restocker: retirer les quantités ajoutées par cette facture et créer des mouvements de correction
         try:
             lignes = LigneFactureAchat.objects.filter(facture_achat=facture)
             for ligne in lignes:
@@ -10357,16 +11033,32 @@ def supprimer_facture_achat(request, facture_id):
                 ancien_stock = getattr(article, 'stock_actuel', 0)
                 # Empêcher les stocks négatifs
                 article.stock_actuel = max(0, ancien_stock - int(ligne.quantite))
+                # Le suivi de stock est toujours activé automatiquement lors de toute modification du stock
+                article.suivi_stock = True
                 article.save()
                 print(f"[STOCK] Reversion achat: {article.designation} {ancien_stock} -> {article.stock_actuel} (-{ligne.quantite})")
+                
+                # Créer un mouvement de correction au lieu de supprimer les mouvements existants
+                try:
+                    MouvementStock.objects.create(
+                        article=article,
+                        agence=agence,
+                        type_mouvement='ajustement',
+                        date_mouvement=timezone.now(),
+                        numero_piece=f"SUPP-{facture.reference_achat}",
+                        quantite_stock=article.stock_actuel,
+                        stock_initial=ancien_stock,
+                        solde=article.stock_actuel,
+                        quantite=int(ligne.quantite),
+                        cout_moyen_pondere=float(article.prix_achat),
+                        stock_permanent=float(article.stock_actuel * article.prix_achat),
+                        facture_achat=facture,
+                        commentaire=f"Correction - Suppression facture achat {facture.reference_achat}"
+                    )
+                except Exception as e:
+                    print(f"[WARNING] Erreur création mouvement correction suppression: {e}")
         except Exception as e:
             print(f"[WARNING] Echec reversion stock facture achat: {e}")
-
-        # Supprimer les mouvements de stock liés à cette facture d'achat (traçabilité)
-        try:
-            MouvementStock.objects.filter(facture_achat=facture).delete()
-        except Exception as e:
-            print(f"[WARNING] Echec suppression mouvements stock: {e}")
 
         facture_name = facture.reference_achat
         facture.delete()
@@ -10614,7 +11306,8 @@ def creer_facture_transfert(request):
                         ancien_dernier_prix = article.dernier_prix_achat
                         nouveau_prix_achat = float(article_data['prix_achat'])
                         article.dernier_prix_achat = nouveau_prix_achat
-                        
+                        # Le suivi de stock est toujours activé automatiquement lors de toute modification du stock
+                        article.suivi_stock = True
                         article.save()
                         print(f"[PACKAGE] STOCK TRANSFERT - Article: {article.designation}")
                         print(f"[PACKAGE] STOCK TRANSFERT - État: {etat} (normalisé: {etat_normalise}), {action_stock} du stock")
@@ -10734,25 +11427,22 @@ def modifier_facture_transfert(request, facture_id):
             if etat_normalise == 'sortie':
                 etat_normalise = 'sortir'
             
+            # Nouvelle logique : Calculer la différence et l'appliquer directement
+            # Prendre en compte l'état (entrer/sortir) et la différence de quantité
+            # Ajouter un flag pour empêcher la mise à jour automatique du stock
+            request.session['modification_en_cours'] = True
             with transaction.atomic():
-                # Annuler l'effet des lignes actuelles sur le stock
+                # 1) Récupérer les anciennes lignes et créer un dictionnaire
                 lignes_existantes = LigneFactureTransfert.objects.select_related('article').filter(facture_transfert=facture)
+                anciennes_quantites = {}
                 for ligne in lignes_existantes:
-                    article = ligne.article
-                    if not article:
-                        continue
-                    quantite_transfert = Decimal(str(ligne.quantite))
-                    if ancien_etat_normalise == 'entrer':
-                        article.stock_actuel = max(Decimal('0'), article.stock_actuel - quantite_transfert)
-                    else:
-                        article.stock_actuel += quantite_transfert
-                    article.save()
+                    if ligne.article:
+                        anciennes_quantites[ligne.article.id] = Decimal(str(ligne.quantite))
                 
-                # Supprimer les anciennes lignes et mouvements liés
+                # 2) Supprimer toutes les anciennes lignes
                 LigneFactureTransfert.objects.filter(facture_transfert=facture).delete()
-                MouvementStock.objects.filter(facture_transfert=facture).delete()
                 
-                # Mettre à jour la facture de transfert
+                # 3) Mettre à jour la facture de transfert
                 facture.numero_compte = numero_compte
                 facture.date_transfert = date_transfert
                 facture.reference_transfert = reference_transfert
@@ -10763,70 +11453,156 @@ def modifier_facture_transfert(request, facture_id):
                 
                 total_quantite = Decimal('0')
                 
+                # 4) Traiter les nouvelles lignes avec la logique de différence
                 for article_data in articles_payload:
                     article_id = article_data.get('id')
-                    quantite_ligne = Decimal(str(article_data.get('quantite', 0)))
+                    quantite_nouvelle = Decimal(str(article_data.get('quantite', 0)))
                     prix_achat_ligne = Decimal(str(article_data.get('prix_achat', 0)))
                     
-                    if not article_id or quantite_ligne <= 0:
+                    if not article_id or quantite_nouvelle <= 0:
                         continue
                     
                     try:
                         article = Article.objects.get(id=article_id)
+                        article.refresh_from_db()
                     except Article.DoesNotExist:
                         messages.error(request, f"Article introuvable (ID: {article_id}).")
                         raise
                     
-                    if etat_normalise == 'sortir' and article.stock_actuel < quantite_ligne:
+                    # Vérifier le stock si c'est une sortie
+                    if etat_normalise == 'sortir' and article.stock_actuel < quantite_nouvelle:
                         messages.error(request, f"Stock insuffisant pour l'article {article.designation}.")
                         raise ValueError("Stock insuffisant")
                     
+                    # Créer la nouvelle ligne
                     LigneFactureTransfert.objects.create(
                         facture_transfert=facture,
                         article=article,
-                        quantite=int(quantite_ligne),
+                        quantite=int(quantite_nouvelle),
                         prix_unitaire=prix_achat_ligne,
-                        valeur_totale=quantite_ligne * prix_achat_ligne
+                        valeur_totale=quantite_nouvelle * prix_achat_ligne
                     )
                     
-                    ancien_stock = article.stock_actuel
-                    if etat_normalise == 'entrer':
-                        article.stock_actuel += quantite_ligne
-                        type_mouvement = 'entree'
+                    # Stock AVANT modification
+                    # IMPORTANT : Le stock actuel contient déjà l'ancienne quantité de la facture
+                    stock_avant_modification = article.stock_actuel
+                    
+                    # Quantité de l'ancienne facture
+                    quantite_ancienne = anciennes_quantites.get(article_id, Decimal('0'))
+                    
+                    # Calcul de la différence entre nouvelle et ancienne quantité
+                    difference = quantite_nouvelle - quantite_ancienne
+                    
+                    # LOGIQUE SIMPLIFIÉE (comme facture achat) : Calculer le stock final avec la différence
+                    # Le stock actuel contient déjà l'effet de l'ancienne facture
+                    # Pour modifier selon l'état :
+                    # - Si état = "entrer" : stock_final = stock_actuel + différence (comme facture achat)
+                    # - Si état = "sortir" : stock_final = stock_actuel - différence
+                    # 
+                    # Si l'état a changé, il faut d'abord annuler l'ancien effet puis appliquer le nouveau
+                    etat_a_change = (ancien_etat_normalise != etat_normalise)
+                    
+                    if etat_a_change:
+                        # L'état a changé : annuler l'ancien effet puis appliquer le nouveau
+                        if ancien_etat_normalise == 'entrer':
+                            # Annuler l'entrée : soustraire l'ancienne quantité
+                            stock_apres_annulation = stock_avant_modification - quantite_ancienne
+                        else:  # ancien = 'sortir'
+                            # Annuler la sortie : ajouter l'ancienne quantité
+                            stock_apres_annulation = stock_avant_modification + quantite_ancienne
+                        
+                        # Appliquer le nouvel effet
+                        if etat_normalise == 'entrer':
+                            stock_final = stock_apres_annulation + quantite_nouvelle
+                        else:  # nouveau = 'sortir'
+                            stock_final = max(Decimal('0'), stock_apres_annulation - quantite_nouvelle)
                     else:
-                        article.stock_actuel -= quantite_ligne
-                        type_mouvement = 'sortie'
-                    article.dernier_prix_achat = prix_achat_ligne
+                        # L'état n'a pas changé : utiliser directement la différence
+                        if etat_normalise == 'entrer':
+                            # État "entrer" : augmente le stock (comme facture achat)
+                            stock_final = stock_avant_modification + difference
+                        else:  # 'sortir'
+                            # État "sortir" : diminue le stock
+                            stock_final = max(Decimal('0'), stock_avant_modification - difference)
+                    
+                    # S'assurer que le stock ne devient pas négatif
+                    if stock_final < 0:
+                        messages.error(request, f'Stock insuffisant pour l\'article {article.designation}. Stock actuel: {stock_avant_modification}, différence: {difference}')
+                        raise ValueError(f"Stock insuffisant: {stock_avant_modification} + {difference} = {stock_final} < 0")
+                    
+                    # Mettre à jour le stock avec le stock final calculé
+                    article.stock_actuel = stock_final
                     article.save()
                     
-                    total_quantite += quantite_ligne
+                    # Déterminer le type de mouvement et le commentaire selon la différence
+                    if etat_normalise == 'entrer':
+                        # État "entrer" : augmente le stock
+                        if difference > 0:
+                            type_mouvement = 'entree'
+                            quantite_mouvement = difference
+                            commentaire = f"Transfert entrer - Facture {facture.reference_transfert} (modification - augmentation: {quantite_ancienne} → {quantite_nouvelle}, +{difference})"
+                        elif difference < 0:
+                            type_mouvement = 'sortie'
+                            quantite_mouvement = abs(difference)
+                            commentaire = f"Transfert entrer - Facture {facture.reference_transfert} (modification - diminution: {quantite_ancienne} → {quantite_nouvelle}, -{abs(difference)})"
+                        else:
+                            type_mouvement = None
+                            quantite_mouvement = Decimal('0')
+                            commentaire = f"Transfert entrer - Facture {facture.reference_transfert} (modification - quantité inchangée: {quantite_nouvelle})"
+                    else:
+                        # État "sortir" : diminue le stock
+                        if difference > 0:
+                            type_mouvement = 'sortie'
+                            quantite_mouvement = difference
+                            commentaire = f"Transfert sortir - Facture {facture.reference_transfert} (modification - augmentation: {quantite_ancienne} → {quantite_nouvelle}, -{difference})"
+                        elif difference < 0:
+                            type_mouvement = 'entree'
+                            quantite_mouvement = abs(difference)
+                            commentaire = f"Transfert sortir - Facture {facture.reference_transfert} (modification - diminution: {quantite_ancienne} → {quantite_nouvelle}, +{abs(difference)})"
+                        else:
+                            type_mouvement = None
+                            quantite_mouvement = Decimal('0')
+                            commentaire = f"Transfert sortir - Facture {facture.reference_transfert} (modification - quantité inchangée: {quantite_nouvelle})"
                     
-                    try:
-                        MouvementStock.objects.create(
-                            article=article,
-                            agence=agence,
-                            type_mouvement=type_mouvement,
-                            date_mouvement=timezone.now(),
-                            numero_piece=facture.reference_transfert,
-                            quantite_stock=article.stock_actuel,
-                            stock_initial=ancien_stock,
-                            solde=article.stock_actuel,
-                            quantite=int(quantite_ligne),
-                            cout_moyen_pondere=float(article.prix_achat),
-                            stock_permanent=float(article.stock_actuel * article.prix_achat),
-                            commentaire=f"Modification transfert ({etat_normalise}) - Facture {facture.reference_transfert}",
-                            facture_transfert=facture
-                        )
-                    except Exception as e:
-                        print(f"[WARNING] ERREUR MOUVEMENT STOCK TRANSFERT MODIFICATION: {e}")
+                    article.dernier_prix_achat = prix_achat_ligne
+                    # Le suivi de stock est toujours activé automatiquement lors de toute modification du stock
+                    article.suivi_stock = True
+                    
+                    total_quantite += quantite_nouvelle
+                    
+                    # Créer un mouvement de stock pour refléter le changement
+                    if quantite_mouvement > 0 and type_mouvement:
+                        try:
+                            MouvementStock.objects.create(
+                                article=article,
+                                agence=agence,
+                                type_mouvement=type_mouvement,
+                                date_mouvement=timezone.now(),
+                                numero_piece=facture.reference_transfert,
+                                quantite_stock=article.stock_actuel,
+                                stock_initial=stock_avant_modification,
+                                solde=article.stock_actuel,
+                                quantite=quantite_mouvement,
+                                cout_moyen_pondere=float(article.prix_achat),
+                                stock_permanent=float(article.stock_actuel * article.prix_achat),
+                                facture_transfert=facture,
+                                commentaire=commentaire
+                            )
+                        except Exception as e:
+                            print(f"[WARNING] ERREUR MOUVEMENT STOCK TRANSFERT MODIFICATION: {e}")
                 
                 facture.quantite = int(total_quantite)
                 facture.save()
+            
+            # Retirer le flag de modification en cours
+            request.session.pop('modification_en_cours', None)
             
             messages.success(request, f'Facture de transfert "{reference_transfert}" modifiée avec succès!')
             return redirect('consulter_factures_transfert')
             
         except Exception as e:
+            # Retirer le flag en cas d'erreur
+            request.session.pop('modification_en_cours', None)
             messages.error(request, f'Erreur lors de la modification de la facture: {str(e)}')
             return redirect('modifier_facture_transfert', facture_id=facture_id)
     
@@ -10872,9 +11648,7 @@ def supprimer_facture_transfert(request, facture_id):
         etat_normalise = (facture.etat or 'sortir').strip().lower()
         
         with transaction.atomic():
-            # Supprimer les mouvements créés lors du transfert initial pour éviter les doublons
-            MouvementStock.objects.filter(facture_transfert=facture).delete()
-            
+            # NE PLUS SUPPRIMER LES MOUVEMENTS - Créer des mouvements de correction à la place
             lignes = LigneFactureTransfert.objects.select_related('article').filter(facture_transfert=facture)
             
             for ligne in lignes:
@@ -10888,14 +11662,17 @@ def supprimer_facture_transfert(request, facture_id):
                 if etat_normalise == 'entrer':
                     # La facture avait augmenté le stock, on revient en arrière
                     article.stock_actuel = max(Decimal('0'), article.stock_actuel - quantite)
-                    commentaire = f"Suppression facture transfert {facture.reference_transfert} - retrait stock"
+                    commentaire = f"Correction - Suppression facture transfert {facture.reference_transfert} - retrait stock"
                 else:
                     # La facture avait diminué le stock, on le restaure
                     article.stock_actuel += quantite
-                    commentaire = f"Suppression facture transfert {facture.reference_transfert} - restauration stock"
+                    commentaire = f"Correction - Suppression facture transfert {facture.reference_transfert} - restauration stock"
                 
+                # Le suivi de stock est toujours activé automatiquement lors de toute modification du stock
+                article.suivi_stock = True
                 article.save()
                 
+                # Créer un mouvement de correction (les mouvements originaux sont conservés pour traçabilité)
                 try:
                     MouvementStock.objects.create(
                         article=article,
@@ -10913,7 +11690,7 @@ def supprimer_facture_transfert(request, facture_id):
                         facture_transfert=facture
                     )
                 except Exception as mouvement_error:
-                    print(f"[WARNING] Erreur enregistrement mouvement suppression transfert: {mouvement_error}")
+                    print(f"[WARNING] Erreur enregistrement mouvement correction suppression transfert: {mouvement_error}")
             
             facture.delete()
         
@@ -12343,66 +13120,155 @@ def export_mouvements_excel(request):
         header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
         header_alignment = Alignment(horizontal="center", vertical="center")
         
-        # En-tête du document
-        ws.merge_cells('A1:P1')
+        # En-tête du document (17 colonnes maintenant avec Référence/Désignation)
+        ws.merge_cells('A1:Q1')
         ws['A1'] = f"FICHE DE STOCK - {article_reference} - {article_designation}"
         ws['A1'].font = Font(bold=True, size=16)
         ws['A1'].alignment = Alignment(horizontal="center")
         
-        ws.merge_cells('A2:P2')
+        ws.merge_cells('A2:Q2')
         ws['A2'] = f"Période: du {date_debut} au {date_fin}"
         ws['A2'].font = Font(size=12)
         ws['A2'].alignment = Alignment(horizontal="center")
         
-        # En-têtes des colonnes
-        headers = ['Date', 'Type', '', 'N°', '', '', 'Tiers', '', '', '', '', '+/-', 'Quantités en stock', 'Solde', 'C.M.U.P.', 'Stock permanent']
+        # En-têtes des colonnes - Ajout d'une colonne Référence/Désignation
+        headers = ['Référence/Désignation', 'Date', 'Type', '', 'N°', '', '', 'Tiers', '', '', '', '', '+/-', 'Quantités en stock', 'Solde', 'C.M.U.P.', 'Stock permanent']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=4, column=col, value=header)
             cell.font = header_font
             cell.fill = header_fill
             cell.alignment = header_alignment
         
-        # Données
-        row = 5
+        # Grouper les mouvements par article (par référence_article)
+        from collections import defaultdict
+        mouvements_par_article = defaultdict(list)
         for mouvement in mouvements_data_list:
-            # Structure modifiée (16 colonnes - sans Référence/Désignation/unitaire, avec Tiers)
-            ws.cell(row=row, column=1, value=mouvement['date_mouvement'])  # Date
-            ws.cell(row=row, column=2, value=mouvement['type_mouvement'])  # Type
-            ws.cell(row=row, column=3, value='')  # Colonne vide
-            ws.cell(row=row, column=4, value=mouvement['numero_piece'])  # N°
-            ws.cell(row=row, column=5, value='')  # Colonne vide
-            ws.cell(row=row, column=6, value='')  # Colonne vide
-            ws.cell(row=row, column=7, value=mouvement['tiers'])  # Tiers
-            ws.cell(row=row, column=8, value='')  # Colonne vide
-            ws.cell(row=row, column=9, value='')  # Colonne vide
-            ws.cell(row=row, column=10, value='')  # Colonne vide
-            ws.cell(row=row, column=11, value='')  # Colonne vide
-            ws.cell(row=row, column=12, value=f"+{mouvement['quantite']}" if mouvement['quantite'] > 0 else mouvement['quantite'])  # +/-
-            ws.cell(row=row, column=13, value=mouvement['stock_initial'])  # Quantités en stock
-            ws.cell(row=row, column=14, value=mouvement['solde'])  # Solde
-            ws.cell(row=row, column=15, value=mouvement['cout_moyen_pondere'])  # C.M.U.P.
-            ws.cell(row=row, column=16, value=mouvement['stock_permanent'])  # Stock permanent
+            # Utiliser référence_article comme clé de regroupement
+            ref_article = mouvement.get('reference_article', 'N/A')
+            mouvements_par_article[ref_article].append(mouvement)
+        
+        # Trier les articles par référence pour un affichage ordonné
+        articles_tries = sorted(mouvements_par_article.keys())
+        
+        # Style pour les en-têtes d'article
+        article_header_font = Font(bold=True, size=12, color="FFFFFF")
+        article_header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        article_header_alignment = Alignment(horizontal="left", vertical="center")
+        
+        # Données groupées par article
+        row = 5
+        total_stock_permanent_global = 0
+        
+        for ref_article in articles_tries:
+            mouvements_article = mouvements_par_article[ref_article]
+            
+            # Récupérer la désignation du premier mouvement (tous les mouvements d'un article ont la même désignation)
+            designation_article = mouvements_article[0].get('designation', 'N/A') if mouvements_article else 'N/A'
+            
+            # En-tête de l'article - Ligne de séparation avec référence et désignation
+            ws.merge_cells(f'A{row}:Q{row}')
+            cell_article = ws.cell(row=row, column=1, value=f"ARTICLE: {ref_article} - {designation_article}")
+            cell_article.font = article_header_font
+            cell_article.fill = article_header_fill
+            cell_article.alignment = article_header_alignment
+            row += 1
+            
+            # Calculer les totaux pour cet article
+            total_entrees_article = sum(1 for m in mouvements_article if m['type_mouvement'] == 'entree')
+            total_sorties_article = sum(1 for m in mouvements_article if m['type_mouvement'] == 'sortie')
+            total_stock_permanent_article = sum(float(m.get('stock_permanent', 0)) for m in mouvements_article)
+            total_stock_permanent_global += total_stock_permanent_article
+            
+            # Afficher tous les mouvements de cet article
+            for mouvement in mouvements_article:
+                # Déterminer le type de mouvement avec "Correction" si c'est une modification
+                type_mouvement_display = mouvement.get('type_mouvement_display', mouvement['type_mouvement'])
+                commentaire = (mouvement.get('commentaire', '') or '').lower()
+                if 'modification' in commentaire or 'modifier' in commentaire or '(modification' in commentaire:
+                    type_mouvement_display = 'Correction'
+                
+                # Structure avec colonne Référence/Désignation (17 colonnes maintenant)
+                ws.cell(row=row, column=1, value=f"{ref_article} - {designation_article}")  # Référence/Désignation
+                ws.cell(row=row, column=2, value=mouvement['date_mouvement'])  # Date
+                ws.cell(row=row, column=3, value=type_mouvement_display)  # Type (avec Correction si modification)
+                ws.cell(row=row, column=4, value='')  # Colonne vide
+                ws.cell(row=row, column=5, value=mouvement['numero_piece'])  # N°
+                ws.cell(row=row, column=6, value='')  # Colonne vide
+                ws.cell(row=row, column=7, value='')  # Colonne vide
+                ws.cell(row=row, column=8, value=mouvement['tiers'])  # Tiers
+                ws.cell(row=row, column=9, value='')  # Colonne vide
+                ws.cell(row=row, column=10, value='')  # Colonne vide
+                ws.cell(row=row, column=11, value='')  # Colonne vide
+                ws.cell(row=row, column=12, value='')  # Colonne vide
+                # Calculer le signe +/- selon le type de mouvement
+                quantite = float(mouvement.get('quantite', 0))
+                if mouvement['type_mouvement'] in ['sortie', 'perte']:
+                    quantite_display = f"-{abs(quantite)}"
+                elif mouvement['type_mouvement'] in ['entree', 'retour']:
+                    quantite_display = f"+{quantite}" if quantite > 0 else str(quantite)
+                elif mouvement['type_mouvement'] == 'ajustement':
+                    # Pour ajustement, déterminer selon solde vs stock_initial
+                    stock_initial = float(mouvement.get('stock_initial', 0))
+                    solde = float(mouvement.get('solde', 0))
+                    if solde < stock_initial:
+                        quantite_display = f"-{abs(quantite)}"
+                    elif solde > stock_initial:
+                        quantite_display = f"+{quantite}"
+                    else:
+                        quantite_display = str(quantite)
+                else:
+                    quantite_display = f"+{quantite}" if quantite > 0 else str(quantite)
+                ws.cell(row=row, column=13, value=quantite_display)  # +/-
+                ws.cell(row=row, column=14, value=mouvement['stock_initial'])  # Quantités en stock
+                ws.cell(row=row, column=15, value=mouvement['solde'])  # Solde
+                ws.cell(row=row, column=16, value=mouvement['cout_moyen_pondere'])  # C.M.U.P.
+                ws.cell(row=row, column=17, value=mouvement['stock_permanent'])  # Stock permanent
+                row += 1
+            
+            # Ligne de sous-total pour cet article
+            ws.merge_cells(f'A{row}:B{row}')
+            ws.cell(row=row, column=1, value=f"SOUS-TOTAL {ref_article}").font = Font(bold=True)
+            ws.cell(row=row, column=3, value=f"Entrées: {total_entrees_article}, Sorties: {total_sorties_article}").font = Font(bold=True)
+            ws.cell(row=row, column=4, value=f"Total: {len(mouvements_article)} mouvements").font = Font(bold=True)
+            ws.cell(row=row, column=17, value=total_stock_permanent_article).font = Font(bold=True)
+            # Remplir les colonnes vides
+            for col in [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]:
+                ws.cell(row=row, column=col, value='').font = Font(bold=True)
+            row += 1
+            
+            # Ligne vide pour séparer les articles
             row += 1
         
-        # Ligne des totaux
+        # Ligne des totaux généraux
         row += 1
-        ws.cell(row=row, column=1, value="TOTAL GÉNÉRAL").font = Font(bold=True)
-        ws.cell(row=row, column=2, value=f"Entrées: {mouvements_entree}, Sorties: {mouvements_sortie}").font = Font(bold=True)
-        ws.cell(row=row, column=3, value=f"Total: {total_mouvements} mouvements").font = Font(bold=True)
-        ws.cell(row=row, column=4, value="").font = Font(bold=True)
-        ws.cell(row=row, column=5, value="").font = Font(bold=True)
-        ws.cell(row=row, column=6, value="").font = Font(bold=True)
-        ws.cell(row=row, column=16, value=valeur_stock_permanent).font = Font(bold=True)
+        ws.merge_cells(f'A{row}:B{row}')
+        ws.cell(row=row, column=1, value="TOTAL GÉNÉRAL").font = Font(bold=True, size=14)
+        ws.cell(row=row, column=3, value=f"Entrées: {mouvements_entree}, Sorties: {mouvements_sortie}").font = Font(bold=True)
+        ws.cell(row=row, column=4, value=f"Total: {total_mouvements} mouvements").font = Font(bold=True)
+        ws.cell(row=row, column=5, value=f"Articles: {len(articles_tries)}").font = Font(bold=True)
+        # Remplir les colonnes vides
+        for col in [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]:
+            ws.cell(row=row, column=col, value="").font = Font(bold=True)
+        ws.cell(row=row, column=17, value=total_stock_permanent_global).font = Font(bold=True, size=12)
         
-        # Ajuster la largeur des colonnes
-        ws.column_dimensions['A'].width = 20
-        ws.column_dimensions['B'].width = 15
-        ws.column_dimensions['C'].width = 30
-        ws.column_dimensions['D'].width = 12
-        ws.column_dimensions['E'].width = 12
-        ws.column_dimensions['F'].width = 15
-        ws.column_dimensions['G'].width = 18
-        ws.column_dimensions['H'].width = 15
+        # Ajuster la largeur des colonnes (17 colonnes maintenant avec Référence/Désignation)
+        ws.column_dimensions['A'].width = 35  # Référence/Désignation (plus large)
+        ws.column_dimensions['B'].width = 20  # Date
+        ws.column_dimensions['C'].width = 15  # Type
+        ws.column_dimensions['D'].width = 5   # Colonne vide
+        ws.column_dimensions['E'].width = 15  # N°
+        ws.column_dimensions['F'].width = 5   # Colonne vide
+        ws.column_dimensions['G'].width = 5  # Colonne vide
+        ws.column_dimensions['H'].width = 25  # Tiers
+        ws.column_dimensions['I'].width = 5   # Colonne vide
+        ws.column_dimensions['J'].width = 5   # Colonne vide
+        ws.column_dimensions['K'].width = 5   # Colonne vide
+        ws.column_dimensions['L'].width = 5  # Colonne vide
+        ws.column_dimensions['M'].width = 12  # +/-
+        ws.column_dimensions['N'].width = 18  # Quantités en stock
+        ws.column_dimensions['O'].width = 12  # Solde
+        ws.column_dimensions['P'].width = 15  # C.M.U.P.
+        ws.column_dimensions['Q'].width = 18  # Stock permanent
         
         # Créer la réponse HTTP
         filename = f"Mouvements_Stock_{article_reference}_{date_debut}_{date_fin}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
@@ -12419,6 +13285,7 @@ def export_mouvements_excel(request):
         print(f"[CHART] EXPORT EXCEL MOUVEMENTS - Article: {article_reference}")
         print(f"[CHART] EXPORT EXCEL MOUVEMENTS - {total_mouvements} mouvements")
         print(f"[CHART] EXPORT EXCEL MOUVEMENTS - Valeur stock permanent: {valeur_stock_permanent} FCFA")
+        print(f"[CHART] EXPORT EXCEL MOUVEMENTS - Articles groupés: {len(articles_tries)}")
         
         return response
         
@@ -14342,7 +15209,7 @@ def modifier_article(request, article_id):
             unite_vente = request.POST.get('unite_vente')
             conditionnement = request.POST.get('conditionnement')
             famille_id = request.POST.get('famille')
-            suivi_stock_value = request.POST.get('suivi_stock', 'true')
+            # Le suivi de stock est toujours activé automatiquement (non modifiable par l'utilisateur)
             
             ancien_stock = article.stock_actuel
             
@@ -14381,13 +15248,15 @@ def modifier_article(request, article_id):
             article.unite_vente = unite_vente
             article.conditionnement = conditionnement
             article.categorie = categorie
-            article.suivi_stock = (suivi_stock_value.lower() == 'true')
+            # Le suivi de stock est toujours activé automatiquement
+            article.suivi_stock = True
             article.save()
             
             nouveau_stock = article.stock_actuel
             difference_stock = nouveau_stock - ancien_stock
             
-            if difference_stock != Decimal('0') and article.suivi_stock:
+            # Créer un mouvement pour TOUS les changements de stock (même si différence = 0 pour traçabilité complète)
+            if article.suivi_stock:
                 try:
                     numero_piece = f"AJUST-{article.id}-{timezone.now().strftime('%Y%m%d%H%M%S')}"
                     MouvementStock.objects.create(
@@ -14399,10 +15268,10 @@ def modifier_article(request, article_id):
                         quantite_stock=nouveau_stock,
                         stock_initial=ancien_stock,
                         solde=nouveau_stock,
-                        quantite=abs(difference_stock),
+                        quantite=abs(difference_stock) if difference_stock != Decimal('0') else Decimal('0'),
                         cout_moyen_pondere=float(article.prix_achat),
                         stock_permanent=float(nouveau_stock * article.prix_achat),
-                        commentaire=f"Ajustement manuel via modification d'article par {request.user.username}"
+                        commentaire=f"Ajustement manuel via modification d'article par {request.user.username}" + (f" (différence: {difference_stock})" if difference_stock != Decimal('0') else " (vérification)")
                     )
                     print(f"[STOCK] Ajustement manuel enregistré: {article.designation} {ancien_stock} -> {nouveau_stock}")
                 except Exception as movement_error:
@@ -14489,10 +15358,8 @@ def detail_article(request, article_id):
     try:
         article = Article.objects.get(id=article_id, agence=get_user_agence(request))
         types_vente = TypeVente.objects.filter(article=article)
-        mouvements_query = MouvementStock.objects.filter(article=article)
-        if not article.suivi_stock:
-            mouvements_query = mouvements_query.exclude(type_mouvement__iexact='ajustement')
-        mouvements = mouvements_query.order_by('-date_mouvement')[:10]
+        # Le suivi de stock est toujours activé, donc on affiche tous les mouvements
+        mouvements = MouvementStock.objects.filter(article=article).order_by('-date_mouvement')[:10]
         
         # Calculer les marges
         marge_unitaire = float(article.prix_vente) - float(article.prix_achat) if article.prix_achat > 0 else 0
@@ -14826,7 +15693,8 @@ def creer_facture_transfert(request):
                         ancien_dernier_prix = article.dernier_prix_achat
                         nouveau_prix_achat = float(article_data['prix_achat'])
                         article.dernier_prix_achat = nouveau_prix_achat
-                        
+                        # Le suivi de stock est toujours activé automatiquement lors de toute modification du stock
+                        article.suivi_stock = True
                         article.save()
                         print(f"[PACKAGE] STOCK TRANSFERT - Article: {article.designation}")
                         print(f"[PACKAGE] STOCK TRANSFERT - État: {etat} (normalisé: {etat_normalise}), {action_stock} du stock")
@@ -14938,96 +15806,190 @@ def modifier_facture_transfert(request, facture_id):
             ancien_etat_normalise = str(ancien_etat).strip().lower() if ancien_etat else 'sortir'
             etat_normalise = str(etat).strip().lower() if etat else 'sortir'
             
+            # Nouvelle logique : Calculer la différence et l'appliquer directement
+            # Prendre en compte l'état (entrer/sortir) et la différence de quantité
+            # Ajouter un flag pour empêcher la mise à jour automatique du stock
+            request.session['modification_en_cours'] = True
             with transaction.atomic():
-                lignes_existantes = LigneFactureTransfert.objects.select_related('article').filter(facture_transfert=facture)
-                for ligne in lignes_existantes:
-                    article = ligne.article
-                    if not article:
-                        continue
-                    quantite_transfert = Decimal(str(ligne.quantite))
-                    if ancien_etat_normalise == 'entrer':
-                        article.stock_actuel = max(Decimal('0'), article.stock_actuel - quantite_transfert)
-                    else:
-                        article.stock_actuel += quantite_transfert
-                    article.save()
-                
-                LigneFactureTransfert.objects.filter(facture_transfert=facture).delete()
-                MouvementStock.objects.filter(facture_transfert=facture).delete()
-                
-                facture.numero_compte = numero_compte
-                facture.date_transfert = date_transfert
-                facture.reference_transfert = reference_transfert
-                facture.lieu_depart = lieu_depart
-                facture.lieu_arrivee = lieu_arrivee
-                facture.statut = statut
-                facture.etat = etat
-                
-                total_quantite = Decimal('0')
-                
-                for article_data in articles_payload:
-                    article_id = article_data.get('id')
-                    quantite_ligne = Decimal(str(article_data.get('quantite', 0)))
-                    prix_achat_ligne = Decimal(str(article_data.get('prix_achat', 0)))
+                    # 1) Récupérer les anciennes lignes et créer un dictionnaire
+                    lignes_existantes = LigneFactureTransfert.objects.select_related('article').filter(facture_transfert=facture)
+                    anciennes_quantites = {}
+                    for ligne in lignes_existantes:
+                        if ligne.article:
+                            anciennes_quantites[ligne.article.id] = Decimal(str(ligne.quantite))
                     
-                    if not article_id or quantite_ligne <= 0:
-                        continue
+                    # 2) Supprimer toutes les anciennes lignes
+                    LigneFactureTransfert.objects.filter(facture_transfert=facture).delete()
                     
-                    try:
-                        article = Article.objects.get(id=article_id)
-                    except Article.DoesNotExist:
-                        messages.error(request, f"Article introuvable (ID: {article_id}).")
-                        raise
+                    # 3) Mettre à jour la facture de transfert
+                    facture.numero_compte = numero_compte
+                    facture.date_transfert = date_transfert
+                    facture.reference_transfert = reference_transfert
+                    facture.lieu_depart = lieu_depart
+                    facture.lieu_arrivee = lieu_arrivee
+                    facture.statut = statut
+                    facture.etat = etat
                     
-                    if etat_normalise == 'sortir' and article.stock_actuel < quantite_ligne:
-                        messages.error(request, f"Stock insuffisant pour l'article {article.designation}.")
-                        raise ValueError("Stock insuffisant")
+                    total_quantite = Decimal('0')
                     
-                    LigneFactureTransfert.objects.create(
-                        facture_transfert=facture,
-                        article=article,
-                        quantite=int(quantite_ligne),
-                        prix_unitaire=prix_achat_ligne,
-                        valeur_totale=quantite_ligne * prix_achat_ligne
-                    )
-                    
-                    ancien_stock = article.stock_actuel
-                    if etat_normalise == 'entrer':
-                        article.stock_actuel += quantite_ligne
-                        type_mouvement = 'entree'
-                    else:
-                        article.stock_actuel -= quantite_ligne
-                        type_mouvement = 'sortie'
-                    article.dernier_prix_achat = prix_achat_ligne
-                    article.save()
-                    
-                    total_quantite += quantite_ligne
-                    
-                    try:
-                        MouvementStock.objects.create(
+                    # 4) Traiter les nouvelles lignes avec la logique de différence
+                    for article_data in articles_payload:
+                        article_id = article_data.get('id')
+                        quantite_nouvelle = Decimal(str(article_data.get('quantite', 0)))
+                        prix_achat_ligne = Decimal(str(article_data.get('prix_achat', 0)))
+                        
+                        if not article_id or quantite_nouvelle <= 0:
+                            continue
+                        
+                        try:
+                            article = Article.objects.get(id=article_id)
+                            article.refresh_from_db()
+                        except Article.DoesNotExist:
+                            messages.error(request, f"Article introuvable (ID: {article_id}).")
+                            raise
+                        
+                        # Vérifier le stock si c'est une sortie
+                        if etat_normalise == 'sortir' and article.stock_actuel < quantite_nouvelle:
+                            messages.error(request, f"Stock insuffisant pour l'article {article.designation}.")
+                            raise ValueError("Stock insuffisant")
+                        
+                        # Créer la nouvelle ligne
+                        LigneFactureTransfert.objects.create(
+                            facture_transfert=facture,
                             article=article,
-                            agence=agence,
-                            type_mouvement=type_mouvement,
-                            date_mouvement=timezone.now(),
-                            numero_piece=facture.reference_transfert,
-                            quantite_stock=article.stock_actuel,
-                            stock_initial=ancien_stock,
-                            solde=article.stock_actuel,
-                            quantite=int(quantite_ligne),
-                            cout_moyen_pondere=float(article.prix_achat),
-                            stock_permanent=float(article.stock_actuel * article.prix_achat),
-                            commentaire=f"Modification transfert ({etat_normalise}) - Facture {facture.reference_transfert}",
-                            facture_transfert=facture
+                            quantite=int(quantite_nouvelle),
+                            prix_unitaire=prix_achat_ligne,
+                            valeur_totale=quantite_nouvelle * prix_achat_ligne
                         )
-                    except Exception as e:
-                        print(f"[WARNING] ERREUR MOUVEMENT STOCK TRANSFERT MODIFICATION: {e}")
-                
-                facture.quantite = int(total_quantite)
-                facture.save()
+                        
+                        # Calculer la différence et l'effet sur le stock
+                        quantite_ancienne = anciennes_quantites.get(article_id, Decimal('0'))
+                        difference = quantite_nouvelle - quantite_ancienne
+                        
+                        # Stock avant modification (ce stock contient déjà l'effet de l'ancienne facture)
+                        stock_avant_modification = article.stock_actuel
+                        
+                        # LOGIQUE CORRIGÉE : Le stock actuel contient déjà l'effet de l'ancienne facture
+                        # Pour modifier : il faut annuler l'effet de l'ancienne facture, puis appliquer le nouvel effet
+                        # Ce qui équivaut à : stock_final = stock_actuel - effet_ancien + effet_nouveau
+                        
+                        # Vérifier si l'état a changé
+                        etat_a_change = (ancien_etat_normalise != etat_normalise)
+                        
+                        # Calculer le stock final selon l'état
+                        if etat_normalise == 'entrer':
+                            # État "entrer" : augmente le stock
+                            # Le stock actuel contient déjà l'effet de l'ancienne facture
+                            # Si ancien état était "entrer" : stock_actuel = stock_initial + ancienne_quantité
+                            #   -> stock_final = stock_actuel - ancienne_quantité + nouvelle_quantité = stock_actuel + différence
+                            # Si ancien état était "sortir" : stock_actuel = stock_initial - ancienne_quantité
+                            #   -> stock_final = stock_actuel + ancienne_quantité + nouvelle_quantité = stock_actuel + ancienne_quantité + nouvelle_quantité
+                            if etat_a_change and ancien_etat_normalise == 'sortir':
+                                # L'état a changé de "sortir" à "entrer"
+                                # Il faut remettre l'ancienne quantité (qui avait été soustraite) et ajouter la nouvelle
+                                stock_final = stock_avant_modification + quantite_ancienne + quantite_nouvelle
+                            else:
+                                # L'état n'a pas changé ou était déjà "entrer"
+                                # stock_final = stock_actuel + différence
+                                stock_final = stock_avant_modification + difference
+                            
+                            # S'assurer que le stock ne devient pas négatif
+                            if stock_final < 0:
+                                messages.error(request, f'Stock insuffisant pour l\'article {article.designation}. Stock actuel: {stock_avant_modification}, différence: {difference}')
+                                raise ValueError(f"Stock insuffisant: {stock_avant_modification} + {difference} = {stock_final} < 0")
+                            
+                            article.stock_actuel = stock_final
+                            
+                            # Déterminer le type de mouvement et le commentaire selon la différence
+                            if difference > 0:
+                                type_mouvement = 'entree'
+                                quantite_mouvement = difference if not etat_a_change else quantite_nouvelle
+                                commentaire = f"Transfert entrer - Facture {facture.reference_transfert} (modification - augmentation: {quantite_ancienne} → {quantite_nouvelle}, +{difference})"
+                            elif difference < 0:
+                                type_mouvement = 'sortie'
+                                quantite_mouvement = abs(difference) if not etat_a_change else quantite_ancienne
+                                commentaire = f"Transfert entrer - Facture {facture.reference_transfert} (modification - diminution: {quantite_ancienne} → {quantite_nouvelle}, -{abs(difference)})"
+                            else:
+                                type_mouvement = None
+                                quantite_mouvement = Decimal('0')
+                                commentaire = f"Transfert entrer - Facture {facture.reference_transfert} (modification - quantité inchangée: {quantite_nouvelle})"
+                        else:
+                            # État "sortir" : diminue le stock
+                            # Le stock actuel contient déjà l'effet de l'ancienne facture
+                            # Si ancien état était "sortir" : stock_actuel = stock_initial - ancienne_quantité
+                            #   -> stock_final = stock_actuel + ancienne_quantité - nouvelle_quantité = stock_actuel - différence
+                            # Si ancien état était "entrer" : stock_actuel = stock_initial + ancienne_quantité
+                            #   -> stock_final = stock_actuel - ancienne_quantité - nouvelle_quantité = stock_actuel - ancienne_quantité - nouvelle_quantité
+                            if etat_a_change and ancien_etat_normalise == 'entrer':
+                                # L'état a changé de "entrer" à "sortir"
+                                # Il faut retirer l'ancienne quantité (qui avait été ajoutée) et soustraire la nouvelle
+                                stock_final = max(Decimal('0'), stock_avant_modification - quantite_ancienne - quantite_nouvelle)
+                            else:
+                                # L'état n'a pas changé ou était déjà "sortir"
+                                # stock_final = stock_actuel - différence
+                                stock_final = max(Decimal('0'), stock_avant_modification - difference)
+                            
+                            # Vérifier le stock avant d'appliquer
+                            if stock_final < 0:
+                                messages.error(request, f'Stock insuffisant pour l\'article {article.designation}. Stock actuel: {stock_avant_modification}, différence: {difference}')
+                                raise ValueError(f"Stock insuffisant: {stock_avant_modification} - {difference} = {stock_final} < 0")
+                            
+                            article.stock_actuel = stock_final
+                            
+                            # Déterminer le type de mouvement et le commentaire selon la différence
+                            if difference > 0:
+                                type_mouvement = 'sortie'
+                                quantite_mouvement = difference if not etat_a_change else quantite_nouvelle
+                                commentaire = f"Transfert sortir - Facture {facture.reference_transfert} (modification - augmentation: {quantite_ancienne} → {quantite_nouvelle}, -{difference})"
+                            elif difference < 0:
+                                type_mouvement = 'entree'
+                                quantite_mouvement = abs(difference) if not etat_a_change else quantite_ancienne
+                                commentaire = f"Transfert sortir - Facture {facture.reference_transfert} (modification - diminution: {quantite_ancienne} → {quantite_nouvelle}, +{abs(difference)})"
+                            else:
+                                type_mouvement = None
+                                quantite_mouvement = Decimal('0')
+                                commentaire = f"Transfert sortir - Facture {facture.reference_transfert} (modification - quantité inchangée: {quantite_nouvelle})"
+                        
+                        article.dernier_prix_achat = prix_achat_ligne
+                        # Le suivi de stock est toujours activé automatiquement lors de toute modification du stock
+                        article.suivi_stock = True
+                        article.save()
+                        
+                        total_quantite += quantite_nouvelle
+                        
+                        # Créer un mouvement de stock pour refléter le changement
+                        if quantite_mouvement > 0 and type_mouvement:
+                            try:
+                                MouvementStock.objects.create(
+                                    article=article,
+                                    agence=agence,
+                                    type_mouvement=type_mouvement,
+                                    date_mouvement=timezone.now(),
+                                    numero_piece=facture.reference_transfert,
+                                    quantite_stock=article.stock_actuel,
+                                    stock_initial=stock_avant_modification,
+                                    solde=article.stock_actuel,
+                                    quantite=quantite_mouvement,
+                                    cout_moyen_pondere=float(article.prix_achat),
+                                    stock_permanent=float(article.stock_actuel * article.prix_achat),
+                                    facture_transfert=facture,
+                                    commentaire=commentaire
+                                )
+                            except Exception as e:
+                                print(f"[WARNING] ERREUR MOUVEMENT STOCK TRANSFERT MODIFICATION: {e}")
+                    
+                    facture.quantite = int(total_quantite)
+                    facture.save()
+            
+            # Retirer le flag de modification en cours
+            request.session.pop('modification_en_cours', None)
             
             messages.success(request, f'Facture de transfert "{reference_transfert}" modifiée avec succès!')
             return redirect('consulter_factures_transfert')
             
         except Exception as e:
+            # Retirer le flag en cas d'erreur
+            request.session.pop('modification_en_cours', None)
             messages.error(request, f'Erreur lors de la modification de la facture: {str(e)}')
             return redirect('modifier_facture_transfert', facture_id=facture_id)
     
@@ -15073,8 +16035,7 @@ def supprimer_facture_transfert(request, facture_id):
         etat_normalise = (facture.etat or 'sortir').strip().lower()
         
         with transaction.atomic():
-            MouvementStock.objects.filter(facture_transfert=facture).delete()
-            
+            # NE PLUS SUPPRIMER LES MOUVEMENTS - Créer des mouvements de correction à la place
             lignes = LigneFactureTransfert.objects.select_related('article').filter(facture_transfert=facture)
             
             for ligne in lignes:
@@ -15087,13 +16048,14 @@ def supprimer_facture_transfert(request, facture_id):
                 
                 if etat_normalise == 'entrer':
                     article.stock_actuel = max(Decimal('0'), article.stock_actuel - quantite)
-                    commentaire = f"Suppression facture transfert {facture.reference_transfert} - retrait stock"
+                    commentaire = f"Correction - Suppression facture transfert {facture.reference_transfert} - retrait stock"
                 else:
                     article.stock_actuel += quantite
-                    commentaire = f"Suppression facture transfert {facture.reference_transfert} - restauration stock"
+                    commentaire = f"Correction - Suppression facture transfert {facture.reference_transfert} - restauration stock"
                 
                 article.save()
                 
+                # Créer un mouvement de correction (les mouvements originaux sont conservés pour traçabilité)
                 try:
                     MouvementStock.objects.create(
                         article=article,
@@ -15111,7 +16073,7 @@ def supprimer_facture_transfert(request, facture_id):
                         facture_transfert=facture
                     )
                 except Exception as mouvement_error:
-                    print(f"[WARNING] Erreur enregistrement mouvement suppression transfert: {mouvement_error}")
+                    print(f"[WARNING] Erreur enregistrement mouvement correction suppression transfert: {mouvement_error}")
             
             facture.delete()
         
@@ -16542,66 +17504,155 @@ def export_mouvements_excel(request):
         header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
         header_alignment = Alignment(horizontal="center", vertical="center")
         
-        # En-tête du document
-        ws.merge_cells('A1:P1')
+        # En-tête du document (17 colonnes maintenant avec Référence/Désignation)
+        ws.merge_cells('A1:Q1')
         ws['A1'] = f"FICHE DE STOCK - {article_reference} - {article_designation}"
         ws['A1'].font = Font(bold=True, size=16)
         ws['A1'].alignment = Alignment(horizontal="center")
         
-        ws.merge_cells('A2:P2')
+        ws.merge_cells('A2:Q2')
         ws['A2'] = f"Période: du {date_debut} au {date_fin}"
         ws['A2'].font = Font(size=12)
         ws['A2'].alignment = Alignment(horizontal="center")
         
-        # En-têtes des colonnes
-        headers = ['Date', 'Type', '', 'N°', '', '', 'Tiers', '', '', '', '', '+/-', 'Quantités en stock', 'Solde', 'C.M.U.P.', 'Stock permanent']
+        # En-têtes des colonnes - Ajout d'une colonne Référence/Désignation
+        headers = ['Référence/Désignation', 'Date', 'Type', '', 'N°', '', '', 'Tiers', '', '', '', '', '+/-', 'Quantités en stock', 'Solde', 'C.M.U.P.', 'Stock permanent']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=4, column=col, value=header)
             cell.font = header_font
             cell.fill = header_fill
             cell.alignment = header_alignment
         
-        # Données
-        row = 5
+        # Grouper les mouvements par article (par référence_article)
+        from collections import defaultdict
+        mouvements_par_article = defaultdict(list)
         for mouvement in mouvements_data_list:
-            # Structure modifiée (16 colonnes - sans Référence/Désignation/unitaire, avec Tiers)
-            ws.cell(row=row, column=1, value=mouvement['date_mouvement'])  # Date
-            ws.cell(row=row, column=2, value=mouvement['type_mouvement'])  # Type
-            ws.cell(row=row, column=3, value='')  # Colonne vide
-            ws.cell(row=row, column=4, value=mouvement['numero_piece'])  # N°
-            ws.cell(row=row, column=5, value='')  # Colonne vide
-            ws.cell(row=row, column=6, value='')  # Colonne vide
-            ws.cell(row=row, column=7, value=mouvement['tiers'])  # Tiers
-            ws.cell(row=row, column=8, value='')  # Colonne vide
-            ws.cell(row=row, column=9, value='')  # Colonne vide
-            ws.cell(row=row, column=10, value='')  # Colonne vide
-            ws.cell(row=row, column=11, value='')  # Colonne vide
-            ws.cell(row=row, column=12, value=f"+{mouvement['quantite']}" if mouvement['quantite'] > 0 else mouvement['quantite'])  # +/-
-            ws.cell(row=row, column=13, value=mouvement['stock_initial'])  # Quantités en stock
-            ws.cell(row=row, column=14, value=mouvement['solde'])  # Solde
-            ws.cell(row=row, column=15, value=mouvement['cout_moyen_pondere'])  # C.M.U.P.
-            ws.cell(row=row, column=16, value=mouvement['stock_permanent'])  # Stock permanent
+            # Utiliser référence_article comme clé de regroupement
+            ref_article = mouvement.get('reference_article', 'N/A')
+            mouvements_par_article[ref_article].append(mouvement)
+        
+        # Trier les articles par référence pour un affichage ordonné
+        articles_tries = sorted(mouvements_par_article.keys())
+        
+        # Style pour les en-têtes d'article
+        article_header_font = Font(bold=True, size=12, color="FFFFFF")
+        article_header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        article_header_alignment = Alignment(horizontal="left", vertical="center")
+        
+        # Données groupées par article
+        row = 5
+        total_stock_permanent_global = 0
+        
+        for ref_article in articles_tries:
+            mouvements_article = mouvements_par_article[ref_article]
+            
+            # Récupérer la désignation du premier mouvement (tous les mouvements d'un article ont la même désignation)
+            designation_article = mouvements_article[0].get('designation', 'N/A') if mouvements_article else 'N/A'
+            
+            # En-tête de l'article - Ligne de séparation avec référence et désignation
+            ws.merge_cells(f'A{row}:Q{row}')
+            cell_article = ws.cell(row=row, column=1, value=f"ARTICLE: {ref_article} - {designation_article}")
+            cell_article.font = article_header_font
+            cell_article.fill = article_header_fill
+            cell_article.alignment = article_header_alignment
+            row += 1
+            
+            # Calculer les totaux pour cet article
+            total_entrees_article = sum(1 for m in mouvements_article if m['type_mouvement'] == 'entree')
+            total_sorties_article = sum(1 for m in mouvements_article if m['type_mouvement'] == 'sortie')
+            total_stock_permanent_article = sum(float(m.get('stock_permanent', 0)) for m in mouvements_article)
+            total_stock_permanent_global += total_stock_permanent_article
+            
+            # Afficher tous les mouvements de cet article
+            for mouvement in mouvements_article:
+                # Déterminer le type de mouvement avec "Correction" si c'est une modification
+                type_mouvement_display = mouvement.get('type_mouvement_display', mouvement['type_mouvement'])
+                commentaire = (mouvement.get('commentaire', '') or '').lower()
+                if 'modification' in commentaire or 'modifier' in commentaire or '(modification' in commentaire:
+                    type_mouvement_display = 'Correction'
+                
+                # Structure avec colonne Référence/Désignation (17 colonnes maintenant)
+                ws.cell(row=row, column=1, value=f"{ref_article} - {designation_article}")  # Référence/Désignation
+                ws.cell(row=row, column=2, value=mouvement['date_mouvement'])  # Date
+                ws.cell(row=row, column=3, value=type_mouvement_display)  # Type (avec Correction si modification)
+                ws.cell(row=row, column=4, value='')  # Colonne vide
+                ws.cell(row=row, column=5, value=mouvement['numero_piece'])  # N°
+                ws.cell(row=row, column=6, value='')  # Colonne vide
+                ws.cell(row=row, column=7, value='')  # Colonne vide
+                ws.cell(row=row, column=8, value=mouvement['tiers'])  # Tiers
+                ws.cell(row=row, column=9, value='')  # Colonne vide
+                ws.cell(row=row, column=10, value='')  # Colonne vide
+                ws.cell(row=row, column=11, value='')  # Colonne vide
+                ws.cell(row=row, column=12, value='')  # Colonne vide
+                # Calculer le signe +/- selon le type de mouvement
+                quantite = float(mouvement.get('quantite', 0))
+                if mouvement['type_mouvement'] in ['sortie', 'perte']:
+                    quantite_display = f"-{abs(quantite)}"
+                elif mouvement['type_mouvement'] in ['entree', 'retour']:
+                    quantite_display = f"+{quantite}" if quantite > 0 else str(quantite)
+                elif mouvement['type_mouvement'] == 'ajustement':
+                    # Pour ajustement, déterminer selon solde vs stock_initial
+                    stock_initial = float(mouvement.get('stock_initial', 0))
+                    solde = float(mouvement.get('solde', 0))
+                    if solde < stock_initial:
+                        quantite_display = f"-{abs(quantite)}"
+                    elif solde > stock_initial:
+                        quantite_display = f"+{quantite}"
+                    else:
+                        quantite_display = str(quantite)
+                else:
+                    quantite_display = f"+{quantite}" if quantite > 0 else str(quantite)
+                ws.cell(row=row, column=13, value=quantite_display)  # +/-
+                ws.cell(row=row, column=14, value=mouvement['stock_initial'])  # Quantités en stock
+                ws.cell(row=row, column=15, value=mouvement['solde'])  # Solde
+                ws.cell(row=row, column=16, value=mouvement['cout_moyen_pondere'])  # C.M.U.P.
+                ws.cell(row=row, column=17, value=mouvement['stock_permanent'])  # Stock permanent
+                row += 1
+            
+            # Ligne de sous-total pour cet article
+            ws.merge_cells(f'A{row}:B{row}')
+            ws.cell(row=row, column=1, value=f"SOUS-TOTAL {ref_article}").font = Font(bold=True)
+            ws.cell(row=row, column=3, value=f"Entrées: {total_entrees_article}, Sorties: {total_sorties_article}").font = Font(bold=True)
+            ws.cell(row=row, column=4, value=f"Total: {len(mouvements_article)} mouvements").font = Font(bold=True)
+            ws.cell(row=row, column=17, value=total_stock_permanent_article).font = Font(bold=True)
+            # Remplir les colonnes vides
+            for col in [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]:
+                ws.cell(row=row, column=col, value='').font = Font(bold=True)
+            row += 1
+            
+            # Ligne vide pour séparer les articles
             row += 1
         
-        # Ligne des totaux
+        # Ligne des totaux généraux
         row += 1
-        ws.cell(row=row, column=1, value="TOTAL GÉNÉRAL").font = Font(bold=True)
-        ws.cell(row=row, column=2, value=f"Entrées: {mouvements_entree}, Sorties: {mouvements_sortie}").font = Font(bold=True)
-        ws.cell(row=row, column=3, value=f"Total: {total_mouvements} mouvements").font = Font(bold=True)
-        ws.cell(row=row, column=4, value="").font = Font(bold=True)
-        ws.cell(row=row, column=5, value="").font = Font(bold=True)
-        ws.cell(row=row, column=6, value="").font = Font(bold=True)
-        ws.cell(row=row, column=16, value=valeur_stock_permanent).font = Font(bold=True)
+        ws.merge_cells(f'A{row}:B{row}')
+        ws.cell(row=row, column=1, value="TOTAL GÉNÉRAL").font = Font(bold=True, size=14)
+        ws.cell(row=row, column=3, value=f"Entrées: {mouvements_entree}, Sorties: {mouvements_sortie}").font = Font(bold=True)
+        ws.cell(row=row, column=4, value=f"Total: {total_mouvements} mouvements").font = Font(bold=True)
+        ws.cell(row=row, column=5, value=f"Articles: {len(articles_tries)}").font = Font(bold=True)
+        # Remplir les colonnes vides
+        for col in [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]:
+            ws.cell(row=row, column=col, value="").font = Font(bold=True)
+        ws.cell(row=row, column=17, value=total_stock_permanent_global).font = Font(bold=True, size=12)
         
-        # Ajuster la largeur des colonnes
-        ws.column_dimensions['A'].width = 20
-        ws.column_dimensions['B'].width = 15
-        ws.column_dimensions['C'].width = 30
-        ws.column_dimensions['D'].width = 12
-        ws.column_dimensions['E'].width = 12
-        ws.column_dimensions['F'].width = 15
-        ws.column_dimensions['G'].width = 18
-        ws.column_dimensions['H'].width = 15
+        # Ajuster la largeur des colonnes (17 colonnes maintenant avec Référence/Désignation)
+        ws.column_dimensions['A'].width = 35  # Référence/Désignation (plus large)
+        ws.column_dimensions['B'].width = 20  # Date
+        ws.column_dimensions['C'].width = 15  # Type
+        ws.column_dimensions['D'].width = 5   # Colonne vide
+        ws.column_dimensions['E'].width = 15  # N°
+        ws.column_dimensions['F'].width = 5   # Colonne vide
+        ws.column_dimensions['G'].width = 5  # Colonne vide
+        ws.column_dimensions['H'].width = 25  # Tiers
+        ws.column_dimensions['I'].width = 5   # Colonne vide
+        ws.column_dimensions['J'].width = 5   # Colonne vide
+        ws.column_dimensions['K'].width = 5   # Colonne vide
+        ws.column_dimensions['L'].width = 5  # Colonne vide
+        ws.column_dimensions['M'].width = 12  # +/-
+        ws.column_dimensions['N'].width = 18  # Quantités en stock
+        ws.column_dimensions['O'].width = 12  # Solde
+        ws.column_dimensions['P'].width = 15  # C.M.U.P.
+        ws.column_dimensions['Q'].width = 18  # Stock permanent
         
         # Créer la réponse HTTP
         filename = f"Mouvements_Stock_{article_reference}_{date_debut}_{date_fin}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
@@ -16618,6 +17669,7 @@ def export_mouvements_excel(request):
         print(f"[CHART] EXPORT EXCEL MOUVEMENTS - Article: {article_reference}")
         print(f"[CHART] EXPORT EXCEL MOUVEMENTS - {total_mouvements} mouvements")
         print(f"[CHART] EXPORT EXCEL MOUVEMENTS - Valeur stock permanent: {valeur_stock_permanent} FCFA")
+        print(f"[CHART] EXPORT EXCEL MOUVEMENTS - Articles groupés: {len(articles_tries)}")
         
         return response
         

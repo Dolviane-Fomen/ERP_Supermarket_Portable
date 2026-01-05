@@ -518,6 +518,7 @@
 
 <script>
     const csrfToken = '{{ csrf_token }}';
+    const canDefacturerSansRetour = {% if can_defacturer_sans_retour %}true{% else %}false{% endif %};
     
     function attachViewDetailsHandlers() {
         const buttons = document.querySelectorAll('.view-details-btn');
@@ -644,10 +645,15 @@
                 </table>
             ` : '<p style="text-align: center; color: #666; margin-top: 20px;">Aucun article trouvé pour cette facture.</p>'}
             
-            <div class="modal-actions" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e9ecef; text-align: center;">
+            <div class="modal-actions" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e9ecef; text-align: center; display: flex; gap: 10px; justify-content: center;">
                 <button onclick="defacturerFacture(${facture.id})" class="btn-defacturer" style="background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: 600;">
-                    <i class="fas fa-undo"></i> Défacturer cette vente
+                    <i class="fas fa-undo"></i> Défacturer (avec retour stock)
                 </button>
+                ${canDefacturerSansRetour ? `
+                <button onclick="defacturerFactureSansRetour(${facture.id})" class="btn-defacturer-sans-retour" style="background: #ff9800; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: 600;">
+                    <i class="fas fa-ban"></i> Défacturer (sans retour stock)
+                </button>
+                ` : ''}
             </div>
         `;
 
@@ -672,6 +678,13 @@
         if (confirm('⚠️ ATTENTION: Vous êtes sur le point de défacturer cette vente.\n\nCette action va :\n• Supprimer la facture\n• Remettre les produits en stock\n• Créer des mouvements de stock inversés\n\nCette action est IRRÉVERSIBLE !\n\nÊtes-vous sûr de vouloir continuer ?')) {
             // Rediriger vers la page de confirmation de défacturation
             window.location.href = `/supermarket/stock/defacturer/${factureId}/`;
+        }
+    }
+
+    function defacturerFactureSansRetour(factureId) {
+        if (confirm('⚠️ ATTENTION: Vous êtes sur le point de défacturer cette vente SANS retour de stock.\n\nCette action va :\n• Supprimer la facture\n• NE PAS modifier le stock (le stock reste inchangé)\n• Créer des mouvements de stock pour traçabilité\n\nCette action est IRRÉVERSIBLE !\n\nÊtes-vous sûr de vouloir continuer ?')) {
+            // Rediriger vers la fonction de défacturation sans retour
+            window.location.href = `/supermarket/stock/defacturer/${factureId}/sans-retour/`;
         }
     }
 

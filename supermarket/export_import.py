@@ -659,6 +659,8 @@ def import_data(data, agence_id=None, clear_existing=False):
                             # IMPORTANT: Mettre à jour le stock avec la valeur du fichier
                             article.stock_actuel = Decimal(str(article_data.get('stock_actuel', '0')))
                             article.stock_minimum = Decimal(str(article_data.get('stock_minimum', '0')))
+                            # Le suivi de stock est toujours activé automatiquement lors de toute modification du stock
+                            article.suivi_stock = True
                             article.save()
                             created = False
                             article_map[reference_article] = reference_article
@@ -669,7 +671,7 @@ def import_data(data, agence_id=None, clear_existing=False):
                                 agence=agence,
                                 designation=article_data.get('designation', ''),
                                 categorie=famille,
-                                suivi_stock=article_data.get('suivi_stock', True),
+                                suivi_stock=True,  # Toujours activé automatiquement
                                 conditionnement=conditionnement,
                                 prix_achat=Decimal(str(article_data.get('prix_achat', '0'))),
                                 dernier_prix_achat=Decimal(str(article_data.get('dernier_prix_achat', '0'))),
@@ -689,7 +691,8 @@ def import_data(data, agence_id=None, clear_existing=False):
                                 article = existing_article
                                 article.designation = article_data.get('designation', '')
                                 article.categorie = famille
-                                article.suivi_stock = article_data.get('suivi_stock', True)
+                                # Le suivi de stock est toujours activé automatiquement
+                                article.suivi_stock = True
                                 article.conditionnement = conditionnement
                                 article.prix_achat = Decimal(str(article_data.get('prix_achat', '0')))
                                 article.dernier_prix_achat = Decimal(str(article_data.get('dernier_prix_achat', '0')))
@@ -736,7 +739,7 @@ def import_data(data, agence_id=None, clear_existing=False):
                                 agence=agence,
                                 designation=article_data.get('designation', ''),
                                 categorie=famille,
-                                suivi_stock=article_data.get('suivi_stock', True),
+                                suivi_stock=True,  # Toujours activé automatiquement
                                 conditionnement=conditionnement,
                                 prix_achat=Decimal(str(article_data.get('prix_achat', '0'))),
                                 dernier_prix_achat=Decimal(str(article_data.get('dernier_prix_achat', '0'))),

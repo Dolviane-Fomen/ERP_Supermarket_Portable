@@ -393,58 +393,9 @@
     @media (max-width: 900px) {
         .container { flex-direction: column; }
         .menu-bar { width: 100%; }
-        .content { padding-left: 0; padding-top: 10px; }
+        .content { padding-left: 0; }
         .kpis { grid-template-columns: repeat(2, 1fr); }
         .cards { grid-template-columns: 1fr; }
-    }
-    
-    @media (max-width: 768px) {
-        body { padding: 10px; }
-        header { 
-            flex-direction: column; 
-            align-items: flex-start;
-            padding: 15px;
-        }
-        .header-info { 
-            margin-left: 0; 
-            margin-top: 10px;
-            width: 100%;
-            justify-content: space-between;
-        }
-        .super-market-title { font-size: 1.4em; }
-        .username { margin-right: 10px; font-size: 0.9em; }
-        .logout-button { padding: 8px 12px; font-size: 0.9em; }
-        .menu-bar { width: 100%; margin-bottom: 15px; }
-        .menu-bar h2 { font-size: 1.2em; }
-        .menu-item { padding: 12px; font-size: 0.95em; }
-        .kpis { grid-template-columns: 1fr; gap: 15px; }
-        .kpi-card { padding: 20px; }
-        .kpi-value { font-size: 2em; }
-        .cards { grid-template-columns: 1fr; gap: 15px; }
-        .card { padding: 20px; }
-        .table-card { padding: 15px; overflow-x: auto; }
-        table { min-width: 600px; }
-        .dashboard-title { font-size: 1.2em; }
-        .refresh-button { padding: 10px 15px; font-size: 0.9em; }
-        .notifications-dropdown { width: 100% !important; right: 0 !important; }
-    }
-    
-    @media (max-width: 480px) {
-        body { padding: 5px; }
-        header { padding: 10px; }
-        .super-market-title { font-size: 1.2em; }
-        .username { display: none; }
-        .logout-button { padding: 6px 10px; font-size: 0.85em; }
-        .menu-item { padding: 10px; font-size: 0.9em; }
-        .kpi-card { padding: 15px; }
-        .kpi-icon { font-size: 2em; }
-        .kpi-value { font-size: 1.8em; }
-        .card { padding: 15px; }
-        .card-title { font-size: 1em; }
-        .table-card { padding: 10px; }
-        .dashboard-title { font-size: 1em; }
-        .submenu { padding: 5px 0; }
-        .submenu-item { padding: 10px 15px; font-size: 0.9em; }
     }
     
     /* Styles pour les notifications */

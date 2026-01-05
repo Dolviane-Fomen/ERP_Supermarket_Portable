@@ -447,7 +447,7 @@
                             <td>{{ cmd.article.designation }}</td>
                             <td>{{ cmd.article.reference_article|default:"-" }}</td>
                             <td>{{ cmd.quantite|floatformat:2 }}</td>
-                            <td>{{ cmd.article.prix_vente|floatformat:0 }} FCFA</td>
+                            <td>{{ cmd.prix_unitaire|floatformat:0 }} FCFA</td>
                             <td>{{ cmd.prix_total|floatformat:0 }} FCFA</td>
                         </tr>
                         {% endfor %}

@@ -950,6 +950,26 @@ document.addEventListener('click', function(e) {
     }
 });
 
+// Fonction pour normaliser les valeurs décimales (gérer les virgules, etc.)
+function normalizeDecimalInput(value) {
+    if (value === null || value === undefined) return 0;
+    let valueStr = String(value).trim();
+    // Remplacer les virgules par des points (format français vers international)
+    valueStr = valueStr.replace(',', '.');
+    // Supprimer les caractères non numériques sauf point et moins
+    valueStr = valueStr.replace(/[^\d.-]/g, '');
+    // Supprimer les espaces (séparateurs de milliers)
+    valueStr = valueStr.replace(/\s/g, '');
+    if (!valueStr || valueStr === '-' || valueStr === '.') return 0;
+    // Gérer les multiples points décimaux
+    const parts = valueStr.split('.');
+    if (parts.length > 2) {
+        valueStr = parts[0] + '.' + parts.slice(1).join('');
+    }
+    const result = parseFloat(valueStr);
+    return isNaN(result) ? 0 : result;
+}
+
 // Gestion de la soumission du formulaire
 document.getElementById('facture-form').addEventListener('submit', function(e) {
     const articles = [];
@@ -966,15 +986,22 @@ document.getElementById('facture-form').addEventListener('submit', function(e) {
     rows.forEach(row => {
         const articleId = row.getAttribute('data-article-id');
         const designation = row.cells[0].textContent.trim();
-        const quantite = row.querySelector('.quantity-input').value;
-        const prixAchat = row.querySelector('.price-input').value;
+        const quantiteInput = row.querySelector('.quantity-input');
+        const prixInput = row.querySelector('.price-input');
         
-        if (articleId && quantite && prixAchat) {
+        if (!articleId || !quantiteInput || !prixInput) return;
+        
+        // Normaliser les valeurs (convertir les virgules en points, etc.)
+        const q = normalizeDecimalInput(quantiteInput.value);
+        const p = normalizeDecimalInput(prixInput.value);
+        
+        if (articleId && q > 0) {
+            // Envoyer les valeurs normalisées (avec point décimal, pas de virgule)
             articles.push({
-                id: articleId,
+                id: parseInt(articleId),
                 designation: designation,
-                quantite: quantite,
-                prix_achat: prixAchat
+                quantite: q.toString(),
+                prix_achat: p.toString()
             });
         }
     });

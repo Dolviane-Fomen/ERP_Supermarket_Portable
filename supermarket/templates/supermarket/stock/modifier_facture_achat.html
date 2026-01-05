@@ -364,6 +364,18 @@
         color: #28a745;
         text-align: right;
     }
+    
+    .current-value {
+        background-color: #f8f9fa;
+        padding: 8px;
+        border-radius: 6px;
+        font-size: 0.9em;
+        border: 1px solid #e9ecef;
+        text-align: center;
+        color: #6c757d;
+        font-weight: 600;
+        vertical-align: middle;
+    }
 
     .btn-delete-line {
         background: #dc3545;
@@ -670,7 +682,9 @@
                                 <thead>
                                     <tr>
                                         <th>Désignation</th>
+                                        <th>Quantité actuelle</th>
                                         <th>Quantité</th>
+                                        <th>Prix d'Achat actuel</th>
                                         <th>Prix d'Achat</th>
                                         <th>Total</th>
                                         <th>Actions</th>
@@ -681,11 +695,17 @@
                                         {% for ligne in lignes %}
                                         <tr data-ligne-id="{{ ligne.id }}" data-article-id="{{ ligne.article.id }}">
                                             <td>{{ ligne.reference_article }} - {{ ligne.designation }}</td>
+                                            <td class="current-value">
+                                                {{ ligne.quantite }}
+                                            </td>
                                             <td>
                                                 <input type="number" class="quantity-input" value="{{ ligne.quantite }}" min="0" step="0.01" onchange="updateRowTotal(this.closest('tr'))" oninput="updateRowTotal(this.closest('tr'))">
                                             </td>
+                                            <td class="current-value">
+                                                {{ ligne.prix_unitaire|floatformat:2 }} FCFA
+                                            </td>
                                             <td>
-                                                <input type="number" class="price-input" value="{{ ligne.prix_unitaire|floatformat:2 }}" min="0" step="0.01" onchange="updateRowTotal(this.closest('tr'))" oninput="updateRowTotal(this.closest('tr'))">
+                                                <input type="number" class="price-input" value="{{ ligne.prix_unitaire }}" min="0" step="0.01" onchange="updateRowTotal(this.closest('tr'))" oninput="updateRowTotal(this.closest('tr'))">
                                             </td>
                                             <td class="total-cell">{{ ligne.prix_total_article|floatformat:2 }} FCFA</td>
                                             <td>
@@ -697,7 +717,7 @@
                                         {% endfor %}
                                     {% else %}
                                         <tr class="no-articles-row">
-                                            <td colspan="5" class="no-articles">
+                                            <td colspan="7" class="no-articles">
                                                 <i class="fas fa-info-circle"></i>
                                                 <p>Aucun article sélectionné</p>
                                             </td>
@@ -723,7 +743,7 @@
                                 Prix Total Global (FCFA) <span class="required">*</span>
                             </label>
                             <input type="number" id="prix_total_global" name="prix_total_global" 
-                                   value="{{ facture.prix_total_global|floatformat:2 }}" 
+                                   value="{{ facture.prix_total_global }}" 
                                    min="0" step="0.01" required readonly>
                             <div class="help-text">Montant total calculé automatiquement</div>
                         </div>
@@ -783,6 +803,68 @@
 </div>
 
 <script>
+// Fonction pour normaliser les entrées décimales (format français vers international)
+function normalizeDecimalInput(value) {
+    if (value === null || value === undefined) return 0;
+    let valueStr = String(value).trim();
+    // Remplacer les virgules par des points (format français vers international)
+    valueStr = valueStr.replace(',', '.');
+    // Supprimer les caractères non numériques sauf point et moins
+    valueStr = valueStr.replace(/[^\d.-]/g, '');
+    // Supprimer les espaces (séparateurs de milliers)
+    valueStr = valueStr.replace(/\s/g, '');
+    if (!valueStr || valueStr === '-' || valueStr === '.') return 0;
+    // Gérer les multiples points décimaux
+    const parts = valueStr.split('.');
+    if (parts.length > 2) {
+        valueStr = parts[0] + '.' + parts.slice(1).join('');
+    }
+    const result = parseFloat(valueStr);
+    return isNaN(result) ? 0 : result;
+}
+
+// Fonction pour mettre à jour le total d'une ligne (PORTÉE GLOBALE)
+function updateRowTotal(row) {
+    if (!row) return;
+    
+    const quantiteInput = row.querySelector('.quantity-input');
+    const prixInput = row.querySelector('.price-input');
+    const totalCell = row.querySelector('.total-cell');
+    
+    if (!quantiteInput || !prixInput || !totalCell) return;
+    
+    const quantite = normalizeDecimalInput(quantiteInput.value);
+    const prix = normalizeDecimalInput(prixInput.value);
+    const total = Math.round(quantite * prix * 100) / 100; // Arrondir à 2 décimales
+    
+    // Mettre à jour le total de la ligne
+    totalCell.textContent = total.toLocaleString('fr-FR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    }) + ' FCFA';
+    
+    // Mettre à jour le total global
+    updateTotalGlobal();
+}
+
+// Fonction pour mettre à jour le total global
+function updateTotalGlobal() {
+    let totalGlobal = 0;
+    const totalCells = document.querySelectorAll('.total-cell');
+    
+    totalCells.forEach(cell => {
+        const totalText = cell.textContent.replace(/[^\d,]/g, '').replace(',', '.');
+        const total = normalizeDecimalInput(totalText);
+        totalGlobal += total;
+    });
+    
+    // Mettre à jour le champ prix total global
+    const prixTotalGlobal = document.getElementById('prix_total_global');
+    if (prixTotalGlobal) {
+        prixTotalGlobal.value = totalGlobal.toFixed(2);
+    }
+}
+
 // Fonction pour confirmer l'annulation
 function confirmCancel() {
     // Vérifier s'il y a des modifications non sauvegardées
@@ -816,56 +898,19 @@ function confirmCancel() {
     return true;
 }
 
-// Fonction pour mettre à jour le total d'une ligne
+// Fonction pour mettre à jour le total d'une ligne (ancienne fonction, gardée pour compatibilité)
 function updateLigneTotal(input) {
     const ligneId = input.dataset.ligneId;
     const row = document.querySelector(`tr[data-ligne-id="${ligneId}"]`);
     
     if (!row) return;
-    
-    const quantiteInput = row.querySelector('.quantity-input');
-    const prixInput = row.querySelector('.price-input');
-    const totalCell = row.querySelector('.total-cell');
-    
-    const quantite = parseFloat(quantiteInput.value) || 0;
-    const prix = parseFloat(prixInput.value) || 0;
-    const total = quantite * prix;
-    
-    // Mettre à jour le total de la ligne
-    totalCell.textContent = total.toLocaleString() + ' FCFA';
-    
-    // Mettre à jour le total global
-    updateTotalGlobal();
-}
-
-// Fonction pour mettre à jour le total global
-function updateTotalGlobal() {
-    let totalGlobal = 0;
-    const totalCells = document.querySelectorAll('.total-cell');
-    
-    totalCells.forEach(cell => {
-        const totalText = cell.textContent.replace(/[^\d,]/g, '').replace(',', '');
-        const total = parseFloat(totalText) || 0;
-        totalGlobal += total;
-    });
-    
-    // Mettre à jour le champ prix total global
-    const prixTotalGlobal = document.getElementById('prix_total_global');
-    prixTotalGlobal.value = totalGlobal.toFixed(2);
+    updateRowTotal(row);
 }
 
 // Fonction pour supprimer une ligne
 function deleteLigne(ligneId, designation) {
     if (confirm(`Êtes-vous sûr de vouloir supprimer l'article "${designation}" de cette facture ?`)) {
-        // Ajouter un champ caché pour marquer la ligne comme supprimée
-        const form = document.getElementById('facture-form');
-        const hiddenInput = document.createElement('input');
-        hiddenInput.type = 'hidden';
-        hiddenInput.name = 'ligne_supprimee';
-        hiddenInput.value = ligneId;
-        form.appendChild(hiddenInput);
-        
-        // Supprimer la ligne du tableau
+        // Supprimer la ligne du tableau (on n'a plus besoin de ligne_supprimee, tout est géré via articles_data)
         const row = document.querySelector(`tr[data-ligne-id="${ligneId}"]`);
         if (row) {
             row.remove();
@@ -873,12 +918,12 @@ function deleteLigne(ligneId, designation) {
         }
         
         // Vérifier s'il reste des lignes
-        const remainingRows = document.querySelectorAll('#articles-table tbody tr');
+        const remainingRows = document.querySelectorAll('#articles-table tbody tr[data-article-id]');
         if (remainingRows.length === 0) {
             const tbody = document.querySelector('#articles-table tbody');
             tbody.innerHTML = `
-                <tr>
-                    <td colspan="6" class="no-articles-message">
+                <tr class="no-articles-row">
+                    <td colspan="5" class="no-articles">
                         <i class="fas fa-info-circle"></i>
                         <p>Aucun article dans cette facture.</p>
                     </td>
@@ -897,20 +942,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let totalAmount = 0;
     const searchInput = document.getElementById('article_search');
 
-    function normalizeDecimalInput(value) {
-        if (value === null || value === undefined) return 0;
-        let valueStr = String(value).trim();
-        valueStr = valueStr.replace(',', '.');
-        valueStr = valueStr.replace(/[^\d.-]/g, '');
-        valueStr = valueStr.replace(/\s/g, '');
-        if (!valueStr || valueStr === '-' || valueStr === '.') return 0;
-        const parts = valueStr.split('.');
-        if (parts.length > 2) {
-            valueStr = parts[0] + '.' + parts.slice(1).join('');
-        }
-        const result = parseFloat(valueStr);
-        return isNaN(result) ? 0 : result;
-    }
+    // normalizeDecimalInput est maintenant dans la portée globale, pas besoin de la redéfinir
 
     function searchArticles() {
         const searchTerm = document.getElementById('article_search').value.trim();
@@ -1021,11 +1053,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const row = document.createElement('tr');
         row.setAttribute('data-article-id', articleId);
         row.innerHTML = `
-            <td>${reference}</td>
-            <td>${designation}</td>
+            <td>${reference} - ${designation}</td>
+            <td class="current-value">-</td>
             <td><input type="number" class="quantity-input" value="1" min="0" step="0.01"></td>
+            <td class="current-value">-</td>
             <td><input type="number" class="price-input" value="${prixAchat}" min="0" step="0.01"></td>
-            <td class="total-cell">${Number(prixAchat).toLocaleString()} FCFA</td>
+            <td class="total-cell">${Number(prixAchat).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} FCFA</td>
             <td><button type="button" class="btn-delete-line" title="Retirer"><i class="fas fa-trash"></i></button></td>
         `;
         tbody.appendChild(row);
@@ -1038,12 +1071,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('article_search').value = '';
     }
 
-    function updateRowTotal(row) {
-        const q = normalizeDecimalInput(row.querySelector('.quantity-input').value);
-        const p = normalizeDecimalInput(row.querySelector('.price-input').value);
-        const total = Math.round(q * p * 100) / 100;
-        row.querySelector('.total-cell').textContent = total.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' FCFA';
-    }
+    // updateRowTotal est maintenant dans la portée globale, pas besoin de la redéfinir
 
     // Validation du formulaire
     const form = document.getElementById('facture-form');
@@ -1093,17 +1121,41 @@ document.addEventListener('DOMContentLoaded', function() {
             return false;
         }
 
-        // Compiler les nouvelles lignes (avec data-article-id) -> articles_data JSON (comme création)
-        const rows = document.querySelectorAll('#articles-table tbody tr[data-article-id]:not([data-ligne-id])');
+        // Compiler TOUTES les lignes (existantes modifiées + nouvelles) -> articles_data JSON
+        // Les lignes existantes ont data-ligne-id ET data-article-id
+        // Les nouvelles lignes ont seulement data-article-id
+        const allRows = document.querySelectorAll('#articles-table tbody tr[data-article-id]');
         const items = [];
-        rows.forEach(row => {
+        allRows.forEach(row => {
             const id = row.getAttribute('data-article-id');
-            const q = row.querySelector('.quantity-input')?.value || '0';
-            const p = row.querySelector('.price-input')?.value || '0';
-            if (id) items.push({ id: id, quantite: q, prix_achat: p });
+            const quantiteInput = row.querySelector('.quantity-input');
+            const prixInput = row.querySelector('.price-input');
+            
+            if (!id || !quantiteInput || !prixInput) return;
+            
+            // Normaliser les valeurs (convertir les virgules en points, etc.)
+            const q = normalizeDecimalInput(quantiteInput.value);
+            const p = normalizeDecimalInput(prixInput.value);
+            
+            if (id && q > 0) {
+                // Envoyer les valeurs normalisées (avec point décimal, pas de virgule)
+                items.push({ 
+                    id: parseInt(id), 
+                    quantite: q.toString(), 
+                    prix_achat: p.toString() 
+                });
+            }
         });
-        if (items.length > 0) {
-            document.getElementById('articles_data').value = JSON.stringify(items);
+        
+        console.log('[DEBUG] Articles data à envoyer:', items);
+        
+        // Toujours envoyer articles_data, même si vide (pour indiquer qu'on veut remplacer toutes les lignes)
+        document.getElementById('articles_data').value = JSON.stringify(items);
+        
+        // Supprimer le champ ligne_supprimee s'il existe (on ne l'utilise plus)
+        const ligneSupprimeeInput = form.querySelector('input[name="ligne_supprimee"]');
+        if (ligneSupprimeeInput) {
+            ligneSupprimeeInput.remove();
         }
 
         // Confirmation avant soumission

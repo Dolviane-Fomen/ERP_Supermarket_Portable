@@ -54,53 +54,111 @@
         .table-container {
             background: white;
             padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             overflow-x: auto;
+            margin-bottom: 20px;
+            border: 1px solid #e1e8ed;
         }
         table {
             width: 100%;
             border-collapse: collapse;
+            min-width: 2200px;
+            background: white;
         }
+        th:nth-child(1), td:nth-child(1) { width: 220px; min-width: 180px; } /* NOMS */
+        th:nth-child(2), td:nth-child(2) { width: 140px; min-width: 120px; } /* TELEPHONES */
+        /* Pour chaque plage horaire: colonne heure (3, 6, 9, 12, 15) */
+        th:nth-child(3), td:nth-child(3),
+        th:nth-child(6), td:nth-child(6),
+        th:nth-child(9), td:nth-child(9),
+        th:nth-child(12), td:nth-child(12),
+        th:nth-child(15), td:nth-child(15) { width: 140px; min-width: 120px; } /* Plage horaire (heure) */
+        /* Colonnes Commandes (4, 7, 10, 13, 16) */
+        th:nth-child(4), td:nth-child(4),
+        th:nth-child(7), td:nth-child(7),
+        th:nth-child(10), td:nth-child(10),
+        th:nth-child(13), td:nth-child(13),
+        th:nth-child(16), td:nth-child(16) { width: 300px; min-width: 250px; } /* Commandes */
+        /* Colonnes Actions (5, 8, 11, 14, 17) */
+        th:nth-child(5), td:nth-child(5),
+        th:nth-child(8), td:nth-child(8),
+        th:nth-child(11), td:nth-child(11),
+        th:nth-child(14), td:nth-child(14),
+        th:nth-child(17), td:nth-child(17) { width: 180px; min-width: 150px; } /* Actions */
+        th:last-child, td:last-child { width: 140px; min-width: 120px; } /* TOTAL */
         thead {
-            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            background: #06beb6;
             color: white;
         }
         th {
-            padding: 15px;
-            text-align: left;
-            font-weight: 600;
+            padding: 15px 12px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 0.95em;
+            border: 1px solid #05a89a;
+            white-space: nowrap;
+            background: #06beb6;
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         td {
-            padding: 15px;
-            border-bottom: 1px solid #e1e8ed;
+            padding: 12px;
+            border: 1px solid #e1e8ed;
+            vertical-align: top;
+            background: white;
+            min-height: 80px;
+            box-sizing: border-box;
         }
-        tbody tr:hover {
+        tbody tr:hover td {
             background-color: #f8f9fa;
+        }
+        tbody tr:nth-child(even) td {
+            background-color: #fafbfc;
         }
         .action-input {
             width: 100%;
-            padding: 8px;
-            border: 2px solid #e1e8ed;
-            border-radius: 5px;
+            padding: 8px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
             font-size: 0.9em;
-            min-height: 50px;
+            min-height: 60px;
             resize: vertical;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.5;
+            box-sizing: border-box;
+            background: #ffffff;
+            color: #2c3e50;
         }
         .action-input:focus {
             outline: none;
             border-color: #06beb6;
+            background: white;
+        }
+        .action-input::placeholder {
+            color: #8b949e;
+            font-style: italic;
         }
         .heure-appel-input {
-            padding: 5px;
-            border: 1px solid #e1e8ed;
-            border-radius: 5px;
-            width: 100px;
-            font-size: 0.9em;
+            padding: 8px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            width: 100%;
+            font-size: 0.95em;
+            text-align: center;
+            background: white;
+            font-weight: 600;
+            box-sizing: border-box;
+            color: #2c3e50;
         }
         .heure-appel-input:focus {
             outline: none;
             border-color: #06beb6;
+        }
+        .heure-appel-input::placeholder {
+            color: #8b949e;
+            font-weight: normal;
         }
         .btn {
             padding: 8px 15px;
@@ -113,23 +171,50 @@
             display: inline-block;
         }
         .btn-success {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            background: #28a745;
             color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: 600;
+            box-sizing: border-box;
+            font-size: 0.9em;
+            padding: 8px 12px;
+            width: 100%;
+            margin-bottom: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
         }
         .btn-success:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 10px rgba(40, 167, 69, 0.3);
+            background: #218838;
+        }
+        .btn-success:active {
+            background: #1e7e34;
         }
         .btn-save {
             background: #17a2b8;
             color: white;
-            font-size: 0.85em;
-            padding: 5px 10px;
-            margin-bottom: 5px;
+            font-size: 0.9em;
+            padding: 8px 12px;
+            margin-bottom: 6px;
             width: 100%;
+            border: none;
+            border-radius: 4px;
+            font-weight: 600;
+            cursor: pointer;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
         }
         .btn-save:hover {
             background: #138496;
+        }
+        .btn-save:active {
+            background: #117a8b;
         }
         .btn-edit {
             background: #ffc107;
@@ -219,10 +304,32 @@
         }
         .action-display {
             color: #2c3e50;
+            background: #fff8e1;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border-left: 3px solid #ff9800;
+            margin-bottom: 8px;
+            line-height: 1.5;
+            font-size: 0.9em;
         }
         .heure-display {
-            color: #6c757d;
+            color: #2e7d32;
             font-weight: 600;
+            background: #e8f5e9;
+            padding: 6px 10px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-bottom: 6px;
+            font-size: 0.9em;
+            border: 1px solid #c8e6c9;
+        }
+        .total-cell {
+            background: #e8f5e9;
+            font-weight: 700;
+            font-size: 1em;
+            color: #1b5e20;
+            text-align: right;
+            padding: 12px;
         }
     </style>
 </head>
@@ -265,7 +372,7 @@
                         <input 
                             type="date" 
                             id="date-select" 
-                            name="date" 
+                            name="date_selectionnee" 
                             value="{{ date_selectionnee }}"
                             style="padding: 10px 15px; border: 2px solid #e1e8ed; border-radius: 8px; font-size: 1em;"
                             onchange="document.getElementById('filterForm').submit()"
@@ -282,87 +389,121 @@
         
         <div class="table-container">
             {% if clients %}
-            <table>
+            <table style="min-width: 100%;">
                 <thead>
                     <tr>
                         <th>NOMS</th>
                         <th>TELEPHONES</th>
-                        <th>06h30-08h30</th>
+                        {% for plage_code, plage_label in plages_horaires %}
+                        <th>{{ plage_label }}</th>
                         <th>Commandes</th>
                         <th>Actions</th>
+                        {% endfor %}
+                        <th>TOTAL</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for client in clients %}
-                        {% if client.id in actions_dict %}
-                            {% for action_data in actions_dict|get_item:client.id %}
-                            <tr id="row_{{ client.id }}_{{ action_data.id }}" class="{% if action_data.action %}{% if 'ne plus rappeler' in action_data.action|lower %}row-critical{% elif 'pas de commande' in action_data.action|lower or 'n\'appel plus' in action_data.action|lower %}row-special{% endif %}{% endif %}">
-                                <td><strong>{{ client.intitule }}</strong></td>
-                                <td>{{ client.telephone }}</td>
-                                <td>
+                    <tr id="row_{{ client.id }}">
+                        <td style="font-weight: 700; color: #24292f; font-size: 1.05em; text-transform: uppercase; letter-spacing: 0.3px;"><strong>{{ client.intitule }}</strong></td>
+                        <td style="color: #57606a; font-family: 'Courier New', monospace; font-size: 1em; font-weight: 600; letter-spacing: 1px;">{{ client.telephone }}</td>
+                        
+                        {% for plage_code, plage_label in plages_horaires %}
+                        <!-- Colonne Plage horaire (heure d'appel et heure commande) -->
+                        <td style="text-align: center;">
+                            {% if client.id in actions_dict and plage_code in actions_dict|get_item:client.id %}
+                                {% for action_data in actions_dict|get_item:client.id|get_item:plage_code %}
+                                <div style="margin-bottom: 6px;">
                                     <span class="heure-display">
-                                        {% if action_data.heure_appel %}{{ action_data.heure_appel|time:'H:i' }}{% endif %}
+                                        {% if action_data.heure_appel %}{{ action_data.heure_appel|time:'H:i' }}{% else %}--:--{% endif %}
                                     </span>
-                                </td>
-                                <td>
-                                    <span class="action-display">
+                                </div>
+                                {% endfor %}
+                            {% endif %}
+                            {% if client.id in commandes_dict and plage_code in commandes_dict|get_item:client.id %}
+                                {% for cmd_data in commandes_dict|get_item:client.id|get_item:plage_code %}
+                                <div style="margin-bottom: 6px;">
+                                    <span style="color: #2e7d32; font-weight: 600; background: #c8e6c9; padding: 6px 10px; border-radius: 4px; display: inline-block; margin-bottom: 6px; font-size: 0.9em; border: 1px solid #a5d6a7;">
+                                        {{ cmd_data.heure }}
+                                    </span>
+                                </div>
+                                {% endfor %}
+                            {% endif %}
+                            <!-- Champ de saisie de l'heure -->
+                            <input 
+                                type="time" 
+                                id="heure_appel_{{ client.id }}_{{ plage_code }}" 
+                                class="heure-appel-input"
+                                placeholder="--:--"
+                            />
+                        </td>
+                        
+                        <!-- Colonne Commandes (textarea pour l'action et articles commandés) -->
+                        <td>
+                            {% if client.id in actions_dict and plage_code in actions_dict|get_item:client.id %}
+                                {% for action_data in actions_dict|get_item:client.id|get_item:plage_code %}
+                                <div style="margin-bottom: 6px; padding: 6px; background-color: #fff8e1; border-left: 2px solid #ff9800; border-radius: 3px;">
+                                    <span style="font-size: 0.85em; color: #e65100; display: block; margin-bottom: 4px; line-height: 1.4;">
                                         {{ action_data.action }}
                                     </span>
-                                </td>
-                                <td>
-                                    <a 
-                                        href="{% url 'enregistrer_commande' %}?client_id={{ client.id }}" 
-                                        class="btn btn-success"
-                                        style="display: block; width: 100%; text-align: center;"
+                                    <button 
+                                        class="btn btn-edit btn-modifier-action" 
+                                        data-action-id="{{ action_data.id }}"
+                                        data-client-id="{{ client.id }}"
+                                        data-plage-code="{{ plage_code }}"
+                                        style="padding: 3px 8px; font-size: 0.75em; background: #ff9800; color: white; border: none; border-radius: 3px; cursor: pointer; font-weight: 500;"
                                     >
-                                        <i class="fas fa-shopping-cart"></i> Passer Commande
-                                    </a>
-                                </td>
-                            </tr>
+                                        <i class="fas fa-edit"></i> Modifier
+                                    </button>
+                                </div>
                             {% endfor %}
                         {% endif %}
-                        <!-- Ligne pour nouveau appel -->
-                        <tr id="row_new_{{ client.id }}">
-                            <td><strong>{{ client.intitule }}</strong></td>
-                            <td>{{ client.telephone }}</td>
-                            <td>
-                                <input 
-                                    type="time" 
-                                    id="heure_appel_new_{{ client.id }}" 
-                                    class="heure-appel-input"
-                                    placeholder="HH:MM"
-                                />
-                            </td>
-                            <td>
-                                <textarea 
-                                    class="action-input" 
-                                    id="action_new_{{ client.id }}" 
-                                    placeholder="Saisir l'action après l'appel (ex: pas de reponse, pas de commande, ne plus rappeler...)"
-                                    rows="2"
-                                ></textarea>
-                            </td>
-                            <td>
+                            {% if client.id in commandes_dict and plage_code in commandes_dict|get_item:client.id %}
+                                {% for cmd_data in commandes_dict|get_item:client.id|get_item:plage_code %}
+                                <div style="margin-bottom: 6px; padding: 6px; background-color: #c8e6c9; border-left: 2px solid #4caf50; border-radius: 3px;">
+                                    <span style="font-size: 0.85em; color: #1b5e20; display: block; line-height: 1.4;">
+                                        {{ cmd_data.article }}
+                                    </span>
+                                </div>
+                                {% endfor %}
+                            {% endif %}
+                            <!-- Textarea pour saisir l'action -->
+                            <textarea 
+                                class="action-input" 
+                                id="action_{{ client.id }}_{{ plage_code }}" 
+                                placeholder="Saisir l'action après l'appel (ex: pas de reponse, pas de commande, ne plus rappeler...)"
+                                rows="3"
+                            ></textarea>
+                        </td>
+                        
+                        <!-- Colonne Actions (boutons Enregistrer et Passer Commande) -->
+                        <td style="text-align: center;">
                                 <button 
-                                    class="btn btn-save" 
-                                    id="btn_save_new_{{ client.id }}"
-                                    onclick="sauvegarderAction({{ client.id }})"
+                                class="btn btn-save btn-sauvegarder-action" 
+                                data-client-id="{{ client.id }}"
+                                data-plage-code="{{ plage_code }}"
+                                style="width: 100%; box-sizing: border-box;"
                                 >
                                     <i class="fas fa-save"></i> Enregistrer
-                                    <span id="saving_new_{{ client.id }}" class="saving-indicator" style="display: none;">
-                                        <i class="fas fa-spinner"></i>
-                                    </span>
-                                    <span id="saved_new_{{ client.id }}" class="saved-check" style="display: none;">
-                                        <i class="fas fa-check-circle"></i>
-                                    </span>
                                 </button>
                                 <a 
                                     href="{% url 'enregistrer_commande' %}?client_id={{ client.id }}" 
                                     class="btn btn-success"
-                                    style="display: block; width: 100%; text-align: center; margin-top: 5px;"
+                                style="display: block; width: 100%; text-align: center; padding: 10px 16px; font-size: 0.95em; box-sizing: border-box; margin-top: 8px;"
                                 >
                                     <i class="fas fa-shopping-cart"></i> Passer Commande
                                 </a>
                             </td>
+                        {% endfor %}
+                        
+                        <!-- Colonne Total -->
+                        <td class="total-cell">
+                            {% if client.id in commandes_totaux %}
+                                <strong>{{ commandes_totaux|get_item:client.id|floatformat:0 }} FCFA</strong>
+                            {% else %}
+                                <strong>0 FCFA</strong>
+                            {% endif %}
+                        </td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -397,12 +538,9 @@
             }, 3000);
         }
         
-        function sauvegarderAction(clientId) {
-            const actionInput = document.getElementById('action_new_' + clientId);
-            const heureAppelInput = document.getElementById('heure_appel_new_' + clientId);
-            const saveButton = document.getElementById('btn_save_new_' + clientId);
-            const savingIndicator = document.getElementById('saving_new_' + clientId);
-            const savedCheck = document.getElementById('saved_new_' + clientId);
+        function sauvegarderAction(clientId, plageCode) {
+            const actionInput = document.getElementById('action_' + clientId + '_' + plageCode);
+            const heureAppelInput = document.getElementById('heure_appel_' + clientId + '_' + plageCode);
             
             const action = actionInput.value.trim();
             const heureAppel = heureAppelInput.value;
@@ -413,11 +551,6 @@
                 return;
             }
             
-            // Afficher l'indicateur de chargement
-            saveButton.disabled = true;
-            savingIndicator.style.display = 'inline-block';
-            savedCheck.style.display = 'none';
-            
             // Récupérer la date sélectionnée dans le filtre
             const dateSelectionnee = document.getElementById('date-select').value;
             
@@ -425,8 +558,16 @@
             formData.append('client_id', clientId);
             formData.append('action', action);
             formData.append('heure_appel', heureAppel);
-            formData.append('date_action', dateSelectionnee); // Envoyer la date sélectionnée
+            formData.append('plage_horaire', plageCode);
+            formData.append('date_action', dateSelectionnee);
             formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            
+            // Trouver le bouton qui a déclenché l'action
+            const saveButton = document.querySelector('[data-client-id="' + clientId + '"][data-plage-code="' + plageCode + '"].btn-sauvegarder-action');
+            if (saveButton) {
+                saveButton.disabled = true;
+                saveButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enregistrement...';
+            }
             
             fetch('{% url "sauvegarder_action_client" %}', {
                 method: 'POST',
@@ -434,54 +575,101 @@
             })
             .then(response => response.json())
             .then(data => {
-                // Masquer l'indicateur de chargement
-                savingIndicator.style.display = 'none';
+                if (saveButton) {
                 saveButton.disabled = false;
+                    saveButton.innerHTML = '<i class="fas fa-save"></i> Enregistrer';
+                }
                 
                 if (data.success) {
-                    // Afficher le check de succès
-                    savedCheck.style.display = 'inline-block';
-                    setTimeout(() => {
-                        savedCheck.style.display = 'none';
-                    }, 2000);
-                    
-                    // Afficher le toast de confirmation
                     showToast('✓ Appel enregistré avec succès !');
-                    
-                    // Animation de confirmation sur les champs
-                    actionInput.style.borderColor = '#28a745';
-                    actionInput.style.backgroundColor = '#d4edda';
-                    heureAppelInput.style.borderColor = '#28a745';
-                    heureAppelInput.style.backgroundColor = '#d4edda';
-                    
+                    // Réinitialiser les champs
+                    actionInput.value = '';
+                    heureAppelInput.value = '';
+                    // Recharger la page pour afficher la nouvelle action
                     setTimeout(() => {
-                        // Réinitialiser les champs pour permettre une nouvelle saisie
-                        actionInput.value = '';
-                        heureAppelInput.value = '';
-                        
-                        // Remettre les styles par défaut
-                        actionInput.style.borderColor = '#e1e8ed';
-                        actionInput.style.backgroundColor = 'white';
-                        heureAppelInput.style.borderColor = '#e1e8ed';
-                        heureAppelInput.style.backgroundColor = 'white';
-                        
-                        // Recharger la page pour afficher la nouvelle action en conservant les filtres
                         const zone = document.getElementById('zone-select').value;
                         const date = document.getElementById('date-select').value;
                         let url = '{% url "suivi_client" %}?';
                         if (zone) url += 'zone=' + encodeURIComponent(zone) + '&';
-                        if (date) url += 'date=' + encodeURIComponent(date);
+                        if (date) url += 'date_selectionnee=' + encodeURIComponent(date);
                         window.location.href = url;
-                    }, 1500);
+                    }, 500);
                 } else {
                     showToast('Erreur : ' + data.error, true);
                 }
             })
             .catch(error => {
                 console.error('Erreur:', error);
-                savingIndicator.style.display = 'none';
+                if (saveButton) {
                 saveButton.disabled = false;
+                    saveButton.innerHTML = '<i class="fas fa-save"></i> Enregistrer';
+                }
                 showToast('Une erreur est survenue lors de l\'enregistrement.', true);
+            });
+        }
+        
+        // Écouteurs d'événements pour les boutons
+        document.addEventListener('DOMContentLoaded', function() {
+            // Boutons de sauvegarde
+            document.querySelectorAll('.btn-sauvegarder-action').forEach(function(button) {
+                button.addEventListener('click', function() {
+                    const clientId = this.getAttribute('data-client-id');
+                    const plageCode = this.getAttribute('data-plage-code');
+                    sauvegarderAction(clientId, plageCode);
+                });
+            });
+            
+            // Boutons de modification
+            document.querySelectorAll('.btn-modifier-action').forEach(function(button) {
+                button.addEventListener('click', function() {
+                    const actionId = this.getAttribute('data-action-id');
+                    const clientId = this.getAttribute('data-client-id');
+                    const plageCode = this.getAttribute('data-plage-code');
+                    modifierAction(actionId, clientId, plageCode);
+                });
+            });
+        });
+        
+        function modifierAction(actionId, clientId, plageCode) {
+            // Récupérer les données de l'action existante et permettre la modification
+            const newAction = prompt('Modifier l\'action:', '');
+            const newHeure = prompt('Modifier l\'heure (HH:MM):', '');
+            
+            if (newAction === null && newHeure === null) {
+                return; // Annulé
+            }
+            
+            const formData = new FormData();
+            formData.append('action_id', actionId);
+            formData.append('client_id', clientId);
+            formData.append('action', newAction || '');
+            formData.append('heure_appel', newHeure || '');
+            formData.append('plage_horaire', plageCode);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            
+            fetch('{% url "modifier_action_client" %}', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('✓ Action modifiée avec succès !');
+                    setTimeout(() => {
+                        const zone = document.getElementById('zone-select').value;
+                        const date = document.getElementById('date-select').value;
+                        let url = '{% url "suivi_client" %}?';
+                        if (zone) url += 'zone=' + encodeURIComponent(zone) + '&';
+                        if (date) url += 'date_selectionnee=' + encodeURIComponent(date);
+                        window.location.href = url;
+                    }, 500);
+                } else {
+                    showToast('Erreur : ' + data.error, true);
+                }
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                showToast('Une erreur est survenue lors de la modification.', true);
             });
         }
     </script>

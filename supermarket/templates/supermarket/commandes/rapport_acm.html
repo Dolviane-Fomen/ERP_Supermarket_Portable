@@ -92,32 +92,44 @@
         }
         .table-container {
             background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             overflow-x: auto;
+            margin-bottom: 20px;
         }
         table {
             width: 100%;
             border-collapse: collapse;
             font-size: 0.9em;
+            min-width: 2200px;
+            background: transparent;
         }
         thead {
-            background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
-            color: white;
+            background-color: #008080;
         }
         th {
-            padding: 12px;
-            text-align: left;
-            font-weight: 600;
-            border: 1px solid rgba(255,255,255,0.3);
+            padding: 12px 10px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.9em;
+            border: 1px solid #000;
+            white-space: nowrap;
+            background-color: #008080;
+            color: white;
+            box-sizing: border-box;
+            vertical-align: middle;
         }
         td {
-            padding: 10px 12px;
-            border: 1px solid #e1e8ed;
+            padding: 8px;
+            border: 1px solid #000;
+            vertical-align: top;
+            background-color: #f5f5f5;
+            box-sizing: border-box;
+            overflow: visible;
         }
-        tbody tr:hover {
-            background-color: #f8f9fa;
+        tbody tr:hover td {
+            background-color: #f0f0f0;
         }
         .row-critical {
             background-color: #ffebee !important;
@@ -220,15 +232,37 @@
                         <i class="fas fa-file-excel"></i> Exporter en Excel
                     </a>
                 </div>
-                <table id="rapportTable">
+                <table id="rapportTable" style="border-collapse: collapse; width: 100%; min-width: 2200px;">
                     <thead>
+                        {% comment %} Première ligne d'en-têtes avec fusion des colonnes pour les plages horaires {% endcomment %}
                         <tr>
-                            <th>DETAIL</th>
-                            <th>REF</th>
-                            <th>POTENTIEL /5</th>
-                            <th>NOMS</th>
-                            <th>TELEPHONES</th>
-                            <th>06h30-08h30</th>
+                            <th rowspan="2">DETAIL</th>
+                            <th rowspan="2">REF</th>
+                            <th rowspan="2">POTENTIEL /5</th>
+                            <th rowspan="2">NOMS</th>
+                            <th rowspan="2">TELEPHONES</th>
+                            <th colspan="3">06h30-08h30</th>
+                            <th colspan="3">08h30-10h00</th>
+                            <th colspan="3">10h00-11h30</th>
+                            <th colspan="3">14h30-16h00</th>
+                            <th colspan="3">16h00-17h30</th>
+                            <th rowspan="2">TOTAL</th>
+                        </tr>
+                        {% comment %} Deuxième ligne d'en-têtes avec les sous-colonnes pour chaque plage horaire {% endcomment %}
+                        <tr>
+                            <th>Heure</th>
+                            <th>Commandes</th>
+                            <th>Total</th>
+                            <th>Heure</th>
+                            <th>Commandes</th>
+                            <th>Total</th>
+                            <th>Heure</th>
+                            <th>Commandes</th>
+                            <th>Total</th>
+                            <th>Heure</th>
+                            <th>Commandes</th>
+                            <th>Total</th>
+                            <th>Heure</th>
                             <th>Commandes</th>
                             <th>Total</th>
                         </tr>
@@ -259,48 +293,61 @@
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Erreur HTTP: ' + response.status);
+                }
+                return response.json();
+            })
             .then(data => {
                 loading.style.display = 'none';
                 
-                if (data.success && data.clients && data.clients.length > 0) {
+                console.log('Données reçues:', data); // Debug
+                
+                if (!data.success) {
+                    console.error('Erreur dans les données:', data.error);
+                    alert('Erreur: ' + (data.error || 'Erreur inconnue'));
+                    noData.style.display = 'block';
+                    return;
+                }
+                
+                if (data.clients && data.clients.length > 0) {
                     rapportBody.innerHTML = '';
                     
-                    // Grouper les clients par ID pour gérer plusieurs appels
-                    const clientsGrouped = {};
-                    data.clients.forEach(client => {
-                        if (!clientsGrouped[client.id]) {
-                            clientsGrouped[client.id] = {
-                                detail: client.detail || '',
-                                ref: client.ref || '',
-                                potentiel: client.potentiel || '',
-                                nom: client.nom,
-                                telephone: client.telephone,
-                                commandes: client.commandes || [],
-                                total: client.total || 0,
-                                appels: []
-                            };
-                        }
-                        // Ajouter l'appel à la liste
-                        if (client.heure_appel || client.action) {
-                            clientsGrouped[client.id].appels.push({
-                                heure_appel: client.heure_appel || '',
-                                action: client.action || ''
-                            });
-                        }
-                    });
+                    // Plages horaires dans l'ordre
+                    const plagesHoraires = [
+                        '06h30-08h30',
+                        '08h30-10h00',
+                        '10h00-11h30',
+                        '14h30-16h00',
+                        '16h00-17h30'
+                    ];
                     
-                    // Afficher les clients avec tous leurs appels
-                    Object.values(clientsGrouped).forEach(client => {
+                    // Afficher chaque client avec toutes ses plages horaires
+                    data.clients.forEach(client => {
+                        console.log('Client:', client.id, 'Actions par plage:', client.actions_par_plage); // Debug
+                        
                         // Déterminer la classe de ligne selon les actions
                         let rowClass = '';
-                        const hasCriticalAction = client.appels.some(a => 
-                            a.action.toLowerCase().includes('ne plus rappeler')
-                        );
-                        const hasSpecialAction = client.appels.some(a => 
-                            a.action.toLowerCase().includes('pas de commande') || 
-                            a.action.toLowerCase().includes('n\'appel plus')
-                        );
+                        let hasCriticalAction = false;
+                        let hasSpecialAction = false;
+                        
+                        // Vérifier toutes les actions de toutes les plages
+                        if (client.actions_par_plage) {
+                            Object.values(client.actions_par_plage).forEach(actionsList => {
+                                if (Array.isArray(actionsList)) {
+                                    actionsList.forEach(action => {
+                                        const actionLower = (action.action || '').toLowerCase();
+                                        if (actionLower.includes('ne plus rappeler')) {
+                                            hasCriticalAction = true;
+                                        }
+                                        if (actionLower.includes('pas de commande') || actionLower.includes('n\'appel plus')) {
+                                            hasSpecialAction = true;
+                                        }
+                                    });
+                                }
+                            });
+                        }
                         
                         if (hasCriticalAction) {
                             rowClass = 'row-critical';
@@ -308,76 +355,94 @@
                             rowClass = 'row-special';
                         }
                         
-                        // Afficher chaque appel avec uniquement son heure d'appel dans la colonne horaire
-                        client.appels.forEach((appel, index) => {
-                            const appelRow = document.createElement('tr');
-                            appelRow.className = rowClass;
-                            appelRow.innerHTML = `
-                                <td>${index === 0 ? client.detail : ''}</td>
-                                <td>${index === 0 ? client.ref : ''}</td>
-                                <td>${index === 0 ? client.potentiel : ''}</td>
-                                <td><strong>${index === 0 ? client.nom : ''}</strong></td>
-                                <td>${index === 0 ? client.telephone : ''}</td>
-                                <td>${appel.heure_appel || ''}</td>
-                                <td>${appel.action}</td>
-                                <td class="total-cell">${index === 0 ? client.total.toFixed(2) + ' FCFA' : ''}</td>
-                            `;
-                            rapportBody.appendChild(appelRow);
-                        });
+                        // Créer une ligne pour le client
+                        const clientRow = document.createElement('tr');
+                        clientRow.className = rowClass;
                         
-                        // Si pas d'appels mais des commandes, afficher quand même
-                        if (client.appels.length === 0 && client.commandes.length > 0) {
-                            const mainRow = document.createElement('tr');
-                            mainRow.className = rowClass;
-                            mainRow.innerHTML = `
+                        // Colonnes fixes
+                        let rowHTML = `
                                 <td>${client.detail || ''}</td>
                                 <td>${client.ref || ''}</td>
                                 <td>${client.potentiel || ''}</td>
-                                <td><strong>${client.nom}</strong></td>
-                                <td>${client.telephone}</td>
-                                <td></td>
-                                <td></td>
-                                <td class="total-cell">${client.total.toFixed(2)} FCFA</td>
-                            `;
-                            rapportBody.appendChild(mainRow);
-                        }
+                                <td><strong>${client.nom || ''}</strong></td>
+                                <td>${client.telephone || ''}</td>
+                        `;
                         
-                        // Lignes pour les commandes (seulement sur la première ligne)
-                        // Les articles d'une même commande sont sur une seule ligne
-                        if (client.commandes && client.commandes.length > 0 && client.appels.length > 0) {
-                            client.commandes.forEach(cmd => {
-                                const cmdRow = document.createElement('tr');
-                                cmdRow.className = rowClass + ' commande-row';
-                                cmdRow.innerHTML = `
-                                    <td></td>
-                                    <td></td>
-                                    <td></td>
-                                    <td>→ ${cmd.date} ${cmd.heure}</td>
-                                    <td></td>
-                                    <td></td>
-                                    <td>${cmd.articles}</td>
-                                    <td>${cmd.total.toFixed(2)} FCFA</td>
-                                `;
-                                rapportBody.appendChild(cmdRow);
-                            });
-                        } else if (client.commandes && client.commandes.length > 0) {
-                            // Si pas d'appels, afficher les commandes après la ligne principale
-                            client.commandes.forEach(cmd => {
-                                const cmdRow = document.createElement('tr');
-                                cmdRow.className = rowClass + ' commande-row';
-                                cmdRow.innerHTML = `
-                                    <td></td>
-                                    <td></td>
-                                    <td></td>
-                                    <td>→ ${cmd.date} ${cmd.heure}</td>
-                                    <td></td>
-                                    <td></td>
-                                    <td>${cmd.articles}</td>
-                                    <td>${cmd.total.toFixed(2)} FCFA</td>
-                                `;
-                                rapportBody.appendChild(cmdRow);
-                            });
-                        }
+                        // Pour chaque plage horaire
+                        plagesHoraires.forEach(plageCode => {
+                            // Récupérer les actions pour cette plage horaire
+                            let actionsList = [];
+                            if (client.actions_par_plage && client.actions_par_plage[plageCode]) {
+                                actionsList = Array.isArray(client.actions_par_plage[plageCode]) 
+                                    ? client.actions_par_plage[plageCode] 
+                                    : [];
+                            }
+                            
+                            // Récupérer les commandes pour cette plage horaire (une seule fois)
+                            let commandesList = [];
+                            if (client.commandes_par_plage && client.commandes_par_plage[plageCode]) {
+                                commandesList = Array.isArray(client.commandes_par_plage[plageCode]) 
+                                    ? client.commandes_par_plage[plageCode] 
+                                    : [];
+                            }
+                            
+                            // Colonne 1: Heure (actions + commandes)
+                            let heuresHTML = '';
+                            let heuresSet = new Set(); // Pour éviter les doublons
+                            
+                            // Ajouter les heures des actions
+                            if (actionsList && actionsList.length > 0) {
+                                actionsList.forEach(action => {
+                                    if (action && action.heure_appel) {
+                                        if (!heuresSet.has(action.heure_appel)) {
+                                            heuresSet.add(action.heure_appel);
+                                            heuresHTML += `<div style="margin-bottom: 4px; padding: 6px 8px; background-color: #e8f5e9; border-radius: 6px; font-size: 0.9em; color: #2e7d32; font-weight: 600; display: inline-block; min-width: 60px; text-align: center;">${action.heure_appel}</div>`;
+                                        }
+                                    }
+                                });
+                            }
+                            
+                            // Ajouter les heures des commandes pour cette plage horaire
+                            if (commandesList && commandesList.length > 0) {
+                                commandesList.forEach(cmd => {
+                                    if (cmd && cmd.heure && !heuresSet.has(cmd.heure)) {
+                                        heuresSet.add(cmd.heure);
+                                        heuresHTML += `<div style="margin-bottom: 4px; padding: 6px 8px; background-color: #e8f5e9; border-radius: 6px; font-size: 0.9em; color: #2e7d32; font-weight: 600; display: inline-block; min-width: 60px; text-align: center;">${cmd.heure}</div>`;
+                                    }
+                                });
+                            }
+                            
+                            rowHTML += `<td style="text-align: center;">${heuresHTML || ''}</td>`;
+                            
+                            // Colonne 2: Commandes (actions + commandes)
+                            let actionsHTML = '';
+                            if (actionsList && actionsList.length > 0) {
+                                actionsList.forEach(action => {
+                                    if (action && action.action) {
+                                        actionsHTML += `<div style="margin-bottom: 4px; padding: 6px; background-color: #fff8e1; border-left: 3px solid #ff9800; border-radius: 4px; font-size: 0.85em; color: #e65100; line-height: 1.4;">${action.action}</div>`;
+                                    }
+                                });
+                            }
+                            // Ajouter les commandes pour cette plage horaire
+                            if (commandesList && commandesList.length > 0) {
+                                commandesList.forEach(cmd => {
+                                    if (cmd && cmd.articles) {
+                                        actionsHTML += `<div style="margin-bottom: 4px; padding: 6px; background-color: #e8f5e9; border-left: 3px solid #2e7d32; border-radius: 4px; font-size: 0.85em; color: #1b5e20; line-height: 1.4; font-weight: 600;">${cmd.articles} (${cmd.date} ${cmd.heure})</div>`;
+                                    }
+                                });
+                            }
+                            rowHTML += `<td>${actionsHTML || ''}</td>`;
+                            
+                            // Colonne 3: Total pour cette plage horaire
+                            const totalPlage = (client.totaux_par_plage && client.totaux_par_plage[plageCode]) ? client.totaux_par_plage[plageCode] : 0;
+                            rowHTML += `<td style="text-align: right; font-weight: 600;">${totalPlage > 0 ? totalPlage.toFixed(0) + ' FCFA' : ''}</td>`;
+                        });
+                        
+                        // Colonne Total général
+                        rowHTML += `<td style="font-weight: 700; text-align: right; color: #1b5e20;">${(client.total || 0).toFixed(0)} FCFA</td>`;
+                        
+                        clientRow.innerHTML = rowHTML;
+                        rapportBody.appendChild(clientRow);
                     });
                     
                     results.style.display = 'block';
@@ -403,4 +468,8 @@
     </script>
 </body>
 </html>
+
+
+
+
 

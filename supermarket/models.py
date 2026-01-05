@@ -413,12 +413,30 @@ class FactureAchat(models.Model):
     
     def save(self, *args, **kwargs):
         """Override save pour gerer automatiquement la mise a jour du stock"""
+        # Vérifier si c'est une nouvelle facture ou une mise à jour
+        is_new = self.pk is None
+        
+        # Si c'est une mise à jour, vérifier si le statut a changé
+        statut_avant = None
+        if not is_new:
+            try:
+                ancienne_facture = FactureAchat.objects.get(pk=self.pk)
+                statut_avant = ancienne_facture.statut
+            except FactureAchat.DoesNotExist:
+                pass
+        
         # Appeler la méthode save parente
         super().save(*args, **kwargs)
         
         # Mettre a jour le stock automatiquement seulement si la facture est validée
+        # et si le statut vient de changer vers 'validee' (ou si c'est une nouvelle facture avec statut 'validee')
         if self.statut == 'validee':
-            self.mettre_a_jour_stock()
+            # Mettre à jour le stock si :
+            # 1. C'est une nouvelle facture avec statut 'validee'
+            # 2. Le statut vient de changer vers 'validee'
+            if is_new or (statut_avant and statut_avant != 'validee'):
+                print(f"[INFO] Facture {self.reference_achat} validée - Mise à jour du stock...")
+                self.mettre_a_jour_stock()
     
     def mettre_a_jour_stock(self):
         """Methode pour mettre a jour le stock des articles de cette facture"""
@@ -428,10 +446,43 @@ class FactureAchat(models.Model):
         for ligne in lignes:
             if ligne.article:
                 try:
+                    # IMPORTANT: Vérifier si un mouvement de stock existe déjà pour cette facture et cet article
+                    # pour éviter les mises à jour multiples
+                    # Cette vérification est cruciale lors des modifications pour éviter de réappliquer la quantité totale
+                    # 
+                    # On vérifie s'il existe un mouvement récent (moins de 5 secondes) pour cette facture et cet article
+                    # Si oui, on ignore car c'est probablement une modification qui a déjà été gérée manuellement
+                    mouvements_recents = MouvementStock.objects.filter(
+                        facture_achat=self,
+                        article=ligne.article,
+                        numero_piece=self.reference_achat,
+                        date_creation__gte=timezone.now() - timezone.timedelta(seconds=5)
+                    ).exists()
+                    
+                    if mouvements_recents:
+                        print(f"[INFO] Mouvement récent détecté pour {ligne.article.designation} - Facture {self.reference_achat}")
+                        print(f"[INFO] Ignorant mettre_a_jour_stock() car une modification récente a déjà été gérée manuellement")
+                        continue
+                    
+                    # Vérifier aussi s'il existe un mouvement quelconque pour cette facture et cet article
+                    # (pour les modifications plus anciennes)
+                    mouvement_existant = MouvementStock.objects.filter(
+                        facture_achat=self,
+                        article=ligne.article,
+                        numero_piece=self.reference_achat
+                    ).exists()
+                    
+                    if mouvement_existant:
+                        print(f"[INFO] Stock déjà mis à jour pour {ligne.article.designation} - Facture {self.reference_achat}")
+                        print(f"[INFO] Ignorant mettre_a_jour_stock() car un mouvement existe déjà (modification gérée manuellement)")
+                        continue
+                    
                     # Mettre a jour le stock de l'article
                     ancien_stock = ligne.article.stock_actuel
                     ligne.article.stock_actuel += ligne.quantite
                     ligne.article.dernier_prix_achat = ligne.prix_unitaire
+                    # Le suivi de stock est toujours activé automatiquement lors de toute modification du stock
+                    ligne.article.suivi_stock = True
                     ligne.article.save()
                     
                     # Créer un mouvement de stock pour la traçabilité
@@ -455,6 +506,8 @@ class FactureAchat(models.Model):
                     
                 except Exception as e:
                     print(f"[ERREUR] Erreur mise a jour stock automatique pour {ligne.article.designation}: {e}")
+                    import traceback
+                    traceback.print_exc()
     
     def valider_facture(self):
         """Méthode pour valider une facture et mettre à jour le stock"""
@@ -912,9 +965,18 @@ class Livreur(models.Model):
 
 class SuiviClientAction(models.Model):
     """Modèle pour suivre les actions des ACM sur les clients - Plusieurs appels possibles par client"""
+    PLAGE_HORAIRE_CHOICES = [
+        ('06h30-08h30', '06h30-08h30'),
+        ('08h30-10h00', '08h30-10h00'),
+        ('10h00-11h30', '10h00-11h30'),
+        ('14h30-16h00', '14h30-16h00'),
+        ('16h00-17h30', '16h00-17h30'),
+    ]
+    
     client = models.ForeignKey(Client, on_delete=models.CASCADE, verbose_name="Client", related_name='actions_suivi')
     agence = models.ForeignKey(Agence, on_delete=models.CASCADE, verbose_name="Agence")
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Créé par", related_name='actions_suivi_creees')
+    plage_horaire = models.CharField(max_length=20, choices=PLAGE_HORAIRE_CHOICES, blank=True, null=True, verbose_name="Plage horaire")
     heure_appel = models.TimeField(blank=True, null=True, verbose_name="Heure d'appel")
     action = models.TextField(verbose_name="Action/Commande", blank=True, null=True)
     date_action = models.DateTimeField(auto_now_add=True, verbose_name="Date de l'action")
@@ -928,7 +990,8 @@ class SuiviClientAction(models.Model):
     
     def __str__(self):
         heure_str = self.heure_appel.strftime('%H:%M') if self.heure_appel else 'N/A'
-        return f"Appel {heure_str} - {self.client.intitule} - {self.date_action.strftime('%d/%m/%Y')}"
+        plage = self.plage_horaire if self.plage_horaire else 'N/A'
+        return f"Appel {heure_str} ({plage}) - {self.client.intitule} - {self.date_action.strftime('%d/%m/%Y')}"
 
 
 class Livraison(models.Model):

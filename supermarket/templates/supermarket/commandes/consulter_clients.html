@@ -134,6 +134,11 @@
                             <a href="{% url 'modifier_client_commandes' client.id %}" class="btn btn-primary" style="padding: 5px 10px; font-size: 0.85em;">
                                 <i class="fas fa-edit"></i> Modifier
                             </a>
+                            <button class="btn btn-danger delete-btn" style="padding: 5px 10px; font-size: 0.85em;" 
+                                    data-client-id="{{ client.id }}" 
+                                    data-client-name="{{ client.intitule|escapejs }}">
+                                <i class="fas fa-trash"></i> Supprimer
+                            </button>
                         </td>
                     </tr>
                     {% endfor %}
@@ -147,6 +152,56 @@
             {% endif %}
         </div>
     </div>
+
+<!-- Modal de confirmation de suppression -->
+<div id="deleteModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
+    <div style="background: white; border-radius: 15px; padding: 30px; max-width: 500px; width: 90%; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+        <h3 style="color: #dc3545; margin-bottom: 15px;">
+            <i class="fas fa-exclamation-triangle"></i> Confirmer la suppression
+        </h3>
+        <p style="margin-bottom: 10px;">Êtes-vous sûr de vouloir supprimer le client <strong id="clientName"></strong> ?</p>
+        <p style="color: #dc3545; font-weight: 600; margin-bottom: 20px;">Cette action est irréversible !</p>
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <button onclick="closeDeleteModal()" class="btn btn-secondary" style="padding: 10px 20px;">Annuler</button>
+            <form id="deleteForm" method="POST" style="display: inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger" style="padding: 10px 20px;">
+                    <i class="fas fa-trash"></i> Supprimer
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmDelete(clientId, clientName) {
+    document.getElementById('clientName').textContent = clientName;
+    document.getElementById('deleteForm').action = "{% url 'supprimer_client_commandes' 0 %}".replace('0', clientId);
+    document.getElementById('deleteModal').style.display = 'flex';
+}
+
+function closeDeleteModal() {
+    document.getElementById('deleteModal').style.display = 'none';
+}
+
+// Fermer le modal en cliquant en dehors
+document.getElementById('deleteModal')?.addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeDeleteModal();
+    }
+});
+
+// Attacher les événements de suppression aux boutons
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.delete-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var clientId = this.getAttribute('data-client-id');
+            var clientName = this.getAttribute('data-client-name');
+            confirmDelete(clientId, clientName);
+        });
+    });
+});
+</script>
 </body>
 </html>
 

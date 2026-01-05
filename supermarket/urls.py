@@ -229,6 +229,7 @@ urlpatterns = [
     path('stock/defacturer/<int:facture_id>/', defacturation_views.defacturer_vente_confirmation, name='defacturer_confirmation'),
     path('stock/defacturer/<int:facture_id>/confirmer/', defacturation_views.defacturer_vente, name='defacturer_vente'),
     path('stock/defacturer/<int:facture_id>/ligne/<int:ligne_id>/', defacturation_views.defacturer_ligne_vente, name='defacturer_ligne_vente'),
+    path('stock/defacturer/<int:facture_id>/sans-retour/', defacturation_views.defacturer_vente_sans_retour_stock, name='defacturer_vente_sans_retour'),
     
     # Export/Import des Données
     path('export-import/', views.export_import_page, name='export_import_page'),

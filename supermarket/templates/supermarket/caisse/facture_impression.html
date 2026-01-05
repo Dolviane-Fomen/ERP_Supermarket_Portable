@@ -117,7 +117,7 @@
             justify-content: space-between;
             align-items: flex-start;
             font-size: 11px;
-            gap: 3px;
+            gap: 15px;
         }
         
         .article-name {
@@ -136,8 +136,9 @@
             white-space: nowrap;
             flex-shrink: 0;
             text-align: center;
-            min-width: 60px;
-            max-width: 60px;
+            min-width: 75px;
+            max-width: 75px;
+            padding-right: 10px;
         }
         
         .article-price {
@@ -146,8 +147,9 @@
             white-space: nowrap;
             flex-shrink: 0;
             text-align: right;
-            min-width: 70px;
-            max-width: 70px;
+            min-width: 75px;
+            max-width: 75px;
+            padding-left: 10px;
         }
         
         /* TOTAUX STYLE SAGE */
@@ -317,8 +319,8 @@
         <!-- ARTICLES -->
         <div class="article-header">
             <span style="flex: 1;">ARTICLE</span>
-            <span style="width: 60px; text-align: center;">QTE x PU</span>
-            <span style="width: 70px; text-align: right;">TOTAL</span>
+            <span style="width: 75px; text-align: center; padding-right: 10px;">QTE x PU</span>
+            <span style="width: 75px; text-align: right; padding-left: 10px;">TOTAL</span>
         </div>
         
         {% for ligne in facture.lignes %}

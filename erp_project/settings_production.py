@@ -6,6 +6,7 @@ from .settings import *
 import os
 from pathlib import Path
 import dj_database_url
+from decouple import config
 
 # ============================================
 # SÉCURITÉ - CRITIQUE EN PRODUCTION
@@ -13,10 +14,10 @@ import dj_database_url
 DEBUG = False
 
 # SECRET_KEY doit être dans les variables d'environnement
-SECRET_KEY = os.environ.get('SECRET_KEY', 'changez-moi-en-production-avec-une-cle-secrete-longue-et-aleatoire')
+SECRET_KEY = config('SECRET_KEY', default='changez-moi-en-production-avec-une-cle-secrete-longue-et-aleatoire')
 
 # Domaines autorisés - À MODIFIER avec votre domaine
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
 
 # ============================================
 # BASE DE DONNÉES
@@ -33,15 +34,15 @@ if 'DATABASE_URL' in os.environ:
         )
     }
 else:
-    # Fallback pour autres environnements (Azure, etc.)
+    # Fallback pour autres environnements (Azure, OVH, etc.)
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.environ.get('DB_NAME', 'erp_db'),
-            'USER': os.environ.get('DB_USER', 'erp_user'),
-            'PASSWORD': os.environ.get('DB_PASSWORD', ''),
-            'HOST': os.environ.get('DB_HOST', 'localhost'),
-            'PORT': os.environ.get('DB_PORT', '5432'),
+            'NAME': config('DB_NAME', default='erp_db'),
+            'USER': config('DB_USER', default='erp_user'),
+            'PASSWORD': config('DB_PASSWORD', default=''),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
             'OPTIONS': {
                 'connect_timeout': 10,
             },
@@ -61,7 +62,7 @@ else:
 # HTTPS ET SÉCURITÉ
 # ============================================
 # Redirection HTTPS (activer après configuration SSL)
-SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'False').lower() == 'true'
+SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default='False', cast=bool)
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_BROWSER_XSS_FILTER = True
@@ -175,6 +176,6 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 # TIMEZONE
 # ============================================
 # Ajustez selon votre localisation
-TIME_ZONE = os.environ.get('TIME_ZONE', 'UTC')
+TIME_ZONE = config('TIME_ZONE', default='UTC')
 USE_TZ = True
 
