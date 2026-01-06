@@ -111,6 +111,25 @@
                 {% endfor %}
             {% endif %}
 
+            <!-- Barre de recherche -->
+            <div style="margin-bottom: 20px;">
+                <form method="GET" style="display: flex; gap: 10px; align-items: center;">
+                    <input type="text" 
+                           name="search" 
+                           placeholder="Rechercher un client (nom, téléphone, email, adresse)..." 
+                           value="{{ search_query }}"
+                           style="flex: 1; padding: 10px; border: 2px solid #e1e8ed; border-radius: 8px; font-size: 1em;">
+                    <button type="submit" class="btn btn-info" style="padding: 10px 20px;">
+                        <i class="fas fa-search"></i> Rechercher
+                    </button>
+                    {% if search_query %}
+                        <a href="{% url 'consulter_clients_commandes' %}" class="btn btn-secondary" style="padding: 10px 20px;">
+                            <i class="fas fa-times"></i> Effacer
+                        </a>
+                    {% endif %}
+                </form>
+            </div>
+
             {% if clients %}
             <table>
                 <thead>
@@ -144,10 +163,38 @@
                     {% endfor %}
                 </tbody>
             </table>
+
+            <!-- Pagination -->
+            {% if page_obj.has_other_pages %}
+            <div style="margin-top: 30px; display: flex; justify-content: center; align-items: center; gap: 10px;">
+                {% if page_obj.has_previous %}
+                    <a href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}" class="btn btn-secondary" style="padding: 8px 15px;">
+                        <i class="fas fa-angle-double-left"></i> Première
+                    </a>
+                    <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" class="btn btn-secondary" style="padding: 8px 15px;">
+                        <i class="fas fa-angle-left"></i> Précédent
+                    </a>
+                {% endif %}
+                
+                <span style="padding: 8px 15px; background: #f8f9fa; border-radius: 8px; font-weight: 600;">
+                    Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+                </span>
+                
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" class="btn btn-secondary" style="padding: 8px 15px;">
+                        Suivant <i class="fas fa-angle-right"></i>
+                    </a>
+                    <a href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}" class="btn btn-secondary" style="padding: 8px 15px;">
+                        Dernière <i class="fas fa-angle-double-right"></i>
+                    </a>
+                {% endif %}
+            </div>
+            {% endif %}
+
             {% else %}
             <div class="empty-state">
                 <i class="fas fa-users"></i>
-                <p>Aucun client trouvé</p>
+                <p>{% if search_query %}Aucun client trouvé pour "{{ search_query }}"{% else %}Aucun client trouvé{% endif %}</p>
             </div>
             {% endif %}
         </div>

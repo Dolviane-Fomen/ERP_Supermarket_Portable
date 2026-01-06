@@ -4405,7 +4405,7 @@ def consulter_clients(request):
     search_query = request.GET.get('search', '')
     agence_filter = request.GET.get('agence_filter', '')
     
-    # Construire la requête de base
+    # Construire la requête de base - Limiter aux clients de l'agence de l'utilisateur
     clients = Client.objects.filter(agence=agence)
     
     # Appliquer les filtres
@@ -6976,6 +6976,8 @@ def enregistrer_client(request):
 @require_commandes_feature('gestion_client')
 def consulter_clients_commandes(request):
     """Vue pour consulter les clients dans le module commandes"""
+    from django.core.paginator import Paginator
+    
     agence = get_user_agence(request)
     if not agence:
         messages.error(request, 'Votre compte n\'est pas correctement lié à une agence.')
@@ -6986,19 +6988,31 @@ def consulter_clients_commandes(request):
         messages.error(request, 'Votre compte n\'est pas configuré correctement.')
         return redirect('login_commandes')
     
+    # Récupérer les paramètres de recherche
+    search_query = request.GET.get('search', '')
+    
+    # Construire la requête de base - Tous les clients de l'agence (plus de filtre ACM restrictif)
     clients = Client.objects.filter(agence=agence).order_by('intitule')
     
-    # Si ACM, filtrer pour ne montrer que les clients qu'il a suivis
-    if compte.type_compte == 'acm':
-        clients_ids = SuiviClientAction.objects.filter(
-            agence=agence,
-            created_by=compte.user
-        ).values_list('client_id', flat=True).distinct()
-        clients = clients.filter(id__in=clients_ids)
+    # Appliquer le filtre de recherche
+    if search_query:
+        clients = clients.filter(
+            Q(intitule__icontains=search_query) |
+            Q(telephone__icontains=search_query) |
+            Q(email__icontains=search_query) |
+            Q(adresse__icontains=search_query)
+        )
+    
+    # Pagination - 20 clients par page
+    paginator = Paginator(clients, 20)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
     
     context = {
-        'clients': clients,
+        'clients': page_obj,
         'agence': agence,
+        'search_query': search_query,
+        'page_obj': page_obj,
     }
     return render(request, 'supermarket/commandes/consulter_clients.html', context)
 

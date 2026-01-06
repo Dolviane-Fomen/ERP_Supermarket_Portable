@@ -3941,7 +3941,7 @@ def consulter_clients(request):
     search_query = request.GET.get('search', '')
     agence_filter = request.GET.get('agence_filter', '')
     
-    # Construire la requête de base
+    # Construire la requête de base - Limiter aux clients de l'agence de l'utilisateur
     clients = Client.objects.filter(agence=agence)
     
     # Appliquer les filtres
