@@ -8421,11 +8421,15 @@ def suivi_client(request):
     # Récupérer les commandes avec leurs détails (articles, quantités, heures)
     commandes_dict = {}
     commandes_totaux = {}
+    # Utiliser distinct() pour éviter les doublons et regrouper par client, date, heure, article
     commandes = Commande.objects.filter(
         agence=agence,
         client__in=clients,
         date=date_selectionnee
-    ).select_related('client', 'article').order_by('client', 'heure')
+    ).select_related('client', 'article').order_by('client', 'heure', 'article').distinct()
+    
+    # Utiliser un set pour éviter de compter deux fois la même commande
+    commandes_deja_comptees = set()
     
     for cmd in commandes:
         client_id = cmd.client.id
@@ -8439,6 +8443,14 @@ def suivi_client(request):
         if plage_code not in commandes_dict[client_id]:
             commandes_dict[client_id][plage_code] = []
         
+        # Créer une clé unique pour éviter les doublons : (client_id, date, heure, article_id)
+        cmd_key = (client_id, str(cmd.date), str(cmd.heure) if cmd.heure else '', cmd.article.id if cmd.article else None)
+        
+        # Ne compter qu'une seule fois chaque commande unique
+        if cmd_key not in commandes_deja_comptees:
+            commandes_totaux[client_id] += float(cmd.prix_total)
+            commandes_deja_comptees.add(cmd_key)
+        
         # Formater les informations de la commande
         quantite_int = int(cmd.quantite) if cmd.quantite else 0
         article_str = f"{cmd.article.designation if cmd.article else 'N/A'}*{quantite_int}PCS (Qté: {float(cmd.quantite)}) ({cmd.date.strftime('%d/%m/%Y')} {cmd.heure.strftime('%H:%M') if cmd.heure else ''})"
@@ -8449,8 +8461,6 @@ def suivi_client(request):
             'quantite': float(cmd.quantite),
             'prix_total': float(cmd.prix_total),
         })
-        
-        commandes_totaux[client_id] += float(cmd.prix_total)
     
     context = {
         'agence': agence,
@@ -8486,14 +8496,6 @@ def sauvegarder_action_client(request):
             from django.utils import timezone
             from datetime import datetime
             
-            heure_appel = None
-            if heure_appel_str:
-                try:
-                    # Format attendu: HH:MM (ex: 07:30)
-                    heure_appel = datetime.strptime(heure_appel_str, '%H:%M').time()
-                except ValueError:
-                    pass
-            
             # Récupérer la date depuis le POST, sinon utiliser la date/heure actuelle
             date_action_str = request.POST.get('date_action', '')
             if date_action_str:
@@ -8507,12 +8509,37 @@ def sauvegarder_action_client(request):
             else:
                 date_action = timezone.now()
             
+            # Remplir automatiquement l'heure si un commentaire est saisi
+            heure_appel = None
+            if action:  # Si un commentaire/action est saisi
+                # Utiliser l'heure fournie par le navigateur (heure locale)
+                if heure_appel_str:
+                    try:
+                        # Format attendu: HH:MM (ex: 07:30) - heure locale du navigateur
+                        heure_appel = datetime.strptime(heure_appel_str, '%H:%M').time()
+                    except ValueError:
+                        # Si erreur, utiliser l'heure actuelle du serveur
+                        heure_appel = timezone.now().time()
+                else:
+                    # Si pas d'heure fournie, utiliser l'heure actuelle du serveur
+                    heure_appel = timezone.now().time()
+            elif heure_appel_str:  # Sinon, utiliser l'heure fournie manuellement (si nécessaire)
+                try:
+                    # Format attendu: HH:MM (ex: 07:30)
+                    heure_appel = datetime.strptime(heure_appel_str, '%H:%M').time()
+                except ValueError:
+                    pass
+            
+            # Récupérer la plage horaire depuis le POST
+            plage_horaire = request.POST.get('plage_horaire', '').strip()
+            
             # Créer une nouvelle action (plusieurs appels possibles par client)
             suivi_action = SuiviClientAction.objects.create(
                 client=client,
                 agence=agence,
                 action=action,
                 heure_appel=heure_appel,
+                plage_horaire=plage_horaire if plage_horaire else None,
                 date_action=date_action,
                 created_by=request.user  # Enregistrer qui a créé l'action
             )
@@ -8559,15 +8586,29 @@ def modifier_action_client(request):
             from django.utils import timezone
             from datetime import datetime
             
+            # Remplir automatiquement l'heure si un commentaire est modifié
             heure_appel = None
-            if heure_appel_str:
+            if action:  # Si un commentaire/action est saisi
+                # Utiliser l'heure fournie par le navigateur (heure locale)
+                if heure_appel_str:
+                    try:
+                        # Format attendu: HH:MM (ex: 07:30) - heure locale du navigateur
+                        heure_appel = datetime.strptime(heure_appel_str, '%H:%M').time()
+                    except ValueError:
+                        # Si erreur, utiliser l'heure actuelle du serveur
+                        heure_appel = timezone.now().time()
+                else:
+                    # Si pas d'heure fournie, utiliser l'heure actuelle du serveur
+                    heure_appel = timezone.now().time()
+            elif heure_appel_str:  # Sinon, utiliser l'heure fournie manuellement (si nécessaire)
                 try:
                     heure_appel = datetime.strptime(heure_appel_str, '%H:%M').time()
                 except ValueError:
                     pass
             
             suivi_action.action = action
-            suivi_action.heure_appel = heure_appel
+            if heure_appel:
+                suivi_action.heure_appel = heure_appel
             suivi_action.save()
             
             return JsonResponse({

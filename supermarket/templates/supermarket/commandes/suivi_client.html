@@ -429,13 +429,15 @@
                                 </div>
                                 {% endfor %}
                             {% endif %}
-                            <!-- Champ de saisie de l'heure -->
+                            <!-- Champ de saisie de l'heure (caché, rempli automatiquement) -->
                             <input 
-                                type="time" 
+                                type="hidden" 
                                 id="heure_appel_{{ client.id }}_{{ plage_code }}" 
                                 class="heure-appel-input"
-                                placeholder="--:--"
                             />
+                            <span id="heure_display_{{ client.id }}_{{ plage_code }}" class="heure-display" style="display: block; font-weight: 600; color: #06beb6;">
+                                --:--
+                            </span>
                         </td>
                         
                         <!-- Colonne Commandes (textarea pour l'action et articles commandés) -->
@@ -473,6 +475,7 @@
                                 id="action_{{ client.id }}_{{ plage_code }}" 
                                 placeholder="Saisir l'action après l'appel (ex: pas de reponse, pas de commande, ne plus rappeler...)"
                                 rows="3"
+                                oninput="updateHeureAuto('{{ client.id }}', '{{ plage_code }}')"
                             ></textarea>
                         </td>
                         
@@ -538,18 +541,48 @@
             }, 3000);
         }
         
+        // Fonction pour remplir automatiquement l'heure lors de la saisie d'un commentaire
+        function updateHeureAuto(clientId, plageCode) {
+            const actionInput = document.getElementById('action_' + clientId + '_' + plageCode);
+            const heureAppelInput = document.getElementById('heure_appel_' + clientId + '_' + plageCode);
+            const heureDisplay = document.getElementById('heure_display_' + clientId + '_' + plageCode);
+            
+            const action = actionInput.value.trim();
+            
+            // Si un commentaire est saisi, remplir automatiquement l'heure actuelle
+            if (action) {
+                const now = new Date();
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const heureActuelle = hours + ':' + minutes;
+                
+                heureAppelInput.value = heureActuelle;
+                heureDisplay.textContent = heureActuelle;
+                heureDisplay.style.color = '#06beb6';
+            } else {
+                heureAppelInput.value = '';
+                heureDisplay.textContent = '--:--';
+                heureDisplay.style.color = '#6c757d';
+            }
+        }
+        
         function sauvegarderAction(clientId, plageCode) {
             const actionInput = document.getElementById('action_' + clientId + '_' + plageCode);
             const heureAppelInput = document.getElementById('heure_appel_' + clientId + '_' + plageCode);
             
             const action = actionInput.value.trim();
-            const heureAppel = heureAppelInput.value;
             
-            // Vérifier qu'au moins l'heure ou l'action est remplie
-            if (!action && !heureAppel) {
-                showToast('Veuillez remplir au moins l\'heure d\'appel ou l\'action.', true);
+            // Vérifier qu'au moins l'action est remplie
+            if (!action) {
+                showToast('Veuillez saisir un commentaire.', true);
                 return;
             }
+            
+            // Toujours remplir automatiquement l'heure si un commentaire est saisi
+            updateHeureAuto(clientId, plageCode);
+            
+            // Récupérer l'heure après la mise à jour automatique
+            const heureAppel = heureAppelInput.value;
             
             // Récupérer la date sélectionnée dans le filtre
             const dateSelectionnee = document.getElementById('date-select').value;
@@ -585,6 +618,11 @@
                     // Réinitialiser les champs
                     actionInput.value = '';
                     heureAppelInput.value = '';
+                    const heureDisplay = document.getElementById('heure_display_' + clientId + '_' + plageCode);
+                    if (heureDisplay) {
+                        heureDisplay.textContent = '--:--';
+                        heureDisplay.style.color = '#6c757d';
+                    }
                     // Recharger la page pour afficher la nouvelle action
                     setTimeout(() => {
                         const zone = document.getElementById('zone-select').value;
