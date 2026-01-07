@@ -8,6 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Sum, Max, Q, F
 from django.db import models, connection, IntegrityError, transaction
 from django.utils import timezone
+from django.conf import settings
 from datetime import datetime, time
 import json
 from decimal import Decimal
@@ -2060,18 +2061,22 @@ def detail_factures(request):
     print(f"DEBUG: Aujourd'hui - Factures: {factures_aujourd_hui}, CA: {ca_aujourd_hui}")
     
     # Vérifier si l'utilisateur a accès à la défacturation orange
-    # Seulement pour admin1 dans l'agence MARCHE HUITIEME
-    # Masquer pour TOUS les autres utilisateurs, même ceux de l'agence MARCHE HUITIEME
+    # Cette fonctionnalité est masquée par défaut et nécessite une variable d'environnement
+    # pour être activée (voir settings.py - ENABLE_DEFACTURATION_SANS_RETOUR)
     can_defacturer_sans_retour = False
-    if request.user.username == 'admin1':
-        # Vérifier que l'agence est bien MARCHE HUITIEME
-        if agence and 'huitieme' in agence.nom_agence.lower():
-            can_defacturer_sans_retour = True
-            print(f"[ACCÈS] Utilisateur {request.user.username} autorisé pour défacturation orange")
+    if getattr(settings, 'ENABLE_DEFACTURATION_SANS_RETOUR', False):
+        # Seulement pour admin1 dans l'agence MARCHE HUITIEME
+        if request.user.username == 'admin1':
+            # Vérifier que l'agence est bien MARCHE HUITIEME
+            if agence and 'huitieme' in agence.nom_agence.lower():
+                can_defacturer_sans_retour = True
+                print(f"[ACCÈS] Utilisateur {request.user.username} autorisé pour défacturation orange")
+            else:
+                print(f"[ACCÈS] Utilisateur {request.user.username} non autorisé - Agence: {agence.nom_agence if agence else 'None'}")
         else:
-            print(f"[ACCÈS] Utilisateur {request.user.username} non autorisé - Agence: {agence.nom_agence if agence else 'None'}")
+            print(f"[ACCÈS] Utilisateur {request.user.username} non autorisé - Seul admin1 peut accéder")
     else:
-        print(f"[ACCÈS] Utilisateur {request.user.username} non autorisé - Seul admin1 peut accéder")
+        print(f"[ACCÈS] Fonctionnalité défacturation sans retour désactivée (masquée pour GitHub)")
     
     context = {
 

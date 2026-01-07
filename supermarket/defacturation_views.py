@@ -8,6 +8,7 @@ from django.contrib import messages
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Sum
+from django.conf import settings
 from decimal import Decimal
 from .models import FactureVente, LigneFactureVente, MouvementStock, Article
 from .views import get_user_agence
@@ -230,83 +231,12 @@ def defacturer_vente_confirmation(request, facture_id):
         return redirect('detail_factures')
 
 
-@login_required
-def defacturer_vente_sans_retour_stock(request, facture_id):
-    """Vue pour défacturer une vente SANS retourner le stock en magasin"""
-    # Vérifier que seul admin1 dans l'agence MARCHE HUITIEME peut accéder
-    if request.user.username != 'admin1':
-        messages.error(request, 'Accès refusé. Cette fonctionnalité est réservée à l\'administrateur.')
+try:
+    from .defacturation_views_private import defacturer_vente_sans_retour_stock
+except ImportError:
+    def defacturer_vente_sans_retour_stock(request, facture_id):
+        messages.error(request, 'Cette fonctionnalité n\'est pas disponible.')
         return redirect('detail_factures')
-    
-    try:
-        agence = get_user_agence(request)
-        if not agence or 'huitieme' not in agence.nom_agence.lower():
-            messages.error(request, 'Accès refusé. Cette fonctionnalité est réservée à l\'agence MARCHE HUITIEME.')
-            return redirect('detail_factures')
-    except:
-        messages.error(request, 'Agence non trouvée.')
-        return redirect('detail_factures')
-    
-    try:
-        # Récupérer la facture
-        facture = FactureVente.objects.get(id=facture_id, agence=agence)
-        
-        # Vérifier que la facture n'est pas déjà annulée
-        if hasattr(facture, 'annulee') and facture.annulee:
-            messages.error(request, 'Cette facture est déjà annulée.')
-            return redirect('detail_factures')
-        
-        # Utiliser une transaction pour s'assurer de la cohérence
-        with transaction.atomic():
-            print(f"[DÉFACTURATION SANS RETOUR] Début de la défacturation de la facture {facture.numero_ticket}")
-            
-            # 1. Récupérer toutes les lignes de la facture
-            lignes = LigneFactureVente.objects.filter(facture_vente=facture)
-            print(f"[DÉFACTURATION SANS RETOUR] {lignes.count()} lignes à traiter")
-            
-            # 2. Supprimer uniquement les mouvements de retour éventuels
-            # Le mouvement de facturation (Sortie) doit RESTER visible dans les mouvements de stock
-            numero_ticket = facture.numero_ticket
-            
-            # Supprimer seulement les mouvements de retour qui pourraient référencer cette facture
-            # (au cas où une défacturation avec retour aurait été faite avant)
-            mouvements_retour = MouvementStock.objects.filter(
-                numero_piece__in=[f"RETOUR-{numero_ticket}", f"DEFACT-{numero_ticket}"]
-            )
-            nombre_retours = mouvements_retour.count()
-            mouvements_retour.delete()
-            
-            if nombre_retours > 0:
-                print(f"[DÉFACTURATION SANS RETOUR] {nombre_retours} mouvement(s) de retour supprimé(s)")
-            
-            # Le mouvement de facturation (Sortie) reste dans les mouvements de stock
-            print(f"[DÉFACTURATION SANS RETOUR] Le mouvement de facturation reste visible dans les mouvements de stock")
-            
-            # 3. Supprimer la facture et ses lignes SANS créer de nouveau mouvement de stock
-            # Cette défacturation ne doit pas apparaître dans les mouvements de stock
-            # pour que le mouvement continue normalement avec le solde après la facturation
-            
-            # Supprimer les lignes de facture
-            lignes.delete()
-            print(f"[DÉFACTURATION SANS RETOUR] Lignes de facture supprimées")
-            
-            # Supprimer la facture
-            facture.delete()
-            print(f"[DÉFACTURATION SANS RETOUR] Facture {numero_ticket} supprimée (aucun mouvement de stock créé)")
-            
-            messages.success(request, f'Facture {numero_ticket} défacturée avec succès. Le stock n\'a pas été modifié et les mouvements de stock ont été supprimés pour maintenir l\'ordre.')
-            
-    except FactureVente.DoesNotExist:
-        messages.error(request, 'Facture non trouvée.')
-        return redirect('detail_factures')
-    except Exception as e:
-        print(f"[ERREUR] Erreur lors de la défacturation sans retour: {e}")
-        import traceback
-        traceback.print_exc()
-        messages.error(request, f'Erreur lors de la défacturation: {str(e)}')
-        return redirect('detail_factures')
-    
-    return redirect('detail_factures')
 
 
 @login_required

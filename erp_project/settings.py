@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -132,3 +134,8 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 LOGIN_URL = '/caisse/login/'
 LOGIN_REDIRECT_URL = '/caisse/'
 LOGOUT_REDIRECT_URL = '/'
+
+# Configuration des fonctionnalités avancées
+# Défacturation sans retour de stock - Masqué par défaut pour GitHub
+# Pour activer: créer un fichier .env avec ENABLE_DEFACTURATION_SANS_RETOUR=True
+ENABLE_DEFACTURATION_SANS_RETOUR = config('ENABLE_DEFACTURATION_SANS_RETOUR', default=False, cast=bool)

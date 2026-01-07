@@ -183,3 +183,6 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+# Fichiers privés - Ne pas versionner
+supermarket/defacturation_views_private.py
+
