@@ -134,8 +134,3 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 LOGIN_URL = '/caisse/login/'
 LOGIN_REDIRECT_URL = '/caisse/'
 LOGOUT_REDIRECT_URL = '/'
-
-# Configuration des fonctionnalités avancées
-# Défacturation sans retour de stock - Masqué par défaut pour GitHub
-# Pour activer: créer un fichier .env avec ENABLE_DEFACTURATION_SANS_RETOUR=True
-ENABLE_DEFACTURATION_SANS_RETOUR = config('ENABLE_DEFACTURATION_SANS_RETOUR', default=False, cast=bool)

@@ -2060,30 +2060,11 @@ def detail_factures(request):
     print(f"DEBUG: Statistiques - Total factures: {total_factures}, CA total: {chiffre_affaires_total}")
     print(f"DEBUG: Aujourd'hui - Factures: {factures_aujourd_hui}, CA: {ca_aujourd_hui}")
     
-    # Vérifier si l'utilisateur a accès à la défacturation orange
-    # Cette fonctionnalité est masquée par défaut et nécessite une variable d'environnement
-    # pour être activée (voir settings.py - ENABLE_DEFACTURATION_SANS_RETOUR)
-    can_defacturer_sans_retour = False
-    if getattr(settings, 'ENABLE_DEFACTURATION_SANS_RETOUR', False):
-        # Seulement pour admin1 dans l'agence MARCHE HUITIEME
-        if request.user.username == 'admin1':
-            # Vérifier que l'agence est bien MARCHE HUITIEME
-            if agence and 'huitieme' in agence.nom_agence.lower():
-                can_defacturer_sans_retour = True
-                print(f"[ACCÈS] Utilisateur {request.user.username} autorisé pour défacturation orange")
-            else:
-                print(f"[ACCÈS] Utilisateur {request.user.username} non autorisé - Agence: {agence.nom_agence if agence else 'None'}")
-        else:
-            print(f"[ACCÈS] Utilisateur {request.user.username} non autorisé - Seul admin1 peut accéder")
-    else:
-        print(f"[ACCÈS] Fonctionnalité défacturation sans retour désactivée (masquée pour GitHub)")
-    
     context = {
 
         'factures': factures,
 
         'total_factures': total_factures,
-        'can_defacturer_sans_retour': can_defacturer_sans_retour,
         'user': request.user,
 
         'chiffre_affaires_total': chiffre_affaires_total,

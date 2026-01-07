@@ -231,12 +231,6 @@ def defacturer_vente_confirmation(request, facture_id):
         return redirect('detail_factures')
 
 
-try:
-    from .defacturation_views_private import defacturer_vente_sans_retour_stock
-except ImportError:
-    def defacturer_vente_sans_retour_stock(request, facture_id):
-        messages.error(request, 'Cette fonctionnalité n\'est pas disponible.')
-        return redirect('detail_factures')
 
 
 @login_required

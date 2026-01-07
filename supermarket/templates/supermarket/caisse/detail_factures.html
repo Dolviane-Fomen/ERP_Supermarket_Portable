@@ -518,7 +518,6 @@
 
 <script>
     const csrfToken = '{{ csrf_token }}';
-    const canDefacturerSansRetour = {% if can_defacturer_sans_retour %}true{% else %}false{% endif %};
     
     function attachViewDetailsHandlers() {
         const buttons = document.querySelectorAll('.view-details-btn');
@@ -649,11 +648,6 @@
                 <button onclick="defacturerFacture(${facture.id})" class="btn-defacturer" style="background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: 600;">
                     <i class="fas fa-undo"></i> Défacturer (avec retour stock)
                 </button>
-                ${canDefacturerSansRetour ? `
-                <button onclick="defacturerFactureSansRetour(${facture.id})" class="btn-defacturer-sans-retour" style="background: #ff9800; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: 600;">
-                    <i class="fas fa-ban"></i> Défacturer (sans retour stock)
-                </button>
-                ` : ''}
             </div>
         `;
 
@@ -681,12 +675,6 @@
         }
     }
 
-    function defacturerFactureSansRetour(factureId) {
-        if (confirm('⚠️ ATTENTION: Vous êtes sur le point de défacturer cette vente SANS retour de stock.\n\nCette action va :\n• Supprimer la facture\n• NE PAS modifier le stock (le stock reste inchangé)\n• Créer des mouvements de stock pour traçabilité\n\nCette action est IRRÉVERSIBLE !\n\nÊtes-vous sûr de vouloir continuer ?')) {
-            // Rediriger vers la fonction de défacturation sans retour
-            window.location.href = `/supermarket/stock/defacturer/${factureId}/sans-retour/`;
-        }
-    }
 
     function attachPartialDefacturerHandlers() {
         // Supprimer les anciens event listeners pour éviter les doublons
