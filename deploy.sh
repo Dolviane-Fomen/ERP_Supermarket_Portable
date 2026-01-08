@@ -3,7 +3,8 @@
 # Script de déploiement automatique pour ERP Supermarket
 # Usage: ./deploy.sh
 
-set -e  # Arrêter en cas d'erreur
+# Ne pas arrêter en cas d'erreur pour git stash (peut ne rien avoir à stasher)
+set +e  # Permet de continuer même en cas d'erreur pour certaines commandes
 
 # Couleurs pour les messages
 GREEN='\033[0;32m'
@@ -43,10 +44,25 @@ source "$VENV_DIR/bin/activate"
 
 # Récupérer les dernières modifications depuis GitHub
 echo -e "\n${GREEN}📥 Récupération des modifications depuis GitHub...${NC}"
-git pull origin main || {
-    echo -e "${RED}❌ Erreur lors du git pull!${NC}"
-    exit 1
-}
+
+# Sauvegarder les modifications locales si elles existent
+if ! git diff-index --quiet HEAD -- 2>/dev/null; then
+    echo -e "${YELLOW}⚠️  Modifications locales détectées, sauvegarde dans stash...${NC}"
+    git stash push -m "Auto-stash before pull $(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
+fi
+
+# Réactiver la gestion d'erreurs stricte
+set -e
+
+# Récupérer depuis GitHub
+echo -e "${GREEN}🔄 Récupération des dernières versions depuis GitHub...${NC}"
+git fetch origin main
+
+# Forcer la mise à jour pour correspondre exactement à GitHub
+echo -e "${GREEN}🔄 Mise à jour du code pour correspondre à GitHub...${NC}"
+git reset --hard origin/main
+
+echo -e "${GREEN}✅ Code à jour avec GitHub${NC}"
 
 # Installer/mettre à jour les dépendances
 echo -e "\n${GREEN}📦 Installation des dépendances...${NC}"
@@ -61,26 +77,60 @@ DJANGO_SETTINGS_MODULE=$SETTINGS_MODULE python manage.py migrate --noinput
 echo -e "\n${GREEN}📁 Collecte des fichiers statiques...${NC}"
 DJANGO_SETTINGS_MODULE=$SETTINGS_MODULE python manage.py collectstatic --noinput
 
-# Redémarrer le service Gunicorn/ERP
-echo -e "\n${GREEN}🔄 Redémarrage du service ERP...${NC}"
+# Redémarrer Gunicorn/ERP
+echo -e "\n${GREEN}🔄 Redémarrage de Gunicorn...${NC}"
 
-# Vérifier si le service existe
-if systemctl list-unit-files | grep -q "$SERVICE_NAME.service"; then
-    sudo systemctl restart $SERVICE_NAME
-    
-    # Vérifier le statut
-    echo -e "\n${GREEN}✅ Vérification du statut...${NC}"
+# Méthode 1: Essayer avec systemd (service erp)
+if systemctl list-unit-files | grep -q "erp.service"; then
+    echo -e "${GREEN}📦 Redémarrage via systemd (service erp)...${NC}"
+    sudo systemctl restart erp
     sleep 2
-    if sudo systemctl is-active --quiet $SERVICE_NAME; then
-        echo -e "${GREEN}✅ Service $SERVICE_NAME est actif!${NC}"
+    if sudo systemctl is-active --quiet erp; then
+        echo -e "${GREEN}✅ Service 'erp' redémarré et actif!${NC}"
     else
-        echo -e "${RED}❌ Erreur: Service $SERVICE_NAME n'est pas actif!${NC}"
-        echo -e "${YELLOW}Vérifiez les logs avec: sudo journalctl -u $SERVICE_NAME -n 50${NC}"
-        exit 1
+        echo -e "${YELLOW}⚠️  Service 'erp' ne répond pas, tentative alternative...${NC}"
     fi
+fi
+
+# Méthode 2: Essayer avec systemd (service gunicorn)
+if systemctl list-unit-files | grep -q "gunicorn.service"; then
+    echo -e "${GREEN}📦 Redémarrage via systemd (service gunicorn)...${NC}"
+    sudo systemctl restart gunicorn
+    sleep 2
+    if sudo systemctl is-active --quiet gunicorn; then
+        echo -e "${GREEN}✅ Service 'gunicorn' redémarré et actif!${NC}"
+    fi
+fi
+
+# Méthode 3: Redémarrer via les processus Gunicorn (si systemd n'est pas disponible)
+if ! sudo systemctl is-active --quiet erp 2>/dev/null && ! sudo systemctl is-active --quiet gunicorn 2>/dev/null; then
+    echo -e "${YELLOW}⚠️  Aucun service systemd trouvé, redémarrage via processus...${NC}"
+    
+    # Tuer les processus Gunicorn existants
+    pkill -f "gunicorn.*erp_project.wsgi:application" 2>/dev/null || true
+    sleep 1
+    
+    # Redémarrer Gunicorn manuellement en arrière-plan
+    echo -e "${GREEN}🔄 Démarrage de Gunicorn manuellement...${NC}"
+    nohup gunicorn \
+        --config gunicorn_config.py \
+        --daemon \
+        erp_project.wsgi:application > /dev/null 2>&1 || {
+        echo -e "${YELLOW}⚠️  Impossible de démarrer Gunicorn automatiquement${NC}"
+        echo -e "${YELLOW}💡 Démarrez-le manuellement avec: gunicorn --config gunicorn_config.py erp_project.wsgi:application${NC}"
+    }
+fi
+
+# Vérification finale
+echo -e "\n${GREEN}✅ Vérification finale du redémarrage...${NC}"
+sleep 2
+
+# Vérifier si Gunicorn tourne
+if pgrep -f "gunicorn.*erp_project.wsgi:application" > /dev/null; then
+    echo -e "${GREEN}✅ Gunicorn est en cours d'exécution!${NC}"
 else
-    echo -e "${YELLOW}⚠️  Service $SERVICE_NAME non trouvé. Redémarrage manuel requis.${NC}"
-    echo -e "${YELLOW}💡 Vérifiez que le service systemd est configuré correctement.${NC}"
+    echo -e "${RED}❌ Attention: Gunicorn ne semble pas être en cours d'exécution${NC}"
+    echo -e "${YELLOW}💡 Vérifiez manuellement avec: ps aux | grep gunicorn${NC}"
 fi
 
 echo -e "\n${GREEN}========================================${NC}"

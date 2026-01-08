@@ -21,11 +21,51 @@ jobs:
         script: |
           cd ${{ secrets.OVH_PROJECT_PATH }}
           source venv/bin/activate
-          git pull origin main
+          
+          # Sauvegarder les modifications locales si elles existent
+          if ! git diff-index --quiet HEAD -- 2>/dev/null; then
+            echo "⚠️  Modifications locales détectées, sauvegarde dans stash..."
+            git stash push -m "Auto-stash before deploy $(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
+          fi
+          
+          # Récupérer et forcer la mise à jour depuis GitHub
+          git fetch origin main
+          git reset --hard origin/main
+          echo "✅ Code à jour avec GitHub"
+          
+          # Installer les dépendances
           pip install --upgrade pip
           pip install -r requirements.txt
+          
+          # Migrations et fichiers statiques
           DJANGO_SETTINGS_MODULE=erp_project.settings_production python manage.py migrate --noinput
           DJANGO_SETTINGS_MODULE=erp_project.settings_production python manage.py collectstatic --noinput
-          sudo systemctl restart erp || echo "Service erp non trouvé, vérifiez manuellement"
-          echo "Déploiement terminé avec succès!"
+          
+          # Redémarrer Gunicorn (plusieurs méthodes pour être sûr)
+          echo "🔄 Redémarrage de Gunicorn..."
+          
+          # Méthode 1: systemd service erp
+          sudo systemctl restart erp 2>/dev/null && echo "✅ Service 'erp' redémarré" || true
+          
+          # Méthode 2: systemd service gunicorn
+          sudo systemctl restart gunicorn 2>/dev/null && echo "✅ Service 'gunicorn' redémarré" || true
+          
+          # Méthode 3: Redémarrer via processus si systemd n'est pas disponible
+          if ! sudo systemctl is-active --quiet erp 2>/dev/null && ! sudo systemctl is-active --quiet gunicorn 2>/dev/null; then
+            echo "⚠️  Aucun service systemd, redémarrage via processus..."
+            pkill -f "gunicorn.*erp_project.wsgi:application" 2>/dev/null || true
+            sleep 1
+            cd ${{ secrets.OVH_PROJECT_PATH }}
+            source venv/bin/activate
+            nohup gunicorn --config gunicorn_config.py --daemon erp_project.wsgi:application > /dev/null 2>&1 || true
+          fi
+          
+          sleep 2
+          if pgrep -f "gunicorn.*erp_project.wsgi:application" > /dev/null; then
+            echo "✅ Gunicorn est en cours d'exécution!"
+          else
+            echo "⚠️  Vérifiez manuellement que Gunicorn est démarré"
+          fi
+          
+          echo "✅ Déploiement terminé avec succès!"
 
