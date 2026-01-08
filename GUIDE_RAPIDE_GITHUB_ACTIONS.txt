@@ -1,0 +1,54 @@
+========================================
+GUIDE RAPIDE: Configuration GitHub Actions
+========================================
+
+ETAPE 1: Generer la cle SSH sur OVH
+------------------------------------
+1. Connectez-vous: ssh ubuntu@51.68.124.152
+
+2. Executez:
+   ssh-keygen -t ed25519 -C "github-actions@ovh" -f ~/.ssh/github_actions_key
+   (Appuyez 3 fois sur Entree)
+
+3. Affichez la cle privee:
+   cat ~/.ssh/github_actions_key
+   
+4. COPIEZ TOUT le texte affiche
+
+5. Autorisez la cle publique:
+   cat ~/.ssh/github_actions_key.pub >> ~/.ssh/authorized_keys
+
+
+ETAPE 2: Configurer les Secrets GitHub
+---------------------------------------
+1. Allez sur:
+   https://github.com/Dolviane-Fomen/ERP_Supermarket_Portable/settings/secrets/actions
+
+2. Ajoutez ces 4 secrets:
+   
+   Secret 1:
+   - Name: OVH_HOST
+   - Value: 51.68.124.152
+   
+   Secret 2:
+   - Name: OVH_USER
+   - Value: ubuntu
+   
+   Secret 3:
+   - Name: OVH_PROJECT_PATH
+   - Value: /home/ubuntu/erp_project
+   
+   Secret 4:
+   - Name: OVH_SSH_KEY
+   - Value: (Collez la cle privee de l'etape 1)
+
+
+ETAPE 3: Tester
+---------------
+1. Faites une petite modification
+2. Double-cliquez sur SYNC_OVH.bat
+3. Allez sur GitHub Actions pour voir le workflow
+4. Si c'est vert, c'est bon!
+
+========================================
+

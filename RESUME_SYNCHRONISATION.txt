@@ -1,0 +1,55 @@
+========================================
+RESUME: SYNCHRONISATION MULTI-PC
+========================================
+
+1. CONFIGURATION INITIALE (Une seule fois par PC)
+--------------------------------------------------
+   - Cloner depuis GitHub: git clone https://github.com/...
+   - Executer: CONFIGURER_NOUVEAU_PC.bat
+   - C'est tout!
+
+
+2. UTILISATION QUOTIDIENNE
+---------------------------
+
+   A. AVANT DE TRAVAILLER (sur n'importe quel PC):
+      → Double-cliquez sur: RECUPERER_MODIFICATIONS.bat
+      → Cela recupere les modifications des autres PCs
+
+
+   B. APRES AVOIR MODIFIE (sur n'importe quel PC):
+      → Double-cliquez sur: SYNC_OVH.bat
+      → Cela envoie vos modifications vers GitHub
+      → OVH se met a jour AUTOMATIQUEMENT
+
+
+3. CE QUI EST AUTOMATIQUE
+--------------------------
+   ✅ Deploiement sur OVH (des que vous poussez sur GitHub)
+   ✅ GitHub Actions execute deploy.sh automatiquement
+   ✅ Pas besoin de se connecter en SSH manuellement
+
+
+4. CE QUI EST MANUEL
+---------------------
+   ⚠️  Recuperer les modifications (RECUPERER_MODIFICATIONS.bat)
+   ⚠️  Envoyer vos modifications (SYNC_OVH.bat)
+
+
+5. WORKFLOW SIMPLE
+------------------
+   PC Local → Modifier → SYNC_OVH.bat → GitHub → OVH (auto)
+
+   Autre PC → RECUPERER_MODIFICATIONS.bat → Travailler → SYNC_OVH.bat
+
+
+========================================
+FICHIERS IMPORTANTS:
+========================================
+
+- SYNC_OVH.bat              → Envoyer vos modifications
+- RECUPERER_MODIFICATIONS.bat → Recuperer les modifications
+- CONFIGURER_NOUVEAU_PC.bat  → Configuration initiale
+
+========================================
+
