@@ -1,0 +1,9 @@
+{
+  "server_host": "VOTRE_IP_SERVEUR",
+  "server_user": "erpuser",
+  "server_path": "/home/erpuser/ERP_Supermarket_Portable",
+  "local_path": "C:\\django erp\\ERP_Supermarket_Portable",
+  "export_file": "sync_export.json",
+  "backup_dir": "backups"
+}
+

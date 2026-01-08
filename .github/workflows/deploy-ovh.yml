@@ -1,0 +1,31 @@
+name: Deploy to OVH
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # Permet de déclencher manuellement
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy ERP to OVH Server
+    
+    steps:
+    - name: Deploy to OVH via SSH
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.OVH_HOST }}
+        username: ${{ secrets.OVH_USER }}
+        key: ${{ secrets.OVH_SSH_KEY }}
+        port: 22
+        script: |
+          cd ${{ secrets.OVH_PROJECT_PATH }}
+          source venv/bin/activate
+          git pull origin main
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          DJANGO_SETTINGS_MODULE=erp_project.settings_production python manage.py migrate --noinput
+          DJANGO_SETTINGS_MODULE=erp_project.settings_production python manage.py collectstatic --noinput
+          sudo systemctl restart erp || echo "Service erp non trouvé, vérifiez manuellement"
+          echo "Déploiement terminé avec succès!"
+

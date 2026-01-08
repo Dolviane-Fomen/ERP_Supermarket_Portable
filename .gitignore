@@ -186,3 +186,12 @@ cython_debug/
 # Fichiers privés - Ne pas versionner
 supermarket/defacturation_views_private.py
 
+# Configuration OVH (contient des informations sensibles)
+.ovh_config.json
+ovh_config.json
+
+# Exports de données (peuvent être volumineux)
+export_data_*.json
+backup_ovh_*.json
+*.sql
+

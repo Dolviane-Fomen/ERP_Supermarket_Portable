@@ -1,0 +1,9 @@
+{
+    "git_branch":  "main",
+    "deployment_method":  "git",
+    "ovh_project_path":  "/home/ubuntu/erp_project",
+    "ovh_host":  "51.68.124.152",
+    "git_remote":  "origin",
+    "ovh_user":  "ubuntu"
+}
+
