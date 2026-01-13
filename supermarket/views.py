@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -9,8 +9,10 @@ from django.db.models import Sum, Max, Q, F
 from django.db import models, connection, IntegrityError, transaction
 from django.utils import timezone
 from django.conf import settings
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 import json
+import openpyxl
+from openpyxl.styles import Font, Alignment, PatternFill
 from decimal import Decimal
 from .models import (
     Agence, Compte, Employe, Caisse, SessionCaisse, Client, InventaireStock, LigneInventaireStock,
@@ -18,13 +20,13 @@ from .models import (
     FactureTemporaire, Famille, Fournisseur, MouvementStock, PlanComptable, PlanTiers, CodeJournaux,
     TauxTaxe, FactureAchat, LigneFactureAchat, FactureTransfert, LigneFactureTransfert,
     Commande, Livraison, FactureCommande, StatistiqueClient, DocumentCommande, LigneCommande, Notification,
-    Livreur, SuiviClientAction
+    Livreur, SuiviClientAction,Depense
 )
 from .decorators import (
     require_stock_modify_access,
     require_commandes_feature, require_module_access, require_compte_type,
     require_caisse_access, require_stock_access, require_comptes_access,
-    get_user_compte, get_user_livreur
+    get_user_compte, get_user_livreur, require_comptable_access,
 )
 from .permissions_utils import (
     filter_commandes_by_user, filter_suivi_client_by_user, filter_livraisons_by_user
@@ -19305,30 +19307,27 @@ def dashboard_financier(request):
         messages.error(request, 'Votre compte n\'est pas correctement lié à une agence.')
         return redirect('login_financier')
     
-    # Calculer les statistiques financières
+    # Calculer les statistiques financières pour TOUTES les agences
     from datetime import datetime, timedelta
-    from django.db.models import Sum, Count, Avg
+    from django.db.models import Sum, Count, Avg, F
     
     # Période : 30 derniers jours
     date_debut = timezone.now().date() - timedelta(days=30)
     
-    # Chiffre d'affaires (ventes)
+    # Chiffre d'affaires (ventes) - TOUTES LES AGENCES
     ca_total = FactureVente.objects.filter(
-        agence=agence,
         date__gte=date_debut
     ).aggregate(total=Sum('nette_a_payer'))['total'] or Decimal('0')
     
-    # Dépenses (achats validés)
+    # Dépenses (achats validés) - TOUTES LES AGENCES
     depenses_total = FactureAchat.objects.filter(
-        agence=agence,
         date_achat__gte=date_debut,
         statut__in=['validee', 'payee']
     ).aggregate(total=Sum('prix_total_global'))['total'] or Decimal('0')
     
-    # Calculer la marge (approximative : CA - Coût d'achat des articles vendus)
+    # Calculer la marge (approximative : CA - Coût d'achat des articles vendus) - TOUTES LES AGENCES
     marge_totale = Decimal('0')
     ventes_lignes = LigneFactureVente.objects.filter(
-        facture_vente__agence=agence,
         facture_vente__date__gte=date_debut
     ).select_related('article', 'facture_vente')
     
@@ -19340,17 +19339,17 @@ def dashboard_financier(request):
             marge_ligne = (prix_vente - prix_achat) * quantite
             marge_totale += marge_ligne
     
-    # Résultat net
+    # Résultat net (Bénéfice) = CA - Dépenses
     resultat_net = ca_total - depenses_total
     
-    # Statistiques supplémentaires
-    nb_ventes = FactureVente.objects.filter(agence=agence, date__gte=date_debut).count()
-    nb_achats = FactureAchat.objects.filter(agence=agence, date_achat__gte=date_debut, statut__in=['validee', 'payee']).count()
+    # Statistiques supplémentaires - TOUTES LES AGENCES
+    nb_ventes = FactureVente.objects.filter(date__gte=date_debut).count()
+    nb_achats = FactureAchat.objects.filter(date_achat__gte=date_debut, statut__in=['validee', 'payee']).count()
     
     # CA moyen par vente
     ca_moyen = ca_total / nb_ventes if nb_ventes > 0 else Decimal('0')
     
-    # Évolution du CA sur 7 derniers jours (pour graphique)
+    # Évolution du CA sur 7 derniers jours (pour graphique) - TOUTES LES AGENCES
     evolution_ca = []
     evolution_depenses = []
     labels_jours = []
@@ -19360,12 +19359,10 @@ def dashboard_financier(request):
         labels_jours.append(date_jour.strftime('%d/%m'))
         
         ca_jour = FactureVente.objects.filter(
-            agence=agence,
             date=date_jour
         ).aggregate(total=Sum('nette_a_payer'))['total'] or Decimal('0')
         
         dep_jour = FactureAchat.objects.filter(
-            agence=agence,
             date_achat=date_jour,
             statut__in=['validee', 'payee']
         ).aggregate(total=Sum('prix_total_global'))['total'] or Decimal('0')
@@ -19373,9 +19370,8 @@ def dashboard_financier(request):
         evolution_ca.append(float(ca_jour))
         evolution_depenses.append(float(dep_jour))
     
-    # Top 5 articles les plus vendus
+    # Top 5 articles les plus vendus - TOUTES LES AGENCES
     top_articles = LigneFactureVente.objects.filter(
-        facture_vente__agence=agence,
         facture_vente__date__gte=date_debut
     ).values('article__designation').annotate(
         total_vente=Sum(F('quantite') * F('prix_unitaire')),
@@ -19403,7 +19399,7 @@ def dashboard_financier(request):
     return render(request, 'supermarket/financier/dashboard_financier.html', context)
 
 def suivi_statistique(request):
-    """Vue pour le suivi statistique"""
+    """Vue pour le suivi statistique - Toutes les agences avec regroupement par marge"""
     compte, redirect_response = check_comptable_access(request)
     if redirect_response:
         return redirect_response
@@ -19413,9 +19409,13 @@ def suivi_statistique(request):
         messages.error(request, 'Votre compte n\'est pas correctement lié à une agence.')
         return redirect('login_financier')
     
+    # Récupérer toutes les agences
+    agences = Agence.objects.all().order_by('nom_agence')
+    
     context = {
         'agence': agence,
         'compte': compte,
+        'agences': agences,
     }
     return render(request, 'supermarket/financier/suivi_statistique.html', context)
 
@@ -19469,3 +19469,661 @@ def etat_resultat(request):
         'compte': compte,
     }
     return render(request, 'supermarket/financier/etat_resultat.html', context)
+
+def generer_suivi_statistique(request):
+    """Générer les statistiques de toutes les agences avec regroupement par catégorie de marge"""
+    compte, redirect_response = check_comptable_access(request)
+    if redirect_response:
+        return redirect_response
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Méthode non autorisée'})
+    
+    try:
+        date_debut_str = request.POST.get('date_debut')
+        date_fin_str = request.POST.get('date_fin')
+        
+        if not date_debut_str or not date_fin_str:
+            return JsonResponse({'success': False, 'error': 'Les dates sont obligatoires'})
+        
+        from datetime import datetime
+        date_debut = datetime.strptime(date_debut_str, '%Y-%m-%d').date()
+        date_fin = datetime.strptime(date_fin_str, '%Y-%m-%d').date()
+        
+        # Récupérer toutes les agences
+        agences = Agence.objects.all().order_by('nom_agence')
+        
+        # Statistiques par agence et par jour
+        statistiques_par_agence = {}
+        
+        for agence in agences:
+            # Pour chaque jour de la période
+            stats_journalieres = {}
+            current_date = date_debut
+            
+            while current_date <= date_fin:
+                # Récupérer les ventes de cette agence pour ce jour
+                ventes_jour = LigneFactureVente.objects.filter(
+                    facture_vente__agence=agence,
+                    facture_vente__date=current_date
+                ).select_related('article', 'facture_vente')
+                
+                # Catégories de marge
+                bonne_marge = []      # ≥ 10%
+                marge_mediocre = []   # 4% à 9%
+                marge_faible = []     # < 4%
+                
+                # Articles déjà traités pour éviter les doublons par jour
+                articles_traites = {}
+                
+                for vente in ventes_jour:
+                    if not vente.article:
+                        continue
+                    
+                    article_id = vente.article.id
+                    prix_vente = Decimal(str(vente.prix_unitaire))
+                    prix_achat = Decimal(str(vente.article.prix_achat))
+                    quantite = Decimal(str(vente.quantite))
+                    
+                    # Calculer la marge en pourcentage
+                    if prix_vente > 0:
+                        marge_unitaire = prix_vente - prix_achat
+                        pourcentage_marge = (marge_unitaire / prix_vente) * 100
+                    else:
+                        pourcentage_marge = Decimal('0')
+                    
+                    # Regrouper par article (sommer les quantités)
+                    if article_id not in articles_traites:
+                        articles_traites[article_id] = {
+                            'article': vente.article,
+                            'quantite_totale': Decimal('0'),
+                            'chiffre_affaires': Decimal('0'),
+                            'marge_totale': Decimal('0'),
+                            'pourcentage_marge': pourcentage_marge,
+                        }
+                    
+                    articles_traites[article_id]['quantite_totale'] += quantite
+                    articles_traites[article_id]['chiffre_affaires'] += prix_vente * quantite
+                    articles_traites[article_id]['marge_totale'] += marge_unitaire * quantite
+                
+                # Classer les articles par catégorie de marge
+                for article_id, stats in articles_traites.items():
+                    marge_pct = float(stats['pourcentage_marge'])
+                    article_data = {
+                        'reference': stats['article'].reference_article,
+                        'designation': stats['article'].designation,
+                        'quantite': float(stats['quantite_totale']),
+                        'chiffre_affaires': float(stats['chiffre_affaires']),
+                        'marge': float(stats['marge_totale']),
+                        'pourcentage_marge': marge_pct,
+                    }
+                    
+                    if marge_pct >= 10:
+                        bonne_marge.append(article_data)
+                    elif marge_pct >= 4:
+                        marge_mediocre.append(article_data)
+                    else:
+                        marge_faible.append(article_data)
+                
+                if bonne_marge or marge_mediocre or marge_faible:
+                    stats_journalieres[str(current_date)] = {
+                        'bonne_marge': bonne_marge,
+                        'marge_mediocre': marge_mediocre,
+                        'marge_faible': marge_faible,
+                    }
+                
+                # Jour suivant
+                from datetime import timedelta
+                current_date += timedelta(days=1)
+            
+            # Toujours inclure l'agence, même si elle n'a pas de ventes
+            statistiques_par_agence[agence.id_agence] = {
+                'nom_agence': agence.nom_agence,
+                'stats_journalieres': stats_journalieres,
+            }
+        
+        # Stocker dans la session pour l'export
+        request.session['suivi_statistique'] = {
+            'date_debut': str(date_debut),
+            'date_fin': str(date_fin),
+            'statistiques_par_agence': statistiques_par_agence,
+        }
+        
+        return JsonResponse({
+            'success': True,
+            'statistiques': statistiques_par_agence,
+            'date_debut': str(date_debut),
+            'date_fin': str(date_fin),
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'success': False, 'error': f'Erreur: {str(e)}'})
+
+def export_suivi_statistique_excel(request):
+    """Exporter les statistiques de suivi en Excel"""
+    compte, redirect_response = check_comptable_access(request)
+    if redirect_response:
+        return redirect_response
+    
+    try:
+        # Récupérer les statistiques depuis la session
+        stats_data = request.session.get('suivi_statistique')
+        
+        if not stats_data:
+            return JsonResponse({'success': False, 'error': 'Aucune statistique générée'})
+        
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        except ImportError:
+            return JsonResponse({'success': False, 'error': 'Module openpyxl non installé'})
+        
+        from django.http import HttpResponse
+        
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = f"Suivi Statistique {stats_data['date_debut']} - {stats_data['date_fin']}"
+        
+        # Styles
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=11)
+        bonne_marge_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+        mediocre_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
+        faible_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+        agence_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+        
+        row = 1
+        
+        # En-têtes des colonnes (sans "Catégorie Marge")
+        headers = ['Référence', 'Désignation', 'Quantité', 'Chiffre d\'Affaires (FCFA)', 'Marge (FCFA)', 'Marge (%)']
+        
+        # Par agence
+        for agence_id, agence_data in stats_data['statistiques_par_agence'].items():
+            # En-tête Agence
+            ws.merge_cells(f'A{row}:F{row}')
+            ws[f'A{row}'] = f"AGENCE: {agence_data['nom_agence']}"
+            ws[f'A{row}'].font = Font(bold=True, size=11)
+            ws[f'A{row}'].fill = agence_fill
+            ws[f'A{row}'].alignment = Alignment(horizontal="left", vertical="center")
+            row += 1
+            
+            # Par jour
+            for date_jour, stats_jour in sorted(agence_data['stats_journalieres'].items()):
+                # Date
+                ws.merge_cells(f'A{row}:F{row}')
+                ws[f'A{row}'] = f"Date: {date_jour}"
+                ws[f'A{row}'].font = Font(bold=True, size=10)
+                ws[f'A{row}'].alignment = Alignment(horizontal="left", vertical="center")
+                row += 1
+                
+                # Bonne marge (≥10%)
+                bonne_marge_articles = stats_jour.get('bonne_marge', [])
+                if bonne_marge_articles:
+                    # Ligne d'en-tête de catégorie
+                    ws.merge_cells(f'A{row}:F{row}')
+                    cell_cat = ws.cell(row=row, column=1, value="Bonne Marge (≥10%)")
+                    cell_cat.fill = bonne_marge_fill
+                    cell_cat.font = Font(bold=True, size=10)
+                    cell_cat.alignment = Alignment(horizontal="left", vertical="center")
+                    row += 1
+                    
+                    # En-têtes du tableau
+                    for col, header in enumerate(headers, 1):
+                        cell = ws.cell(row=row, column=col)
+                        cell.value = header
+                        cell.font = header_font
+                        cell.fill = header_fill
+                        cell.alignment = Alignment(horizontal="center", vertical="center")
+                    row += 1
+                    
+                    # Articles de bonne marge
+                    for article in bonne_marge_articles:
+                        # Référence (colonne A)
+                        ws.cell(row=row, column=1, value=article['reference']).alignment = Alignment(vertical="center")
+                        
+                        # Désignation (colonne B)
+                        ws.cell(row=row, column=2, value=article['designation']).alignment = Alignment(vertical="center")
+                        
+                        # Quantité (colonne C)
+                        cell_qte = ws.cell(row=row, column=3, value=article['quantite'])
+                        cell_qte.number_format = '#,##0.000'
+                        cell_qte.alignment = Alignment(horizontal="right", vertical="center")
+                        
+                        # Chiffre d'Affaires (colonne D)
+                        cell_ca = ws.cell(row=row, column=4, value=article['chiffre_affaires'])
+                        cell_ca.number_format = '#,##0.00'
+                        cell_ca.alignment = Alignment(horizontal="right", vertical="center")
+                        
+                        # Marge (colonne E)
+                        cell_marge = ws.cell(row=row, column=5, value=article['marge'])
+                        cell_marge.number_format = '#,##0.00'
+                        cell_marge.alignment = Alignment(horizontal="right", vertical="center")
+                        
+                        # Marge % (colonne F)
+                        ws.cell(row=row, column=6, value=f"{article['pourcentage_marge']:.2f}%").alignment = Alignment(horizontal="right", vertical="center")
+                        
+                        row += 1
+                
+                # Marge médiocre (4-9%)
+                marge_mediocre_articles = stats_jour.get('marge_mediocre', [])
+                if marge_mediocre_articles:
+                    # Ligne d'en-tête de catégorie
+                    ws.merge_cells(f'A{row}:F{row}')
+                    cell_cat = ws.cell(row=row, column=1, value="Marge Médiocre (4-9%)")
+                    cell_cat.fill = mediocre_fill
+                    cell_cat.font = Font(bold=True, size=10)
+                    cell_cat.alignment = Alignment(horizontal="left", vertical="center")
+                    row += 1
+                    
+                    # En-têtes du tableau
+                    for col, header in enumerate(headers, 1):
+                        cell = ws.cell(row=row, column=col)
+                        cell.value = header
+                        cell.font = header_font
+                        cell.fill = header_fill
+                        cell.alignment = Alignment(horizontal="center", vertical="center")
+                    row += 1
+                    
+                    # Articles de marge médiocre
+                    for article in marge_mediocre_articles:
+                        # Référence (colonne A)
+                        ws.cell(row=row, column=1, value=article['reference']).alignment = Alignment(vertical="center")
+                        
+                        # Désignation (colonne B)
+                        ws.cell(row=row, column=2, value=article['designation']).alignment = Alignment(vertical="center")
+                        
+                        # Quantité (colonne C)
+                        cell_qte = ws.cell(row=row, column=3, value=article['quantite'])
+                        cell_qte.number_format = '#,##0.000'
+                        cell_qte.alignment = Alignment(horizontal="right", vertical="center")
+                        
+                        # Chiffre d'Affaires (colonne D)
+                        cell_ca = ws.cell(row=row, column=4, value=article['chiffre_affaires'])
+                        cell_ca.number_format = '#,##0.00'
+                        cell_ca.alignment = Alignment(horizontal="right", vertical="center")
+                        
+                        # Marge (colonne E)
+                        cell_marge = ws.cell(row=row, column=5, value=article['marge'])
+                        cell_marge.number_format = '#,##0.00'
+                        cell_marge.alignment = Alignment(horizontal="right", vertical="center")
+                        
+                        # Marge % (colonne F)
+                        ws.cell(row=row, column=6, value=f"{article['pourcentage_marge']:.2f}%").alignment = Alignment(horizontal="right", vertical="center")
+                        
+                        row += 1
+                
+                # Marge faible (<4%)
+                marge_faible_articles = stats_jour.get('marge_faible', [])
+                if marge_faible_articles:
+                    # Ligne d'en-tête de catégorie
+                    ws.merge_cells(f'A{row}:F{row}')
+                    cell_cat = ws.cell(row=row, column=1, value="Marge Faible (<4%)")
+                    cell_cat.fill = faible_fill
+                    cell_cat.font = Font(bold=True, size=10)
+                    cell_cat.alignment = Alignment(horizontal="left", vertical="center")
+                    row += 1
+                    
+                    # En-têtes du tableau
+                    for col, header in enumerate(headers, 1):
+                        cell = ws.cell(row=row, column=col)
+                        cell.value = header
+                        cell.font = header_font
+                        cell.fill = header_fill
+                        cell.alignment = Alignment(horizontal="center", vertical="center")
+                    row += 1
+                    
+                    # Articles de marge faible
+                    for article in marge_faible_articles:
+                        # Référence (colonne A)
+                        ws.cell(row=row, column=1, value=article['reference']).alignment = Alignment(vertical="center")
+                        
+                        # Désignation (colonne B)
+                        ws.cell(row=row, column=2, value=article['designation']).alignment = Alignment(vertical="center")
+                        
+                        # Quantité (colonne C)
+                        cell_qte = ws.cell(row=row, column=3, value=article['quantite'])
+                        cell_qte.number_format = '#,##0.000'
+                        cell_qte.alignment = Alignment(horizontal="right", vertical="center")
+                        
+                        # Chiffre d'Affaires (colonne D)
+                        cell_ca = ws.cell(row=row, column=4, value=article['chiffre_affaires'])
+                        cell_ca.number_format = '#,##0.00'
+                        cell_ca.alignment = Alignment(horizontal="right", vertical="center")
+                        
+                        # Marge (colonne E)
+                        cell_marge = ws.cell(row=row, column=5, value=article['marge'])
+                        cell_marge.number_format = '#,##0.00'
+                        cell_marge.alignment = Alignment(horizontal="right", vertical="center")
+                        
+                        # Marge % (colonne F)
+                        ws.cell(row=row, column=6, value=f"{article['pourcentage_marge']:.2f}%").alignment = Alignment(horizontal="right", vertical="center")
+                        
+                        row += 1
+                
+                # Calculer les totaux pour cette date
+                total_quantite = 0
+                total_chiffre_affaires = 0
+                total_marge = 0
+                
+                # Récupérer tous les articles de toutes les catégories
+                tous_articles = bonne_marge_articles + marge_mediocre_articles + marge_faible_articles
+                
+                for article in tous_articles:
+                    total_quantite += float(article['quantite'])
+                    total_chiffre_affaires += float(article['chiffre_affaires'])
+                    total_marge += float(article['marge'])
+                
+                # Calculer le pourcentage de marge global
+                pourcentage_marge_global = 0
+                if total_chiffre_affaires > 0:
+                    pourcentage_marge_global = (total_marge / total_chiffre_affaires) * 100
+                
+                # Ajouter la ligne TOTAL GÉNÉRAL si on a des articles
+                if tous_articles:
+                    # Ligne vide avant le total
+                    row += 1
+                    
+                    # Ligne TOTAL GÉNÉRAL
+                    # Colonne A: "TOTAL GÉNÉRAL"
+                    cell_total_label = ws.cell(row=row, column=1, value="TOTAL GÉNÉRAL")
+                    cell_total_label.font = Font(bold=True, size=11)
+                    cell_total_label.alignment = Alignment(horizontal="left", vertical="center")
+                    
+                    # Colonne B: vide (Désignation)
+                    ws.cell(row=row, column=2, value="")
+                    
+                    # Colonne C: Quantité totale
+                    cell_qte_total = ws.cell(row=row, column=3, value=total_quantite)
+                    cell_qte_total.number_format = '#,##0.000'
+                    cell_qte_total.font = Font(bold=True)
+                    cell_qte_total.alignment = Alignment(horizontal="right", vertical="center")
+                    
+                    # Colonne D: Chiffre d'Affaires total
+                    cell_ca_total = ws.cell(row=row, column=4, value=total_chiffre_affaires)
+                    cell_ca_total.number_format = '#,##0.00'
+                    cell_ca_total.font = Font(bold=True)
+                    cell_ca_total.alignment = Alignment(horizontal="right", vertical="center")
+                    
+                    # Colonne E: Marge totale
+                    cell_marge_total = ws.cell(row=row, column=5, value=total_marge)
+                    cell_marge_total.number_format = '#,##0.00'
+                    cell_marge_total.font = Font(bold=True)
+                    cell_marge_total.alignment = Alignment(horizontal="right", vertical="center")
+                    
+                    # Colonne F: Pourcentage de marge global
+                    cell_pct_total = ws.cell(row=row, column=6, value=f"{pourcentage_marge_global:.2f}%")
+                    cell_pct_total.font = Font(bold=True)
+                    cell_pct_total.alignment = Alignment(horizontal="right", vertical="center")
+                    
+                    row += 1
+                
+                row += 1  # Ligne vide entre les jours
+            
+            row += 1  # Ligne vide entre les agences
+        
+        # Ajuster largeurs colonnes (6 colonnes: A=Reference, B=Designation, C=Quantite, D=CA, E=Marge, F=Marge%)
+        ws.column_dimensions['A'].width = 20
+        ws.column_dimensions['B'].width = 40
+        ws.column_dimensions['C'].width = 15
+        ws.column_dimensions['D'].width = 25
+        ws.column_dimensions['E'].width = 20
+        ws.column_dimensions['F'].width = 15
+        
+        # Réponse HTTP
+        filename = f"Suivi_Statistique_{stats_data['date_debut']}_{stats_data['date_fin']}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        wb.save(response)
+        return response
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'success': False, 'error': f'Erreur export: {str(e)}'})
+
+# ==================== MODULE COMPTABILITÉ ====================
+
+def login_comptabiliter(request):
+    """Page de connexion pour le module Comptabilité"""
+    # Toujours afficher la page de connexion, même si l'utilisateur est déjà connecté
+    if request.user.is_authenticated and request.method == 'GET':
+        logout(request)
+        request.session.flush()
+    
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        
+        if username and password:
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                # Vérifier que l'utilisateur a un compte lié à une agence
+                try:
+                    compte = Compte.objects.get(user=user, actif=True)
+                    if compte.agence:
+                        # Vérifier que l'utilisateur est un comptable, assistant_comptable ou admin
+                        if compte.type_compte not in ['comptable', 'assistant_comptable', 'admin']:
+                            messages.error(request, 'Accès refusé. Ce module est réservé aux comptables, assistants comptables et aux administrateurs.')
+                        else:
+                            login(request, user)
+                            # Stocker l'agence dans la session
+                            request.session['agence_id'] = compte.agence.id_agence
+                            request.session['agence_nom'] = compte.agence.nom_agence
+                            messages.success(request, f'Connexion réussie ! Bienvenue {compte.nom_complet}')
+                            return redirect('dashboard_comptabiliter')
+                    else:
+                        messages.error(request, 'Votre compte n\'est pas lié à une agence.')
+                except Compte.DoesNotExist:
+                    messages.error(request, 'Aucun compte actif trouvé pour cet utilisateur.')
+            else:
+                messages.error(request, 'Nom d\'utilisateur ou mot de passe incorrect.')
+        else:
+            messages.error(request, 'Veuillez remplir tous les champs.')
+    
+    return render(request, 'supermarket/comptabiliter/login_comptabiliter.html')
+
+def logout_comptabiliter(request):
+    """Déconnexion du module Comptabilité"""
+    logout(request)
+    request.session.flush()
+    messages.success(request, 'Vous avez été déconnecté avec succès.')
+    return redirect('index')
+
+@login_required
+def dashboard_comptabiliter(request):
+    """Dashboard principal du module de gestion de stock"""
+    try:
+        # Récupérer l'agence de l'utilisateur
+        agence = get_user_agence(request)
+        if not agence:
+            messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+            # return redirect('logout_stock')
+
+       
+        
+        
+        # Récupérer le nom de l'utilisateur
+        try:
+            compte = Compte.objects.get(user=request.user, actif=True)
+            nom_utilisateur = compte.nom_complet
+        except Compte.DoesNotExist:
+            nom_utilisateur = request.user.username
+
+        context = {
+            'agence': agence,
+            'nom_utilisateur': nom_utilisateur,
+        }
+        
+        return render(request, 'supermarket/comptabiliter/dashboard.html', context)
+        
+    except Exception as e:
+        messages.error(request, f'Erreur lors du chargement du dashboard: {str(e)}')
+        # Récupérer le nom de l'utilisateur même en cas d'erreur
+        try:
+            compte = Compte.objects.get(user=request.user, actif=True)
+            nom_utilisateur = compte.nom_complet
+        except:
+            nom_utilisateur = request.user.username if request.user.is_authenticated else "Utilisateur"
+
+        return render(request, 'supermarket/comptabiliter/dashboard.html', {
+            'agence': None,
+            'nom_utilisateur': nom_utilisateur,
+        })
+
+
+login_required
+def creer_depense(request): 
+    """Vue pour créer une nouvelle dépense"""
+    if request.method == 'POST':
+        try:
+            
+            libelle = request.POST.get('libelle')
+            date = request.POST.get('date')
+            montant = request.POST.get('montant')
+            
+          
+            if not all([libelle, date, montant]):
+                messages.error(request, 'Veuillez remplir tous les champs obligatoires.')
+                return redirect('creer_depense')
+            
+           
+            depense = Depense.objects.create(
+                libelle=libelle, 
+                date=date,
+                montant=montant,
+            )
+            
+            messages.success(request, 'Dépense enregistrée avec succès!')
+            
+            return redirect('dashboard_comptabiliter') 
+            
+        except Exception as e:
+            messages.error(request, f'Erreur lors de la création de la dépense: {str(e)}')
+            return redirect('creer_depense')
+    
+    # GET - Afficher le formulaire
+    
+    context = {
+        # 'agences': agences,
+    }
+    # Chemin corrigé : comptabilite (pas comptabiliter)
+    return render(request, 'supermarket/comptabiliter/creer-depense.html', context)
+
+
+def consulter_depenses(request):
+    """
+    Affiche les dépenses et permet l'export Excel.
+    Par défaut : affiche les 24 dernières heures.
+    """
+    
+    # 1. Gestion des dates (Filtre ou Défaut)
+    date_debut_str = request.GET.get('date_debut')
+    date_fin_str = request.GET.get('date_fin')
+    
+    # Par défaut : maintenant et il y a 24h
+    now = timezone.now()
+    
+    if date_debut_str and date_fin_str:
+        # Si l'utilisateur a choisi des dates
+        try:
+            # On convertit les strings en objets datetime "aware" (conscients du fuseau horaire)
+            # On force le début à 00:00:00 et la fin à 23:59:59 pour inclure toute la journée
+            date_debut = datetime.strptime(date_debut_str, '%Y-%m-%d')
+            date_debut = timezone.make_aware(date_debut.replace(hour=0, minute=0, second=0))
+            
+            date_fin = datetime.strptime(date_fin_str, '%Y-%m-%d')
+            date_fin = timezone.make_aware(date_fin.replace(hour=23, minute=59, second=59))
+            
+            # Filtre
+            depenses = Depense.objects.filter(date__range=[date_debut, date_fin])
+            periode_info = f"Du {date_debut_str} au {date_fin_str}"
+            
+        except ValueError:
+            # En cas d'erreur de format, retour au défaut
+            date_debut = now - timedelta(hours=24)
+            date_fin = now
+            depenses = Depense.objects.filter(date__gte=date_debut)
+            periode_info = "Dernières 24 heures (Erreur date)"
+    else:
+        # Pas de filtre : Dernières 24h
+        date_debut = now - timedelta(hours=24)
+        date_fin = now
+        depenses = Depense.objects.filter(date__gte=date_debut)
+        periode_info = "Dernières 24 heures"
+
+    # Calcul du total pour l'affichage
+    total_general = depenses.aggregate(Sum('montant'))['montant__sum'] or 0
+
+    # 2. GESTION DE L'EXPORT EXCEL
+    if request.GET.get('export') == 'excel':
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = f'attachment; filename="Rapport_Depenses_{datetime.now().strftime("%Y%m%d")}.xlsx"'
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Dépenses"
+
+        # Styles
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="06beb6", end_color="06beb6", fill_type="solid")
+        center_align = Alignment(horizontal="center")
+
+        # En-tête du fichier (Titre et Période)
+        ws.merge_cells('A1:C1')
+        ws['A1'] = f"Rapport des Dépenses - {periode_info}"
+        ws['A1'].font = Font(bold=True, size=14)
+        ws['A1'].alignment = center_align
+
+        # En-têtes du tableau
+        headers = ['Date', 'Libellé', 'Montant (FCFA)']
+        ws.append([]) # Ligne vide
+        ws.append(headers)
+
+        # Appliquer le style aux en-têtes (Ligne 3)
+        for col in range(1, 4):
+            cell = ws.cell(row=3, column=col)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = center_align
+
+        # Données
+        row_num = 4
+        for depense in depenses:
+            # On formate la date sans le fuseau horaire pour Excel
+            date_naive = depense.date.replace(tzinfo=None) if depense.date else ""
+            
+            ws.cell(row=row_num, column=1, value=date_naive).number_format = 'DD/MM/YYYY HH:MM'
+            ws.cell(row=row_num, column=2, value=depense.libelle)
+            ws.cell(row=row_num, column=3, value=depense.montant)
+            row_num += 1
+
+        # Ligne Total
+        ws.append([])
+        total_row = row_num + 1
+        ws.cell(row=total_row, column=2, value="TOTAL DÉPENSES").font = Font(bold=True)
+        ws.cell(row=total_row, column=3, value=total_general).font = Font(bold=True)
+        
+        # Ajuster la largeur des colonnes
+        ws.column_dimensions['A'].width = 20
+        ws.column_dimensions['B'].width = 40
+        ws.column_dimensions['C'].width = 20
+
+        wb.save(response)
+        return response
+
+    # 3. Affichage HTML standard
+    context = {
+        'depenses': depenses,
+        'total_general': total_general,
+        'date_debut': date_debut_str, # Pour pré-remplir le champ input
+        'date_fin': date_fin_str,     # Pour pré-remplir le champ input
+        'periode_info': periode_info
+    }
+    return render(request, 'supermarket/comptabiliter/consulter_depenses.html', context)    
+# login_stock
+# creer_Depanset

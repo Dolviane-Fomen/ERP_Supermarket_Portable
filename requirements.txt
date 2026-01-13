@@ -2,10 +2,3 @@ openpyxl>=3.1.5
 reportlab>=4.4.4
 django>=5.2.7
 pillow>=11.3.0
-
-# Dépendances pour la production
-gunicorn>=21.2.0
-psycopg2-binary>=2.9.9
-whitenoise>=6.6.0
-dj-database-url>=2.1.0
-python-decouple>=3.8

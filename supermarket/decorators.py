@@ -114,6 +114,13 @@ PERMISSIONS = {
         'name': 'Gestion des Comptes',
         'login_url': 'login_comptes'
     },
+
+     # Module comptable -comptable, assistant_comptable , Admin uniquement
+    'comptable': {
+        'allowed_types': ['comptable', 'assistant_comptable', 'admin'],
+        'name': 'Gestion Comptables',
+        'login_url': 'login_comptabilite'
+    },
 }
 
 def require_compte_type(allowed_types, feature_name=None, login_url=None):
@@ -254,6 +261,11 @@ def require_caisse_access(view_func):
 def require_stock_access(view_func):
     """Décorateur pour l'accès au module Stock (comptable, assistant_comptable et admin)"""
     return require_module_access('stock')(view_func)
+
+def require_comptable_access(view_func):
+    """Décorateur pour l'accès au module comptable (comptable, assistant_comptable et admin)"""
+    return require_module_access('comptable')(view_func)
+
 
 def require_stock_modify_access(view_func):
     """Décorateur pour l'accès à la modification d'article (comptable et admin uniquement, exclut assistant_comptable)"""
