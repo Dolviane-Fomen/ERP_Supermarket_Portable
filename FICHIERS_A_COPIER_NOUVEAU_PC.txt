@@ -1,0 +1,72 @@
+========================================
+FICHIERS À COPIER POUR SYNCHRONISATION DES DONNÉES
+========================================
+
+Pour qu'un nouveau PC puisse se connecter à la base de données partagée
+et synchroniser les données en temps réel, copiez TOUS les fichiers sauf :
+
+❌ NE PAS COPIER (seront recréés automatiquement) :
+- venv/ (environnement virtuel Python - recréer sur chaque PC)
+- __pycache__/ (fichiers Python compilés)
+- *.pyc (fichiers Python compilés)
+- .env (sera créé par ACTIVER_BASE_PARTAGEE.bat)
+- db_erp.sqlite3 (base SQLite locale - pas nécessaire avec base partagée)
+- *.log (fichiers de log)
+- .git/ (dossier Git si présent)
+
+✅ À COPIER OBLIGATOIREMENT :
+
+1. STRUCTURE DJANGO :
+   - manage.py (point d'entrée Django)
+   - requirements.txt (dépendances Python)
+   - Procfile (si présent)
+
+2. CODE DE L'APPLICATION :
+   - erp_project/ (tout le dossier - configuration Django)
+   - supermarket/ (tout le dossier - application principale)
+   - static/ (tous les fichiers statiques : CSS, JS, images)
+   - deployment/ (si présent)
+
+3. FICHIERS DE CONFIGURATION ESSENTIELS :
+   - ACTIVER_BASE_PARTAGEE.bat (active la base partagée)
+   - INSTALLER_PSYCOPG2.bat (installe psycopg2-binary)
+   - TESTER_CONNEXION_DB.bat (teste la connexion)
+   - ACTIVER_SQLITE_LOCAL.bat (pour revenir à SQLite si besoin)
+   - env.example.txt (template pour .env)
+
+4. AUTRES SCRIPTS UTILES (optionnels mais recommandés) :
+   - ERP_Launcher.bat (pour lancer l'application)
+   - INSTALLER_DEPENDANCES_ERP.bat (pour installer les dépendances)
+   - CONFIGURER_NOUVEAU_PC.bat (aide à la configuration)
+
+========================================
+MÉTHODE SIMPLE : COPIER TOUT LE DOSSIER
+========================================
+
+La méthode la plus simple est de copier TOUT le dossier du projet,
+puis SUPPRIMER manuellement :
+- Le dossier venv/ (si présent)
+- Le fichier db_erp.sqlite3 (si présent)
+- Le fichier .env (sera recréé automatiquement)
+
+========================================
+APRÈS LA COPIE SUR LE NOUVEAU PC :
+========================================
+
+1. Installer Python 3 (si pas déjà installé)
+2. Double-cliquer sur INSTALLER_PSYCOPG2.bat
+3. Double-cliquer sur ACTIVER_BASE_PARTAGEE.bat
+4. Double-cliquer sur TESTER_CONNEXION_DB.bat (vérifier que ça fonctionne)
+5. C'est tout ! Les données seront synchronisées en temps réel
+
+========================================
+NOTE IMPORTANTE :
+========================================
+
+- Les fichiers de données (factures, stock, etc.) sont dans la base
+  PostgreSQL sur OVH, donc PAS besoin de les copier
+- Chaque PC se connecte directement à la même base de données
+- Tous les PCs voient les mêmes données en temps réel
+
+
+

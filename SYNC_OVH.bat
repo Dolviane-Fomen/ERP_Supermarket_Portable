@@ -1,9 +1,12 @@
 @echo off
-REM Script de synchronisation simple pour Windows
-REM Double-cliquez sur ce fichier pour synchroniser avec OVH
+REM Script de synchronisation du CODE (fichiers Python, templates, etc.)
+REM Double-cliquez sur ce fichier pour synchroniser le CODE avec OVH
+REM 
+REM NOTE: Ce script synchronise uniquement le CODE
+REM Pour synchroniser les DONNEES (stock, clients, etc.), utilisez SYNC_DONNEES.bat
 
 echo ========================================
-echo Synchronisation ERP avec OVH
+echo Synchronisation CODE ERP avec OVH
 echo ========================================
 echo.
 

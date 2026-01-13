@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Analyse Financière</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        line-height: 1.6;
+        min-height: 100vh;
+    }
+    header {
+        display: flex;
+        align-items: center;
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        padding: 15px 20px;
+        border-radius: 12px;
+        box-shadow: 0 8px 30px rgba(245, 87, 108, 0.3);
+        margin-bottom: 25px;
+    }
+    .super-market-title {
+        font-size: 1.8em;
+        font-weight: 600;
+        color: white;
+        margin: 0;
+        flex: 1;
+    }
+    .header-info {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+    .username {
+        color: white;
+        font-weight: 600;
+        font-size: 0.95em;
+    }
+    .logout-button {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        padding: 8px 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        font-size: 0.9em;
+    }
+    .logout-button:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: translateY(-2px);
+    }
+    .container {
+        display: flex;
+        gap: 20px;
+    }
+    .menu-bar {
+        width: 260px;
+        background: linear-gradient(to bottom, #2c3e50, #34495e);
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+        height: fit-content;
+    }
+    .menu-bar h2 {
+        color: #ecf0f1;
+        font-size: 1.3em;
+        margin: 0 0 20px;
+        font-weight: bold;
+        text-align: center;
+        padding-bottom: 15px;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+    }
+    .menu-item {
+        color: #ecf0f1;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        padding: 14px;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        transition: all 0.3s ease;
+    }
+    .menu-item:hover {
+        background: rgba(245, 87, 108, 0.2);
+        transform: translateX(5px);
+    }
+    .menu-item.active {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+    }
+    .icon {
+        margin-right: 12px;
+        font-size: 1.1em;
+        width: 24px;
+        text-align: center;
+    }
+    .content {
+        flex: 1;
+        min-width: 0;
+    }
+    .dashboard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 25px;
+    }
+    .dashboard-header h2 {
+        color: #2c3e50;
+        font-size: 2em;
+        font-weight: 700;
+        margin: 0;
+    }
+    .period-selector {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+    .period-badge {
+        background: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        color: #2c3e50;
+        font-size: 0.9em;
+        font-weight: 600;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    .kpi-card {
+        background: white;
+        border-radius: 16px;
+        padding: 25px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+    .kpi-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+    }
+    .kpi-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, var(--kpi-color), var(--kpi-color-light));
+    }
+    .kpi-card.ca::before { --kpi-color: #4facfe; --kpi-color-light: #00f2fe; }
+    .kpi-card.depenses::before { --kpi-color: #fa709a; --kpi-color-light: #fee140; }
+    .kpi-card.marge::before { --kpi-color: #30cfd0; --kpi-color-light: #330867; }
+    .kpi-card.resultat::before { --kpi-color: #a8edea; --kpi-color-light: #fed6e3; }
+    .kpi-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 15px;
+    }
+    .kpi-title {
+        color: #7f8c8d;
+        font-size: 0.9em;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .kpi-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5em;
+        color: white;
+    }
+    .kpi-icon.ca { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+    .kpi-icon.depenses { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+    .kpi-icon.marge { background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); }
+    .kpi-icon.resultat { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); }
+    .kpi-value {
+        font-size: 2.2em;
+        font-weight: 700;
+        color: #2c3e50;
+        margin-bottom: 8px;
+    }
+    .kpi-subtitle {
+        color: #95a5a6;
+        font-size: 0.85em;
+    }
+    .kpi-trend {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 0.85em;
+        font-weight: 600;
+        margin-top: 10px;
+    }
+    .kpi-trend.positive {
+        background: #d4edda;
+        color: #155724;
+    }
+    .kpi-trend.negative {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    .charts-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    .chart-card {
+        background: white;
+        border-radius: 16px;
+        padding: 25px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+    }
+    .chart-card h3 {
+        color: #2c3e50;
+        font-size: 1.3em;
+        margin-bottom: 20px;
+        font-weight: 700;
+    }
+    .chart-container {
+        position: relative;
+        height: 300px;
+    }
+    .table-card {
+        background: white;
+        border-radius: 16px;
+        padding: 25px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+    }
+    .table-card h3 {
+        color: #2c3e50;
+        font-size: 1.3em;
+        margin-bottom: 20px;
+        font-weight: 700;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    thead {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+    }
+    th {
+        padding: 15px;
+        text-align: left;
+        font-weight: 600;
+        font-size: 0.9em;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    td {
+        padding: 15px;
+        border-bottom: 1px solid #ecf0f1;
+        color: #2c3e50;
+    }
+    tbody tr:hover {
+        background: #f8f9fa;
+    }
+    .badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.85em;
+        font-weight: 600;
+    }
+    .badge-success {
+        background: #d4edda;
+        color: #155724;
+    }
+    @media (max-width: 1200px) {
+        .charts-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    @media (max-width: 900px) {
+        .container {
+            flex-direction: column;
+        }
+        .menu-bar {
+            width: 100%;
+        }
+        .kpi-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+</head>
+<body>
+
+<!-- Messages Django -->
+{% if messages %}
+    {% for message in messages %}
+        <div style="margin: 10px 0; padding: 15px; border-radius: 8px; background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <i class="fas fa-info-circle"></i> {{ message }}
+        </div>
+    {% endfor %}
+{% endif %}
+
+<header>
+    <div style="width: 50px; height: 50px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 15px;">
+        <i class="fas fa-chart-line" style="font-size: 1.5em; color: white;"></i>
+    </div>
+    <div class="super-market-title">Analyse Financière - {{ agence.nom_agence }}</div>
+    <div class="header-info">
+        <i class="fas fa-user-circle" style="font-size: 24px; color: white;"></i>
+        <div class="username">{{ compte.nom_complet }}</div>
+        <a href="{% url 'logout_financier' %}" class="logout-button">
+            <i class="fas fa-sign-out-alt"></i> Déconnexion
+        </a>
+    </div>
+</header>
+
+<div class="container">
+    <div class="menu-bar">
+        <h2><i class="fas fa-bars"></i> MENU</h2>
+        
+        <a href="{% url 'dashboard_financier' %}" class="menu-item {% if request.resolver_match.url_name == 'dashboard_financier' %}active{% endif %}">
+            <i class="fas fa-home icon"></i>
+            <span>Dashboard</span>
+        </a>
+        
+        <a href="{% url 'suivi_statistique' %}" class="menu-item {% if request.resolver_match.url_name == 'suivi_statistique' %}active{% endif %}">
+            <i class="fas fa-chart-bar icon"></i>
+            <span>Suivi Statistique</span>
+        </a>
+        
+        <a href="{% url 'etat_depense' %}" class="menu-item {% if request.resolver_match.url_name == 'etat_depense' %}active{% endif %}">
+            <i class="fas fa-money-bill-wave icon"></i>
+            <span>État Dépense</span>
+        </a>
+        
+        <a href="{% url 'etat_tresorerie' %}" class="menu-item {% if request.resolver_match.url_name == 'etat_tresorerie' %}active{% endif %}">
+            <i class="fas fa-wallet icon"></i>
+            <span>État Trésorerie</span>
+        </a>
+        
+        <a href="{% url 'etat_resultat' %}" class="menu-item {% if request.resolver_match.url_name == 'etat_resultat' %}active{% endif %}">
+            <i class="fas fa-file-invoice-dollar icon"></i>
+            <span>État Résultat</span>
+        </a>
+    </div>
+    
+    <div class="content">
+        {% block content %}
+        <div class="dashboard-header">
+            <h2><i class="fas fa-chart-line" style="color: #f5576c;"></i> Tableau de Bord Financier</h2>
+            <div class="period-selector">
+                <span class="period-badge">
+                    <i class="fas fa-calendar-alt"></i> 
+                    {{ date_debut|date:"d/m/Y" }} - {{ date_fin|date:"d/m/Y" }}
+                </span>
+            </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="kpi-grid">
+            <div class="kpi-card ca">
+                <div class="kpi-header">
+                    <div>
+                        <div class="kpi-title">Chiffre d'Affaires</div>
+                        <div class="kpi-value">{{ ca_total|floatformat:0 }} FCFA</div>
+                        <div class="kpi-subtitle">30 derniers jours</div>
+                    </div>
+                    <div class="kpi-icon ca">
+                        <i class="fas fa-arrow-trend-up"></i>
+                    </div>
+                </div>
+                <div class="kpi-trend positive">
+                    <i class="fas fa-arrow-up"></i> {{ nb_ventes }} ventes
+                </div>
+            </div>
+
+            <div class="kpi-card depenses">
+                <div class="kpi-header">
+                    <div>
+                        <div class="kpi-title">Dépenses</div>
+                        <div class="kpi-value">{{ depenses_total|floatformat:0 }} FCFA</div>
+                        <div class="kpi-subtitle">{{ nb_achats }} achats validés</div>
+                    </div>
+                    <div class="kpi-icon depenses">
+                        <i class="fas fa-arrow-trend-down"></i>
+                    </div>
+                </div>
+                <div class="kpi-trend negative">
+                    <i class="fas fa-receipt"></i> Achats
+                </div>
+            </div>
+
+            <div class="kpi-card marge">
+                <div class="kpi-header">
+                    <div>
+                        <div class="kpi-title">Marge Brute</div>
+                        <div class="kpi-value">{{ marge_totale|floatformat:0 }} FCFA</div>
+                        <div class="kpi-subtitle">{{ pourcentage_marge|floatformat:1 }}% de marge</div>
+                    </div>
+                    <div class="kpi-icon marge">
+                        <i class="fas fa-percent"></i>
+                    </div>
+                </div>
+                <div class="kpi-trend {% if marge_totale > 0 %}positive{% else %}negative{% endif %}">
+                    <i class="fas fa-chart-line"></i> Rentabilité
+                </div>
+            </div>
+
+            <div class="kpi-card resultat">
+                <div class="kpi-header">
+                    <div>
+                        <div class="kpi-title">Résultat Net</div>
+                        <div class="kpi-value">{{ resultat_net|floatformat:0 }} FCFA</div>
+                        <div class="kpi-subtitle">CA - Dépenses</div>
+                    </div>
+                    <div class="kpi-icon resultat">
+                        <i class="fas fa-balance-scale"></i>
+                    </div>
+                </div>
+                <div class="kpi-trend {% if resultat_net > 0 %}positive{% else %}negative{% endif %}">
+                    <i class="fas fa-{% if resultat_net > 0 %}check{% else %}exclamation-triangle{% endif %}"></i> 
+                    {% if resultat_net > 0 %}Bénéfice{% else %}Déficit{% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h3><i class="fas fa-chart-area" style="color: #f5576c;"></i> Évolution CA vs Dépenses (7 derniers jours)</h3>
+                <div class="chart-container">
+                    <canvas id="evolutionChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-card">
+                <h3><i class="fas fa-chart-pie" style="color: #f5576c;"></i> Répartition</h3>
+                <div class="chart-container">
+                    <canvas id="repartitionChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Articles -->
+        <div class="table-card">
+            <h3><i class="fas fa-trophy" style="color: #f5576c;"></i> Top 5 Articles les plus Vendus</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Rang</th>
+                        <th>Article</th>
+                        <th>Quantité</th>
+                        <th>Chiffre d'Affaires</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for article in top_articles %}
+                    <tr>
+                        <td><span class="badge badge-success">{{ forloop.counter }}</span></td>
+                        <td><strong>{{ article.article__designation }}</strong></td>
+                        <td>{{ article.quantite_totale|floatformat:0 }}</td>
+                        <td><strong>{{ article.total_vente|floatformat:0 }} FCFA</strong></td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" style="text-align: center; color: #95a5a6; padding: 30px;">
+                            <i class="fas fa-inbox" style="font-size: 2em; margin-bottom: 10px; display: block;"></i>
+                            Aucune donnée disponible
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endblock %}
+    </div>
+</div>
+
+{{ labels_jours|json_script:"labels-days" }}
+{{ evolution_ca|json_script:"evolution-ca" }}
+{{ evolution_depenses|json_script:"evolution-dep" }}
+
+<script>
+    // Graphique d'évolution
+    const evolutionCtx = document.getElementById('evolutionChart').getContext('2d');
+    const labelsDays = JSON.parse(document.getElementById('labels-days').textContent);
+    const evolutionCA = JSON.parse(document.getElementById('evolution-ca').textContent);
+    const evolutionDep = JSON.parse(document.getElementById('evolution-dep').textContent);
+    
+    new Chart(evolutionCtx, {
+        type: 'line',
+        data: {
+            labels: labelsDays,
+            datasets: [
+                {
+                    label: 'Chiffre d\'Affaires',
+                    data: evolutionCA,
+                    borderColor: '#4facfe',
+                    backgroundColor: 'rgba(79, 172, 254, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    borderWidth: 3
+                },
+                {
+                    label: 'Dépenses',
+                    data: evolutionDep,
+                    borderColor: '#fa709a',
+                    backgroundColor: 'rgba(250, 112, 154, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    borderWidth: 3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return value.toLocaleString('fr-FR') + ' FCFA';
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Graphique de répartition
+    const repartitionCtx = document.getElementById('repartitionChart').getContext('2d');
+    const caValue = parseFloat('{{ ca_total }}') || 0;
+    const depValue = parseFloat('{{ depenses_total }}') || 0;
+    
+    new Chart(repartitionCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Chiffre d\'Affaires', 'Dépenses'],
+            datasets: [{
+                data: [caValue, depValue],
+                backgroundColor: [
+                    '#4facfe',
+                    '#fa709a'
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            label += context.parsed.toLocaleString('fr-FR') + ' FCFA';
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+</script>
+
+</body>
+</html>

@@ -204,3 +204,6 @@ R: Oui, dès que vous poussez sur GitHub, GitHub Actions déploie automatiquemen
 **Q: Puis-je travailler sans internet ?**
 R: Oui, vous pouvez modifier le code. Mais pour synchroniser, il faut internet.
 
+
+
+

@@ -91,3 +91,6 @@ git log -1  # Doit afficher votre dernier commit
 - Le workflow continuera quand même
 - Configurez le service plus tard si nécessaire
 
+
+
+

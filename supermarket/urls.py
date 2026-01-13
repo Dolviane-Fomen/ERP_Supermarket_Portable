@@ -253,11 +253,22 @@ urlpatterns = [
     path('comptes/<int:compte_id>/supprimer/', views.supprimer_compte, name='supprimer_compte'),
     path('comptes/<int:compte_id>/activer-desactiver/', views.activer_desactiver_compte, name='activer_desactiver_compte'),
     path('comptes/<int:compte_id>/reinitialiser-mot-de-passe/', views.reinitialiser_mot_de_passe, name='reinitialiser_mot_de_passe'),
-
-    # ======================== Module Comptabiliter=======================
-    path('comptabiliter/login_comptabiliter/', views.login_comptabiliter, name='login_comptabiliter'),
+    
+    # ===== MODULE ANALYSE FINANCIÈRE =====
+    path('financier/login/', views.login_financier, name='login_financier'),
+    path('financier/logout/', views.logout_financier, name='logout_financier'),
+    path('financier/', views.dashboard_financier, name='dashboard_financier'),
+    path('financier/suivi-statistique/', views.suivi_statistique, name='suivi_statistique'),
+    path('financier/generer-suivi-statistique/', views.generer_suivi_statistique, name='generer_suivi_statistique'),
+    path('financier/export-suivi-statistique-excel/', views.export_suivi_statistique_excel, name='export_suivi_statistique_excel'),
+    path('financier/etat-depense/', views.etat_depense, name='etat_depense'),
+    path('financier/etat-tresorerie/', views.etat_tresorerie, name='etat_tresorerie'),
+    path('financier/etat-resultat/', views.etat_resultat, name='etat_resultat'),
+    
+    # ===== MODULE COMPTABILITÉ =====
+    path('comptabiliter/login/', views.login_comptabiliter, name='login_comptabiliter'),
     path('comptabiliter/dashboard/', views.dashboard_comptabiliter, name='dashboard_comptabiliter'),
-    path('comptabiliter/dashboard/', views.logout_stock, name='logout_Comptabiliter'),
+    path('comptabiliter/logout/', views.logout_comptabiliter, name='logout_comptabiliter'),
     path('comptabiliter/creer-depense/', views.creer_depense, name='creer_depense'),
     path('comptabiliter/consulter-depenses/', views.consulter_depenses, name='consulter_depenses'),
     path('comptabiliter/suivi-chiffre-affaire/', views.suivi_chiffre_affaire, name='suivi_chiffre_affaire'),

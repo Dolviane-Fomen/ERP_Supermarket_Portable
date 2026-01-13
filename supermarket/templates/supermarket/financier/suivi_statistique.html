@@ -1,0 +1,426 @@
+{% extends 'supermarket/financier/dashboard_financier.html' %}
+
+{% block content %}
+<div class="content">
+    <h2><i class="fas fa-chart-bar" style="color: #f5576c; margin-right: 10px;"></i>Suivi Statistique - Toutes Agences</h2>
+    
+    <style>
+        .filter-card {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+        }
+        .filter-card h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            font-weight: 700;
+        }
+        .filter-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 15px;
+            align-items: end;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .form-group label {
+            color: #2c3e50;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+        .form-group input {
+            padding: 12px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #f5576c;
+            box-shadow: 0 0 0 3px rgba(245, 87, 108, 0.1);
+        }
+        .btn-generate {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1em;
+        }
+        .btn-generate:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(245, 87, 108, 0.4);
+        }
+        .btn-export {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1em;
+            margin-left: 10px;
+        }
+        .btn-export:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+        }
+        .results-container {
+            display: none;
+        }
+        .results-container.active {
+            display: block;
+        }
+        .agence-section {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+        }
+        .agence-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .agence-header h3 {
+            margin: 0;
+            font-size: 1.4em;
+        }
+        .jour-section {
+            margin-bottom: 25px;
+            border-left: 4px solid #f5576c;
+            padding-left: 15px;
+        }
+        .jour-title {
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+        .marge-category {
+            margin-bottom: 20px;
+        }
+        .category-header {
+            padding: 12px 15px;
+            border-radius: 8px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .category-header.bonne {
+            background: #C6EFCE;
+            color: #006100;
+        }
+        .category-header.mediocre {
+            background: #FFEB9C;
+            color: #9C6500;
+        }
+        .category-header.faible {
+            background: #FFC7CE;
+            color: #9C0006;
+        }
+        .stats-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .stats-table th {
+            background: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #2c3e50;
+            border-bottom: 2px solid #dee2e6;
+        }
+        .stats-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e9ecef;
+            color: #5a6c7d;
+        }
+        .stats-table tr:hover {
+            background: #f8f9fa;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #5a6c7d;
+        }
+        .loading i {
+            font-size: 3em;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+    
+    <div class="filter-card">
+        <h3><i class="fas fa-filter" style="color: #f5576c;"></i> Sélection de la Période</h3>
+        <form id="formStats" class="filter-form">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="date_debut">Date de début</label>
+                <input type="date" id="date_debut" name="date_debut" required>
+            </div>
+            <div class="form-group">
+                <label for="date_fin">Date de fin</label>
+                <input type="date" id="date_fin" name="date_fin" required>
+            </div>
+            <div>
+                <button type="submit" class="btn-generate">
+                    <i class="fas fa-chart-line"></i> Générer Statistique
+                </button>
+                <button type="button" id="btnExport" class="btn-export" style="display: none;">
+                    <i class="fas fa-file-excel"></i> Exporter Excel
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <div id="loading" class="loading" style="display: none;">
+        <i class="fas fa-spinner"></i>
+        <p>Génération des statistiques en cours...</p>
+    </div>
+    
+    <div id="alertContainer"></div>
+    
+    <div id="resultsContainer" class="results-container"></div>
+</div>
+
+<script>
+document.getElementById('formStats').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const dateDebut = document.getElementById('date_debut').value;
+    const dateFin = document.getElementById('date_fin').value;
+    
+    if (!dateDebut || !dateFin) {
+        showAlert('Veuillez sélectionner les dates', 'error');
+        return;
+    }
+    
+    if (new Date(dateDebut) > new Date(dateFin)) {
+        showAlert('La date de début doit être antérieure à la date de fin', 'error');
+        return;
+    }
+    
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('resultsContainer').classList.remove('active');
+    document.getElementById('btnExport').style.display = 'none';
+    
+    const formData = new FormData();
+    formData.append('date_debut', dateDebut);
+    formData.append('date_fin', dateFin);
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    
+    fetch('{% url "generer_suivi_statistique" %}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('loading').style.display = 'none';
+        
+        if (data.success) {
+            displayResults(data.statistiques, data.date_debut, data.date_fin);
+            document.getElementById('btnExport').style.display = 'inline-block';
+            showAlert('Statistiques générées avec succès', 'success');
+        } else {
+            showAlert('Erreur: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        document.getElementById('loading').style.display = 'none';
+        showAlert('Erreur lors de la génération', 'error');
+        console.error(error);
+    });
+});
+
+function displayResults(statistiques, dateDebut, dateFin) {
+    const container = document.getElementById('resultsContainer');
+    container.innerHTML = '';
+    
+    if (!statistiques || Object.keys(statistiques).length === 0) {
+        container.innerHTML = '<div class="alert alert-info">Aucune donnée disponible pour cette période</div>';
+        container.classList.add('active');
+        return;
+    }
+    
+    let html = '';
+    
+    for (const [agenceId, agenceData] of Object.entries(statistiques)) {
+        html += `<div class="agence-section">
+            <div class="agence-header">
+                <h3><i class="fas fa-store"></i> ${agenceData.nom_agence}</h3>
+            </div>`;
+        
+        const jours = Object.entries(agenceData.stats_journalieres).sort();
+        
+        for (const [date, stats] of jours) {
+            html += `<div class="jour-section">
+                <div class="jour-title"><i class="fas fa-calendar-day"></i> ${date}</div>`;
+            
+            // Bonne marge
+            if (stats.bonne_marge && stats.bonne_marge.length > 0) {
+                html += `<div class="marge-category">
+                    <div class="category-header bonne">
+                        <i class="fas fa-check-circle"></i> Bonne Marge (≥10%) - ${stats.bonne_marge.length} article(s)
+                    </div>
+                    <table class="stats-table">
+                        <thead>
+                            <tr>
+                                <th>Référence</th>
+                                <th>Désignation</th>
+                                <th>Quantité</th>
+                                <th>Chiffre d'Affaires (FCFA)</th>
+                                <th>Marge (FCFA)</th>
+                                <th>Marge (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+                for (const art of stats.bonne_marge) {
+                    html += `<tr>
+                        <td>${art.reference}</td>
+                        <td>${art.designation}</td>
+                        <td>${art.quantite.toLocaleString('fr-FR')}</td>
+                        <td>${art.chiffre_affaires.toLocaleString('fr-FR')}</td>
+                        <td>${art.marge.toLocaleString('fr-FR')}</td>
+                        <td><strong>${art.pourcentage_marge.toFixed(2)}%</strong></td>
+                    </tr>`;
+                }
+                html += `</tbody></table></div>`;
+            }
+            
+            // Marge médiocre
+            if (stats.marge_mediocre && stats.marge_mediocre.length > 0) {
+                html += `<div class="marge-category">
+                    <div class="category-header mediocre">
+                        <i class="fas fa-exclamation-triangle"></i> Marge Médiocre (4% à 9%) - ${stats.marge_mediocre.length} article(s)
+                    </div>
+                    <table class="stats-table">
+                        <thead>
+                            <tr>
+                                <th>Référence</th>
+                                <th>Désignation</th>
+                                <th>Quantité</th>
+                                <th>Chiffre d'Affaires (FCFA)</th>
+                                <th>Marge (FCFA)</th>
+                                <th>Marge (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+                for (const art of stats.marge_mediocre) {
+                    html += `<tr>
+                        <td>${art.reference}</td>
+                        <td>${art.designation}</td>
+                        <td>${art.quantite.toLocaleString('fr-FR')}</td>
+                        <td>${art.chiffre_affaires.toLocaleString('fr-FR')}</td>
+                        <td>${art.marge.toLocaleString('fr-FR')}</td>
+                        <td><strong>${art.pourcentage_marge.toFixed(2)}%</strong></td>
+                    </tr>`;
+                }
+                html += `</tbody></table></div>`;
+            }
+            
+            // Marge faible
+            if (stats.marge_faible && stats.marge_faible.length > 0) {
+                html += `<div class="marge-category">
+                    <div class="category-header faible">
+                        <i class="fas fa-times-circle"></i> Marge Faible (&lt;4%) - ${stats.marge_faible.length} article(s)
+                    </div>
+                    <table class="stats-table">
+                        <thead>
+                            <tr>
+                                <th>Référence</th>
+                                <th>Désignation</th>
+                                <th>Quantité</th>
+                                <th>Chiffre d'Affaires (FCFA)</th>
+                                <th>Marge (FCFA)</th>
+                                <th>Marge (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+                for (const art of stats.marge_faible) {
+                    html += `<tr>
+                        <td>${art.reference}</td>
+                        <td>${art.designation}</td>
+                        <td>${art.quantite.toLocaleString('fr-FR')}</td>
+                        <td>${art.chiffre_affaires.toLocaleString('fr-FR')}</td>
+                        <td>${art.marge.toLocaleString('fr-FR')}</td>
+                        <td><strong>${art.pourcentage_marge.toFixed(2)}%</strong></td>
+                    </tr>`;
+                }
+                html += `</tbody></table></div>`;
+            }
+            
+            html += `</div>`;
+        }
+        
+        html += `</div>`;
+    }
+    
+    container.innerHTML = html;
+    container.classList.add('active');
+}
+
+document.getElementById('btnExport').addEventListener('click', function() {
+    window.location.href = '{% url "export_suivi_statistique_excel" %}';
+});
+
+function showAlert(message, type) {
+    const container = document.getElementById('alertContainer');
+    container.innerHTML = `<div class="alert alert-${type}">
+        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-triangle' : 'info-circle'}"></i> ${message}
+    </div>`;
+    setTimeout(() => {
+        container.innerHTML = '';
+    }, 5000);
+}
+
+// Définir les dates par défaut (30 derniers jours)
+const today = new Date();
+const lastMonth = new Date();
+lastMonth.setDate(today.getDate() - 30);
+
+document.getElementById('date_fin').value = today.toISOString().split('T')[0];
+document.getElementById('date_debut').value = lastMonth.toISOString().split('T')[0];
+</script>
+{% endblock %}

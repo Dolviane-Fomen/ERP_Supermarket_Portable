@@ -90,3 +90,6 @@ SYNC_LOCAL_ONLINE.bat sync   # Bidirectionnel
 
 Pour plus de détails, voir : `GUIDE_SYNCHRONISATION_LOCAL_ONLINE.md`
 
+
+
+
