@@ -20,7 +20,7 @@ from .models import (
     FactureTemporaire, Famille, Fournisseur, MouvementStock, PlanComptable, PlanTiers, CodeJournaux,
     TauxTaxe, FactureAchat, LigneFactureAchat, FactureTransfert, LigneFactureTransfert,
     Commande, Livraison, FactureCommande, StatistiqueClient, DocumentCommande, LigneCommande, Notification,
-    Livreur, SuiviClientAction,Depense
+    Livreur, SuiviClientAction,Depense,ChiffreAffaire
 )
 from .decorators import (
     require_stock_modify_access,
@@ -19351,51 +19351,119 @@ def creer_depense(request):
     return render(request, 'supermarket/comptabiliter/creer-depense.html', context)
 
 
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.utils import timezone
+from django.db.models import Sum
+from datetime import datetime, timedelta
+import openpyxl
+from openpyxl.styles import Font, Alignment, PatternFill
+from django.http import HttpResponse
+
+# Assurez-vous d'importer vos modèles et fonctions utilitaires
+from .models import Depense, Compte, Agence
+# Si get_user_agence est dans un autre fichier (ex: utils.py), importez-le. 
+# Sinon, assurez-vous qu'il est défini ou accessible.
+# from .utils import get_user_agence 
+
+@login_required
+def creer_depense(request): 
+    """Vue pour créer une nouvelle dépense liée à l'agence"""
+    
+    # 1. Récupérer l'agence de l'utilisateur
+    try:
+        agence = get_user_agence(request)
+        if not agence:
+            raise ValueError("Agence non trouvée")
+    except Exception:
+        messages.error(request, "Impossible d'identifier votre agence.")
+        return redirect('dashboard_comptabiliter')
+
+    if request.method == 'POST':
+        try:
+            libelle = request.POST.get('libelle')
+            date = request.POST.get('date')
+            montant = request.POST.get('montant')
+            
+            if not all([libelle, date, montant]):
+                messages.error(request, 'Veuillez remplir tous les champs obligatoires.')
+                return redirect('creer_depense')
+            
+            # 2. CRÉATION AVEC L'AGENCE (Correction ici)
+            Depense.objects.create(
+                libelle=libelle, 
+                date=date,
+                montant=montant,
+                agence=agence  # INDISPENSABLE
+            )
+            
+            messages.success(request, 'Dépense enregistrée avec succès!')
+            return redirect('dashboard_comptabiliter') # Vérifiez que ce nom d'URL est bon
+            
+        except Exception as e:
+            messages.error(request, f'Erreur lors de la création : {str(e)}')
+            return redirect('creer_depense')
+    
+    return render(request, 'supermarket/comptabiliter/creer-depense.html')
+
+
+@login_required
 def consulter_depenses(request):
     """
-    Affiche les dépenses et permet l'export Excel.
-    Par défaut : affiche les 24 dernières heures.
+    Affiche les dépenses FILTRÉES PAR AGENCE et permet l'export Excel.
     """
     
-    # 1. Gestion des dates (Filtre ou Défaut)
+    # 1. Récupérer l'agence
+    try:
+        agence = get_user_agence(request)
+        if not agence:
+            messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+            return redirect('dashboard_comptabiliter')
+    except:
+        return redirect('login_comptabiliter')
+
+    # Récupérer le nom utilisateur
+    try:
+        compte = Compte.objects.get(user=request.user, actif=True)
+        nom_utilisateur = compte.nom_complet
+    except:
+        nom_utilisateur = request.user.username
+
+    # 2. Gestion des dates
     date_debut_str = request.GET.get('date_debut')
     date_fin_str = request.GET.get('date_fin')
-    
-    # Par défaut : maintenant et il y a 24h
     now = timezone.now()
     
+    # --- FILTRAGE DE BASE : Toujours filtrer par agence ---
+    depenses = Depense.objects.filter(agence=agence).order_by('-date')
+
     if date_debut_str and date_fin_str:
-        # Si l'utilisateur a choisi des dates
         try:
-            # On convertit les strings en objets datetime "aware" (conscients du fuseau horaire)
-            # On force le début à 00:00:00 et la fin à 23:59:59 pour inclure toute la journée
             date_debut = datetime.strptime(date_debut_str, '%Y-%m-%d')
             date_debut = timezone.make_aware(date_debut.replace(hour=0, minute=0, second=0))
             
             date_fin = datetime.strptime(date_fin_str, '%Y-%m-%d')
             date_fin = timezone.make_aware(date_fin.replace(hour=23, minute=59, second=59))
             
-            # Filtre
-            depenses = Depense.objects.filter(date__range=[date_debut, date_fin])
+            # Ajout du filtre de date au filtre d'agence existant
+            depenses = depenses.filter(date__range=[date_debut, date_fin])
             periode_info = f"Du {date_debut_str} au {date_fin_str}"
             
         except ValueError:
-            # En cas d'erreur de format, retour au défaut
             date_debut = now - timedelta(hours=24)
-            date_fin = now
-            depenses = Depense.objects.filter(date__gte=date_debut)
+            depenses = depenses.filter(date__gte=date_debut)
             periode_info = "Dernières 24 heures (Erreur date)"
     else:
-        # Pas de filtre : Dernières 24h
         date_debut = now - timedelta(hours=24)
-        date_fin = now
-        depenses = Depense.objects.filter(date__gte=date_debut)
+        # On garde le filtre agence et on ajoute le filtre date
+        depenses = depenses.filter(date__gte=date_debut)
         periode_info = "Dernières 24 heures"
 
-    # Calcul du total pour l'affichage
+    # Calcul du total
     total_general = depenses.aggregate(Sum('montant'))['montant__sum'] or 0
 
-    # 2. GESTION DE L'EXPORT EXCEL
+    # 3. EXPORT EXCEL
     if request.GET.get('export') == 'excel':
         response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         response['Content-Disposition'] = f'attachment; filename="Rapport_Depenses_{datetime.now().strftime("%Y%m%d")}.xlsx"'
@@ -19409,42 +19477,35 @@ def consulter_depenses(request):
         header_fill = PatternFill(start_color="06beb6", end_color="06beb6", fill_type="solid")
         center_align = Alignment(horizontal="center")
 
-        # En-tête du fichier (Titre et Période)
+        # En-tête : Titre et Agence
         ws.merge_cells('A1:C1')
-        ws['A1'] = f"Rapport des Dépenses - {periode_info}"
-        ws['A1'].font = Font(bold=True, size=14)
+        ws['A1'] = f"Dépenses : {agence.nom_agence} - {periode_info}"
+        ws['A1'].font = Font(bold=True, size=12)
         ws['A1'].alignment = center_align
 
-        # En-têtes du tableau
         headers = ['Date', 'Libellé', 'Montant (FCFA)']
-        ws.append([]) # Ligne vide
+        ws.append([]) 
         ws.append(headers)
 
-        # Appliquer le style aux en-têtes (Ligne 3)
         for col in range(1, 4):
             cell = ws.cell(row=3, column=col)
             cell.fill = header_fill
             cell.font = header_font
             cell.alignment = center_align
 
-        # Données
         row_num = 4
         for depense in depenses:
-            # On formate la date sans le fuseau horaire pour Excel
             date_naive = depense.date.replace(tzinfo=None) if depense.date else ""
-            
             ws.cell(row=row_num, column=1, value=date_naive).number_format = 'DD/MM/YYYY HH:MM'
             ws.cell(row=row_num, column=2, value=depense.libelle)
             ws.cell(row=row_num, column=3, value=depense.montant)
             row_num += 1
 
-        # Ligne Total
         ws.append([])
         total_row = row_num + 1
-        ws.cell(row=total_row, column=2, value="TOTAL DÉPENSES").font = Font(bold=True)
+        ws.cell(row=total_row, column=2, value="TOTAL").font = Font(bold=True)
         ws.cell(row=total_row, column=3, value=total_general).font = Font(bold=True)
         
-        # Ajuster la largeur des colonnes
         ws.column_dimensions['A'].width = 20
         ws.column_dimensions['B'].width = 40
         ws.column_dimensions['C'].width = 20
@@ -19452,14 +19513,183 @@ def consulter_depenses(request):
         wb.save(response)
         return response
 
-    # 3. Affichage HTML standard
     context = {
         'depenses': depenses,
         'total_general': total_general,
-        'date_debut': date_debut_str, # Pour pré-remplir le champ input
-        'date_fin': date_fin_str,     # Pour pré-remplir le champ input
-        'periode_info': periode_info
+        'date_debut': date_debut_str,
+        'date_fin': date_fin_str,
+        'periode_info': periode_info,
+        'agence': agence,
+        'nom_utilisateur': nom_utilisateur,
     }
-    return render(request, 'supermarket/comptabiliter/consulter_depenses.html', context)    
-# login_stock
-# creer_Depanset
+    return render(request, 'supermarket/comptabiliter/consulter_depenses.html', context)
+
+@login_required
+def suivi_chiffre_affaire(request):
+    # --- IMPORTS NÉCESSAIRES ---
+
+    
+    # 1. RECUPERATION AGENCE (Sécurisée)
+    try:
+        agence = get_user_agence(request)
+    except Exception as e:
+        messages.error(request, "Erreur d'identification de l'agence.")
+        return redirect('dashboard_comptabiliter')
+
+    # Gestion date pour l'affichage (Input date)
+    date_str = request.POST.get('date') or request.GET.get('date')
+    if date_str:
+        date_a_afficher = date_str
+    else:
+        date_a_afficher = timezone.now().date()
+
+    # 2. TRAITEMENT DU POST (Calcul & Enregistrement)
+    if request.method == "POST":
+        try:
+            montant_previsionnel = request.POST.get('montant_previsionnel', 500000)
+
+            # Calcul du CA du jour via les factures
+            ventes_jour = LigneFactureVente.objects.filter(
+                facture_vente__agence=agence,
+                facture_vente__date=date_a_afficher
+            )
+            calcul_ca = ventes_jour.aggregate(total=Sum(F('quantite') * F('prix_unitaire')))['total'] or 0
+            montant_realise = Decimal(calcul_ca)
+
+            # Enregistrement avec liaison AGENCE
+            ChiffreAffaire.objects.update_or_create(
+                date=date_a_afficher,
+                agence=agence,
+                defaults={
+                    'montant_realise': montant_realise,
+                    'montant_previsionnel': montant_previsionnel
+                }
+            )
+            messages.success(request, "Mise à jour effectuée.")
+
+        except Exception as e:
+            print(f"ERREUR POST: {e}") 
+            messages.error(request, f"Erreur : {e}")
+
+    # 3. RÉCUPÉRATION DES DONNÉES (Pour l'historique et l'Excel)
+    # On filtre uniquement sur l'agence connectée
+    donnees_ca = ChiffreAffaire.objects.filter(agence=agence).order_by('-date')
+
+   # 4. EXPORT EXCEL (Format Rapport Journalier - 3 Colonnes)
+    if request.GET.get('export') == 'excel':
+        # Récupération des données spécifiques au jour affiché
+        try:
+            ca_export = ChiffreAffaire.objects.get(date=date_a_afficher, agence=agence)
+            cap = ca_export.montant_previsionnel
+            car = ca_export.montant_realise
+            canr = ca_export.montant_non_realise
+            p_car = f"{ca_export.pourcent_car}%"
+            p_canr = f"{ca_export.pourcent_canr}%"
+        except ChiffreAffaire.DoesNotExist:
+            # Valeurs par défaut si pas de calcul
+            cap = car = canr = 0
+            p_car = p_canr = "0%"
+
+        # Configuration Nom Fichier
+        nom_agence_safe = agence.nom_agence.replace(" ", "_")
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        filename = f"Rapport_CA_{nom_agence_safe}_{date_a_afficher}.xlsx"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = f"CA {date_a_afficher}"
+
+        # --- STYLES ---
+        # Titre
+        title_font = Font(bold=True, size=14, color="2c3e50")
+        subtitle_font = Font(bold=True, size=11, color="7f8c8d")
+        center_align = Alignment(horizontal="center", vertical="center")
+        left_align = Alignment(horizontal="left", vertical="center")
+        
+        # En-têtes Colonnes
+        header_fill = PatternFill(start_color="34495e", end_color="34495e", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF")
+        
+        # Couleurs des lignes de données (pour faire joli comme sur le site)
+        fill_cap = PatternFill(start_color="d1ecf1", end_color="d1ecf1", fill_type="solid") # Bleu clair
+        fill_car = PatternFill(start_color="d4edda", end_color="d4edda", fill_type="solid") # Vert clair
+        fill_canr = PatternFill(start_color="f8d7da", end_color="f8d7da", fill_type="solid") # Rouge clair
+
+        # --- EN-TÊTE DU FICHIER (AGENCE & DATE) ---
+        # Ligne 1 : Nom de l'agence
+        ws.merge_cells('A1:C1')
+        ws['A1'] = f"AGENCE : {agence.nom_agence.upper()}"
+        ws['A1'].font = title_font
+        ws['A1'].alignment = center_align
+
+        # Ligne 2 : Date
+        ws.merge_cells('A2:C2')
+        ws['A2'] = f"Rapport du : {date_a_afficher}"
+        ws['A2'].font = subtitle_font
+        ws['A2'].alignment = center_align
+
+        # Ligne 3 : Vide
+        ws.append([])
+
+        # --- TABLEAU 3 COLONNES ---
+        
+        # Ligne 4 : En-têtes des colonnes
+        headers = ["Type de Chiffre d'Affaire", "Montant (FCFA)", "Pourcentage"]
+        ws.append(headers)
+        
+        # Appliquer le style aux en-têtes (Ligne 4)
+        for col in range(1, 4):
+            cell = ws.cell(row=4, column=col)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = center_align
+
+        # Ligne 5 : CAP (Objectif)
+        ws.append(["C.A. Prévisionnel (CAP)", cap, "100%"])
+        # Style de la ligne 5
+        for col in range(1, 4):
+            ws.cell(row=5, column=col).fill = fill_cap
+
+        # Ligne 6 : CAR (Réalisé)
+        ws.append(["C.A. Réalisé (CAR)", car, p_car])
+        # Style de la ligne 6
+        for col in range(1, 4):
+            ws.cell(row=6, column=col).fill = fill_car
+
+        # Ligne 7 : CANR (Manque)
+        ws.append(["C.A. Non Réalisé (CANR)", canr, p_canr])
+        # Style de la ligne 7
+        for col in range(1, 4):
+            ws.cell(row=7, column=col).fill = fill_canr
+
+        # --- MISE EN FORME FINALE ---
+        # Élargir les colonnes pour que ce soit lisible
+        ws.column_dimensions['A'].width = 35  # Colonne Type large
+        ws.column_dimensions['B'].width = 20  # Colonne Montant
+        ws.column_dimensions['C'].width = 15  # Colonne %
+
+        # Centrer les montants et pourcentages
+        for row in range(5, 8):
+            ws.cell(row=row, column=2).alignment = center_align
+            ws.cell(row=row, column=3).alignment = center_align
+
+        wb.save(response)
+        return response
+
+    # 5. OBJET DU JOUR (Pour affichage tableau 3 colonnes)
+    try:
+        ca_du_jour = ChiffreAffaire.objects.get(date=date_a_afficher, agence=agence)
+    except ChiffreAffaire.DoesNotExist:
+        ca_du_jour = None
+
+    context = {
+        'historique_ca': donnees_ca,
+        'ca_du_jour': ca_du_jour,
+        'date_a_afficher': date_a_afficher,
+        'agence': agence,
+       
+        
+    }
+
+    return render(request, 'supermarket/comptabiliter/suivi-chiffre-affaire.html', context)

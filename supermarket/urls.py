@@ -260,4 +260,6 @@ urlpatterns = [
     path('comptabiliter/dashboard/', views.logout_stock, name='logout_Comptabiliter'),
     path('comptabiliter/creer-depense/', views.creer_depense, name='creer_depense'),
     path('comptabiliter/consulter-depenses/', views.consulter_depenses, name='consulter_depenses'),
+    path('comptabiliter/suivi-chiffre-affaire/', views.suivi_chiffre_affaire, name='suivi_chiffre_affaire'),
 ]
+

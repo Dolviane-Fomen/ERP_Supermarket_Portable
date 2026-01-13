@@ -1,0 +1,178 @@
+{% extends 'supermarket/stock/base_stock.html' %}
+{% load static %}
+
+{% block title %}shiffre d;affaire{% endblock %}
+
+{% block content %}
+<style>
+    /* Styles harmonisés */
+    .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+    
+    .header-page { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+    .btn-back { color: #666; text-decoration: none; display: flex; align-items: center; gap: 5px; }
+    
+    /* Carte Formulaire */
+    .control-panel {
+        background: white; padding: 20px; border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 30px;
+        border-left: 5px solid #2c3e50;
+    }
+    
+    /* TABLEAU 3 COLONNES (Le cœur de votre demande) */
+    .synthesis-card {
+        background: white; border-radius: 12px; overflow: hidden;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.08); margin-bottom: 40px;
+    }
+    
+    .synthesis-header {
+        background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+        color: white; padding: 15px 25px; font-size: 1.1em; font-weight: bold;
+        display: flex; justify-content: space-between; align-items: center;
+    }
+
+    table.synthesis-table { width: 100%; border-collapse: collapse; }
+    table.synthesis-table th { 
+        background: #f8f9fa; padding: 15px; text-align: left; 
+        color: #7f8c8d; text-transform: uppercase; font-size: 0.85em; letter-spacing: 1px;
+        border-bottom: 2px solid #eee;
+    }
+    table.synthesis-table td { padding: 18px 15px; border-bottom: 1px solid #eee; font-size: 1.05em; }
+    
+    /* Couleurs spécifiques */
+    .text-cap { color: #2980b9; font-weight: bold; }
+    .text-car { color: #27ae60; font-weight: bold; }
+    .text-canr { color: #c0392b; font-weight: bold; }
+    
+    .badge-percent {
+        padding: 5px 10px; border-radius: 15px; font-size: 0.9em; font-weight: bold;
+        display: inline-block; min-width: 50px; text-align: center;
+    }
+    .bg-cap { background: #d1ecf1; color: #0c5460; }
+    .bg-car { background: #d4edda; color: #155724; }
+    .bg-canr { background: #f8d7da; color: #721c24; }
+
+</style>
+
+<div class="container">
+    
+    <div class="header-page">
+        <a href="{% url 'dashboard_comptabiliter' %}" class="btn-back">
+            <i class="fas fa-arrow-left"></i> Tableau de bord
+        </a>
+        <h2 style="color: #2c3e50;">Analyse du Chiffre d'Affaire -  {{ agence.nom_agence }}</h2>
+    </div>
+
+    <div class="control-panel">
+        <form method="POST" style="display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap;">
+            {% csrf_token %}
+            
+            <div style="flex: 1; min-width: 200px;">
+                <label style="font-weight: bold; display: block; margin-bottom: 5px;">Date à analyser</label>
+                <input type="date" name="date" value="{{ date_a_afficher|date:'Y-m-d' }}" 
+                       required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+            </div>
+
+            <div style="flex: 1; min-width: 200px;">
+                <label style="font-weight: bold; display: block; margin-bottom: 5px;">Objectif (CAP)</label>
+                <input type="number" name="montant_previsionnel" value="{{ ca_du_jour.montant_previsionnel|default:'500000' }}" 
+                       required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+            </div>
+
+            <button type="submit" style="background: #2c3e50; color: white; padding: 11px 25px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                <i class="fas fa-sync-alt"></i> Calculer
+            </button>
+        </form>
+    </div>
+
+    {% if ca_du_jour %}
+    <div class="synthesis-card">
+        <div class="synthesis-header">
+            <span><i class="fas fa-chart-pie"></i> Bilan du {{ ca_du_jour.date|date:"d F Y" }}</span>
+        </div>
+        
+        <table class="synthesis-table">
+            <thead>
+                <tr>
+                    <th width="40%">Type de Chiffre d'Affaire</th>
+                    <th width="30%">Montant (FCFA)</th>
+                    <th width="30%">Pourcentage</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>
+                        <i class="fas fa-bullseye" style="color: #2980b9; margin-right: 10px;"></i>
+                        <span class="text-cap">C.A. Prévisionnel (CAP)</span>
+                        <div style="font-size: 0.8em; color: #7f8c8d; margin-top: 4px;">Objectif fixé</div>
+                    </td>
+                    <td class="text-cap">{{ ca_du_jour.montant_previsionnel }}</td>
+                    <td><span class="badge-percent bg-cap">100%</span></td>
+                </tr>
+
+                <tr>
+                    <td>
+                        <i class="fas fa-check-circle" style="color: #27ae60; margin-right: 10px;"></i>
+                        <span class="text-car">C.A. Réalisé (CAR)</span>
+                        <div style="font-size: 0.8em; color: #7f8c8d; margin-top: 4px;">Montant encaissé réel</div>
+                    </td>
+                    <td class="text-car">{{ ca_du_jour.montant_realise }}</td>
+                    <td>
+                        <span class="badge-percent bg-car">{{ ca_du_jour.pourcent_car }}%</span>
+                        <div style="height: 4px; background: #eee; width: 100px; display: inline-block; margin-left: 10px; vertical-align: middle; border-radius: 2px;">
+                            <div style="height: 100%; width: {{ ca_du_jour.pourcent_car }}%; background: #27ae60; border-radius: 2px; max-width: 100%;"></div>
+                        </div>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td>
+                        <i class="fas fa-exclamation-triangle" style="color: #c0392b; margin-right: 10px;"></i>
+                        <span class="text-canr">C.A. Non Réalisé (CANR)</span>
+                        <div style="font-size: 0.8em; color: #7f8c8d; margin-top: 4px;">Manque à gagner</div>
+                    </td>
+                    <td class="text-canr">{{ ca_du_jour.montant_non_realise }}</td>
+                    <td><span class="badge-percent bg-canr">{{ ca_du_jour.pourcent_canr }}%</span></td>
+                </tr>
+            </tbody>
+        </table>
+        <div>
+            <a href="?date={{ date_a_afficher|date:'Y-m-d' }}&export=excel" class="btn" style="background: #27ae60; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                <i class="fas fa-file-excel"></i> Exporter Excel
+            </a>
+        </div>
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 40px; color: #7f8c8d; background: white; border-radius: 12px; margin-bottom: 40px;">
+        <i class="fas fa-info-circle" style="font-size: 2em; margin-bottom: 10px;"></i>
+        <p>Aucune donnée calculée pour cette date.<br>Cliquez sur "Calculer" ci-dessus.</p>
+    </div>
+    {% endif %}
+
+    <h3 style="color: #2c3e50; font-size: 1.1em; margin-bottom: 15px;">Historique récent</h3>
+    <div style="background: white; border-radius: 12px; padding: 15px; overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="border-bottom: 2px solid #eee; text-align: left;">
+                    <th style="padding: 10px;">Date</th>
+                    <th style="padding: 10px;">Objectif</th>
+                    <th style="padding: 10px;">Réalisé</th>
+                    <th style="padding: 10px;">%</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ca in historique_ca|slice:":5" %}
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 10px;">{{ ca.date|date:"d/m/Y" }}</td>
+                    <td style="padding: 10px;">{{ ca.montant_previsionnel }}</td>
+                    <td style="padding: 10px;">{{ ca.montant_realise }}</td>
+                    <td style="padding: 10px; font-weight: bold; color: {% if ca.pourcent_car >= 100 %}#27ae60{% else %}#e67e22{% endif %};">
+                        {{ ca.pourcent_car }}%
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+{% endblock %}

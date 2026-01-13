@@ -1,134 +1,42 @@
 {% extends 'supermarket/stock/base_stock.html' %}
-{% load static %}
-
-{% block title %}Consulter depense{% endblock %}
 
 {% block content %}
 <style>
-    /* Styles spécifiques pour le filtrage et le tableau */
-    .filter-card {
-        background: white;
-        border-radius: 12px;
-        padding: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-        margin-bottom: 25px;
-        border-left: 5px solid #06beb6;
-    }
+    /* Styles pour harmoniser */
+    .header-page { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .back-btn { color: #7f8c8d; text-decoration: none; display: flex; align-items: center; gap: 5px; font-weight: 500; transition: color 0.3s; }
+    .back-btn:hover { color: #06beb6; }
+    .total-badge { background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%); color: white; padding: 15px 25px; border-radius: 10px; font-weight: bold; font-size: 1.2em; box-shadow: 0 4px 15px rgba(6, 190, 182, 0.3); }
     
-    .filter-form {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 20px;
-        align-items: flex-end;
-    }
+    .filter-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 25px; border-left: 5px solid #06beb6; }
+    .filter-form { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; }
+    .filter-group { flex: 1; min-width: 200px; }
+    .filter-group label { display: block; margin-bottom: 8px; color: #2c3e50; font-weight: 600; font-size: 0.9em; }
+    .filter-group input { width: 100%; padding: 10px; border: 1px solid #dfe6e9; border-radius: 8px; }
     
-    .filter-group {
-        flex: 1;
-        min-width: 200px;
-    }
-    
-    .filter-group label {
-        display: block;
-        margin-bottom: 8px;
-        color: #2c3e50;
-        font-weight: 600;
-        font-size: 0.9em;
-    }
-    
-    .filter-group input {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #dfe6e9;
-        border-radius: 8px;
-        font-size: 1em;
-    }
-    
-    .btn-filter {
-        background: #34495e;
-        color: white;
-        padding: 11px 20px;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        font-weight: 600;
-        transition: all 0.3s;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-    }
-    
-    .btn-filter:hover {
-        background: #2c3e50;
-        transform: translateY(-2px);
-    }
-    
-    .btn-excel {
-        background: #27ae60; /* Couleur Excel vert */
-        color: white;
-        padding: 11px 20px;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        font-weight: 600;
-        transition: all 0.3s;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        text-decoration: none;
-    }
-    
-    .btn-excel:hover {
-        background: #219150;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
-    }
+    .btn-filter, .btn-excel { padding: 11px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; color: white; transition: all 0.3s; }
+    .btn-filter { background: #34495e; }
+    .btn-filter:hover { background: #2c3e50; transform: translateY(-2px); }
+    .btn-excel { background: #27ae60; text-decoration: none; }
+    .btn-excel:hover { background: #219150; transform: translateY(-2px); box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3); }
 
-    .total-badge {
-        background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
-        color: white;
-        padding: 15px 25px;
-        border-radius: 10px;
-        font-weight: bold;
-        font-size: 1.2em;
-        text-align: right;
-        display: inline-block;
-        box-shadow: 0 4px 15px rgba(6, 190, 182, 0.3);
-    }
-    
-    /* Reprise du style du tableau de votre dashboard précédent */
-    .table-container {
-        background: white;
-        border-radius: 15px;
-        overflow: hidden;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.05);
-    }
-    
+    .table-container { background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 5px 20px rgba(0,0,0,0.05); }
     table { width: 100%; border-collapse: collapse; }
     th { background: #f8f9fa; padding: 15px; text-align: left; color: #2c3e50; font-weight: 700; text-transform: uppercase; font-size: 0.85em; border-bottom: 2px solid #eee; }
     td { padding: 15px; border-bottom: 1px solid #eee; color: #555; }
     tr:last-child td { border-bottom: none; }
     tr:hover { background-color: #fcfcfc; }
-    
-    .header-page {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-    }
-    .back-btn { color: #7f8c8d; text-decoration: none; display: flex; align-items: center; gap: 5px; font-weight: 500; transition: color 0.3s; }
-    .back-btn:hover { color: #06beb6; }
 </style>
-
-
-
-
 
 <div class="container" style="max-width: 1200px; margin: 20px auto; padding: 0 20px;">
     
     <div class="header-page">
         <div>
             <a href="{% url 'dashboard_comptabiliter' %}" class="back-btn"><i class="fas fa-arrow-left"></i> Retour au Dashboard</a>
-            <h1 style="color: #2c3e50; margin-top: 10px;">Consulter les Dépenses</h1>
+            
+            <h1 style="color: #2c3e50; margin-top: 10px;">
+                Dépenses - {{ agence.nom_agence }}
+            </h1>
             <p style="color: #7f8c8d; font-size: 0.9em;">{{ periode_info }}</p>
         </div>
         <div class="total-badge">
@@ -196,15 +104,9 @@
 </div>
 
 <script>
-    // Petit script pour s'assurer que si on clique sur "Exporter", 
-    // on ne recharge pas toute la page mais on télécharge le fichier,
-    // puis on retire le paramètre 'export' pour ne pas bloquer les futurs filtrages.
-    
     document.querySelector('.btn-excel').addEventListener('click', function() {
-        // Le formulaire sera soumis normalement avec value="excel"
-        // Après un court délai, on peut optionnellement recharger la page sans le paramètre export
-        // mais le comportement par défaut du navigateur gère bien le téléchargement sans quitter la page.
         console.log('Exportation Excel lancée...');
+        // Pas besoin de preventDefault, le navigateur gère le téléchargement
     });
 </script>
 {% endblock %}

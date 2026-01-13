@@ -1125,12 +1125,17 @@ class Notification(models.Model):
 
 # ----------------gestion comptable-------------------------
 
-class Depense(models.Model):  
+class Depense(models.Model): 
+
+    agence = models.ForeignKey('Agence', on_delete=models.CASCADE, verbose_name="Agence")
+    
     """Modèle pour les dépenses"""
     date = models.DateTimeField(null=True, blank=True, verbose_name="Date de dépense")
     montant = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Montant")
  
     libelle = models.CharField(max_length=200, verbose_name="Libellé")
+
+    
 
     class Meta:
         verbose_name = "Dépense"      
@@ -1140,6 +1145,47 @@ class Depense(models.Model):
     def __str__(self):
         return self.libelle
 
+
+from django.db import models
+from decimal import Decimal
+
+class ChiffreAffaire(models.Model):
+    # AJOUT DE LA RELATION ICI
+    agence = models.ForeignKey('Agence', on_delete=models.CASCADE, verbose_name="Agence")
+    
+    date = models.DateField(verbose_name="Date")
+    montant_previsionnel = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Objectif (CAP)")
+    montant_realise = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Réalisé (CAR)")
+
+    class Meta:
+        verbose_name = "Chiffre d'Affaire"
+        verbose_name_plural = "Chiffres d'Affaires"
+        ordering = ['-date']
+        # IMPORTANT : Empêche d'avoir deux entrées pour la même date et la même agence
+        unique_together = ('agence', 'date')
+
+    def __str__(self):
+        return f"CA du {self.date} - {self.agence}"
+
+    # ... vos @property restent inchangées ...
+    @property
+    def montant_non_realise(self):
+        return self.montant_previsionnel - self.montant_realise
+
+    @property
+    def pourcent_cap(self):
+        return 100
+
+    @property
+    def pourcent_car(self):
+        if self.montant_previsionnel == 0:
+            return 0
+        return round((self.montant_realise / self.montant_previsionnel) * 100, 2)
+
+    @property
+    def pourcent_canr(self):
+        return 100 - self.pourcent_car
 # Suppression des signaux - on utilisera une approche plus directe dans la vue
 #  Client
 # libele
+

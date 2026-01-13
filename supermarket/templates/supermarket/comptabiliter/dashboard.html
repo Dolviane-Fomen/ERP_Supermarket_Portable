@@ -423,7 +423,7 @@
     <div class="super-market-title">Gestion Comptable</div>
     <div class="header-info">
         <i class="fas fa-user-circle" style="font-size: 24px; margin-right: 10px; color: #ecf0f1;"></i>
-        <div class="username">{{ nom_utilisateur }}</div>
+        <div class="username">{{ nom_utilisateur }} - {{ agence.nom_agence }}</div>
         <a href="{% url 'logout_Comptabiliter' %}" class="logout-button">Déconnexion</a>
        
     </div>
@@ -435,7 +435,7 @@
         
         <div class="menu-item has-submenu" onclick="toggleSubmenu(event)">
             <span><i class="fas fa-box icon"></i>Suivi Tresorerie</span>
-        <div class="submenu">
+           <div class="submenu">
             <a href="{% url 'creer_depense' %}"  class="submenu-item">
                 <i class="fas fa-plus" style="margin-right: 10px; color: #28a745;"></i>
                 <span>Enregistrer Dépense</span>
@@ -443,18 +443,22 @@
             <a href="{% url 'consulter_depenses' %}" class="submenu-item"> <i class="fas fa-list" style="margin-right: 10px; color: #3498db;"></i>
                 <span>Consulter Dépenses</span>
             </a>
-        </div>
+              </div>
         
+                  
+         </div>
+         
+         <div class="menu-item">
+            <a href="{% url 'suivi_chiffre_affaire' %}" class="submenu-item">
+                <i class="fas fa-coins" style="margin-right: 10px; color: #f39c12;"></i>
+                     <span>Chiffre d'Affaire</span>
+            </a>
+         </div>
 
-
-        
-
-
-
-
-    </div>
+                           
+        </div>     
     <div class="content">
-
+            
     </div>
 </div>
 
@@ -478,3 +482,4 @@
 
 </body>
 </html>
+
