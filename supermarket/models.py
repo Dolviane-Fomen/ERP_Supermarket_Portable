@@ -1123,5 +1123,23 @@ class Notification(models.Model):
     def __str__(self):
         return f"{self.titre} - {self.get_type_notification_display()}"
 
+# ----------------gestion comptable-------------------------
+
+class Depense(models.Model):  
+    """Modèle pour les dépenses"""
+    date = models.DateTimeField(null=True, blank=True, verbose_name="Date de dépense")
+    montant = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Montant")
+ 
+    libelle = models.CharField(max_length=200, verbose_name="Libellé")
+
+    class Meta:
+        verbose_name = "Dépense"      
+        verbose_name_plural = "Dépenses"
+        ordering = ['-date']         
+
+    def __str__(self):
+        return self.libelle
 
 # Suppression des signaux - on utilisera une approche plus directe dans la vue
+#  Client
+# libele
