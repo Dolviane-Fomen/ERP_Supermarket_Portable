@@ -253,4 +253,11 @@ urlpatterns = [
     path('comptes/<int:compte_id>/supprimer/', views.supprimer_compte, name='supprimer_compte'),
     path('comptes/<int:compte_id>/activer-desactiver/', views.activer_desactiver_compte, name='activer_desactiver_compte'),
     path('comptes/<int:compte_id>/reinitialiser-mot-de-passe/', views.reinitialiser_mot_de_passe, name='reinitialiser_mot_de_passe'),
+
+    # ======================== Module Comptabiliter=======================
+    path('comptabiliter/login_comptabiliter/', views.login_comptabiliter, name='login_comptabiliter'),
+    path('comptabiliter/dashboard/', views.dashboard_comptabiliter, name='dashboard_comptabiliter'),
+    path('comptabiliter/dashboard/', views.logout_stock, name='logout_Comptabiliter'),
+    path('comptabiliter/creer-depense/', views.creer_depense, name='creer_depense'),
+    path('comptabiliter/consulter-depenses/', views.consulter_depenses, name='consulter_depenses'),
 ]

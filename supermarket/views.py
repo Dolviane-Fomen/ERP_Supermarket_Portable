@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -9,8 +9,10 @@ from django.db.models import Sum, Max, Q, F
 from django.db import models, connection, IntegrityError, transaction
 from django.utils import timezone
 from django.conf import settings
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 import json
+import openpyxl
+from openpyxl.styles import Font, Alignment, PatternFill
 from decimal import Decimal
 from .models import (
     Agence, Compte, Employe, Caisse, SessionCaisse, Client, InventaireStock, LigneInventaireStock,
@@ -18,13 +20,13 @@ from .models import (
     FactureTemporaire, Famille, Fournisseur, MouvementStock, PlanComptable, PlanTiers, CodeJournaux,
     TauxTaxe, FactureAchat, LigneFactureAchat, FactureTransfert, LigneFactureTransfert,
     Commande, Livraison, FactureCommande, StatistiqueClient, DocumentCommande, LigneCommande, Notification,
-    Livreur, SuiviClientAction
+    Livreur, SuiviClientAction,Depense
 )
 from .decorators import (
     require_stock_modify_access,
     require_commandes_feature, require_module_access, require_compte_type,
     require_caisse_access, require_stock_access, require_comptes_access,
-    get_user_compte, get_user_livreur
+    get_user_compte, get_user_livreur, require_comptable_access,
 )
 from .permissions_utils import (
     filter_commandes_by_user, filter_suivi_client_by_user, filter_livraisons_by_user
@@ -19219,3 +19221,245 @@ def travail_livreur(request):
         'is_livreur_view': True,  # Flag pour identifier la vue livreur
     }
     return render(request, 'supermarket/commandes/dashboard.html', context)
+
+
+
+
+# ===========comtabiliter=========================
+
+def login_comptabiliter(request):
+    """Page de connexion pour la gestion de stock"""
+    # Toujours afficher la page de connexion, même si l'utilisateur est déjà connecté
+    # Cela permet de forcer la reconnexion depuis la page d'accueil
+    if request.user.is_authenticated and request.method == 'GET':
+        # Déconnecter l'utilisateur pour forcer la reconnexion
+        logout(request)
+        request.session.flush()
+    
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        
+        if username and password:
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                # Vérifier que l'utilisateur a un compte lié à une agence
+                try:
+                    compte = Compte.objects.get(user=user, actif=True)
+                    if compte.agence:
+                        # Vérifier que l'utilisateur est un comptable, assistant_comptable ou admin
+                        if compte.type_compte not in ['comptable', 'assistant_comptable', 'admin']:
+                            messages.error(request, 'Accès refusé. Ce module est réservé aux comptables, assistants comptables et aux administrateurs.')
+                        else:
+                            login(request, user)
+                            # Stocker l'agence dans la session
+                            request.session['agence_id'] = compte.agence.id_agence
+                            request.session['agence_nom'] = compte.agence.nom_agence
+                            messages.success(request, f'Connexion réussie ! Bienvenue {compte.nom_complet}')
+                            return redirect('dashboard_comptabiliter')
+                    else:
+                        messages.error(request, 'Votre compte n\'est pas lié à une agence.')
+                except Compte.DoesNotExist:
+                    messages.error(request, 'Aucun compte actif trouvé pour cet utilisateur.')
+            else:
+                messages.error(request, 'Nom d\'utilisateur ou mot de passe incorrect.')
+        else:
+            messages.error(request, 'Veuillez remplir tous les champs.')
+    
+    return render(request, 'supermarket/comptabiliter/login_comptabiliter.html')
+
+
+@login_required
+@require_comptable_access
+def dashboard_comptabiliter(request):
+    """Dashboard principal du module de gestion de stock"""
+    try:
+        # Récupérer l'agence de l'utilisateur
+        agence = get_user_agence(request)
+        if not agence:
+            messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+            # return redirect('logout_stock')
+
+       
+        
+        
+        # Récupérer le nom de l'utilisateur
+        try:
+            compte = Compte.objects.get(user=request.user, actif=True)
+            nom_utilisateur = compte.nom_complet
+        except Compte.DoesNotExist:
+            nom_utilisateur = request.user.username
+
+        context = {
+            'agence': agence,
+            'nom_utilisateur': nom_utilisateur,
+        }
+        
+        return render(request, 'supermarket/comptabiliter/dashboard.html', context)
+        
+    except Exception as e:
+        messages.error(request, f'Erreur lors du chargement du dashboard: {str(e)}')
+        # Récupérer le nom de l'utilisateur même en cas d'erreur
+        try:
+            compte = Compte.objects.get(user=request.user, actif=True)
+            nom_utilisateur = compte.nom_complet
+        except:
+            nom_utilisateur = request.user.username if request.user.is_authenticated else "Utilisateur"
+
+        return render(request, 'supermarket/comptabiliter/dashboard.html', {
+            'agence': None,
+            'nom_utilisateur': nom_utilisateur,
+        })
+
+
+login_required
+def creer_depense(request): 
+    """Vue pour créer une nouvelle dépense"""
+    if request.method == 'POST':
+        try:
+            
+            libelle = request.POST.get('libelle')
+            date = request.POST.get('date')
+            montant = request.POST.get('montant')
+            
+          
+            if not all([libelle, date, montant]):
+                messages.error(request, 'Veuillez remplir tous les champs obligatoires.')
+                return redirect('creer_depense')
+            
+           
+            depense = Depense.objects.create(
+                libelle=libelle, 
+                date=date,
+                montant=montant,
+            )
+            
+            messages.success(request, 'Dépense enregistrée avec succès!')
+            
+            return redirect('dashboard_comptabiliter') 
+            
+        except Exception as e:
+            messages.error(request, f'Erreur lors de la création de la dépense: {str(e)}')
+            return redirect('creer_depense')
+    
+    # GET - Afficher le formulaire
+    
+    context = {
+        # 'agences': agences,
+    }
+    # Chemin corrigé : comptabilite (pas comptabiliter)
+    return render(request, 'supermarket/comptabiliter/creer-depense.html', context)
+
+
+def consulter_depenses(request):
+    """
+    Affiche les dépenses et permet l'export Excel.
+    Par défaut : affiche les 24 dernières heures.
+    """
+    
+    # 1. Gestion des dates (Filtre ou Défaut)
+    date_debut_str = request.GET.get('date_debut')
+    date_fin_str = request.GET.get('date_fin')
+    
+    # Par défaut : maintenant et il y a 24h
+    now = timezone.now()
+    
+    if date_debut_str and date_fin_str:
+        # Si l'utilisateur a choisi des dates
+        try:
+            # On convertit les strings en objets datetime "aware" (conscients du fuseau horaire)
+            # On force le début à 00:00:00 et la fin à 23:59:59 pour inclure toute la journée
+            date_debut = datetime.strptime(date_debut_str, '%Y-%m-%d')
+            date_debut = timezone.make_aware(date_debut.replace(hour=0, minute=0, second=0))
+            
+            date_fin = datetime.strptime(date_fin_str, '%Y-%m-%d')
+            date_fin = timezone.make_aware(date_fin.replace(hour=23, minute=59, second=59))
+            
+            # Filtre
+            depenses = Depense.objects.filter(date__range=[date_debut, date_fin])
+            periode_info = f"Du {date_debut_str} au {date_fin_str}"
+            
+        except ValueError:
+            # En cas d'erreur de format, retour au défaut
+            date_debut = now - timedelta(hours=24)
+            date_fin = now
+            depenses = Depense.objects.filter(date__gte=date_debut)
+            periode_info = "Dernières 24 heures (Erreur date)"
+    else:
+        # Pas de filtre : Dernières 24h
+        date_debut = now - timedelta(hours=24)
+        date_fin = now
+        depenses = Depense.objects.filter(date__gte=date_debut)
+        periode_info = "Dernières 24 heures"
+
+    # Calcul du total pour l'affichage
+    total_general = depenses.aggregate(Sum('montant'))['montant__sum'] or 0
+
+    # 2. GESTION DE L'EXPORT EXCEL
+    if request.GET.get('export') == 'excel':
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = f'attachment; filename="Rapport_Depenses_{datetime.now().strftime("%Y%m%d")}.xlsx"'
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Dépenses"
+
+        # Styles
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="06beb6", end_color="06beb6", fill_type="solid")
+        center_align = Alignment(horizontal="center")
+
+        # En-tête du fichier (Titre et Période)
+        ws.merge_cells('A1:C1')
+        ws['A1'] = f"Rapport des Dépenses - {periode_info}"
+        ws['A1'].font = Font(bold=True, size=14)
+        ws['A1'].alignment = center_align
+
+        # En-têtes du tableau
+        headers = ['Date', 'Libellé', 'Montant (FCFA)']
+        ws.append([]) # Ligne vide
+        ws.append(headers)
+
+        # Appliquer le style aux en-têtes (Ligne 3)
+        for col in range(1, 4):
+            cell = ws.cell(row=3, column=col)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = center_align
+
+        # Données
+        row_num = 4
+        for depense in depenses:
+            # On formate la date sans le fuseau horaire pour Excel
+            date_naive = depense.date.replace(tzinfo=None) if depense.date else ""
+            
+            ws.cell(row=row_num, column=1, value=date_naive).number_format = 'DD/MM/YYYY HH:MM'
+            ws.cell(row=row_num, column=2, value=depense.libelle)
+            ws.cell(row=row_num, column=3, value=depense.montant)
+            row_num += 1
+
+        # Ligne Total
+        ws.append([])
+        total_row = row_num + 1
+        ws.cell(row=total_row, column=2, value="TOTAL DÉPENSES").font = Font(bold=True)
+        ws.cell(row=total_row, column=3, value=total_general).font = Font(bold=True)
+        
+        # Ajuster la largeur des colonnes
+        ws.column_dimensions['A'].width = 20
+        ws.column_dimensions['B'].width = 40
+        ws.column_dimensions['C'].width = 20
+
+        wb.save(response)
+        return response
+
+    # 3. Affichage HTML standard
+    context = {
+        'depenses': depenses,
+        'total_general': total_general,
+        'date_debut': date_debut_str, # Pour pré-remplir le champ input
+        'date_fin': date_fin_str,     # Pour pré-remplir le champ input
+        'periode_info': periode_info
+    }
+    return render(request, 'supermarket/comptabiliter/consulter_depenses.html', context)    
+# login_stock
+# creer_Depanset
