@@ -1,9 +1,8 @@
-# Script de Synchronisation des Données entre Local et OVH
-# Usage: .\sync_data_ovh.ps1 [export|import|backup]
+# Script de Synchronisation AUTOMATIQUE des Donnees entre Local et OVH
+# Usage: .\sync_data_ovh.ps1 [push|pull|sync]
 
 param(
-    [string]$Action = "export",
-    [string]$Direction = "local_to_ovh"  # "local_to_ovh" ou "ovh_to_local"
+    [string]$Action = "sync"  # "push" (local vers OVH), "pull" (OVH vers local), "sync" (bidirectionnel)
 )
 
 # Couleurs
@@ -23,136 +22,190 @@ function Get-OvhConfig {
     $configFile = ".ovh_config.json"
     if (Test-Path $configFile) {
         try {
-            return Get-Content $configFile | ConvertFrom-Json
+            $config = Get-Content $configFile -Encoding UTF8 | ConvertFrom-Json
+            return $config
         } catch {
-            Write-Error "❌ Erreur lors de la lecture de .ovh_config.json"
+            Write-Error "ERREUR: Erreur lors de la lecture de .ovh_config.json"
             return $null
         }
     } else {
-        Write-Error "❌ Fichier .ovh_config.json introuvable!"
-        Write-Info "💡 Exécutez d'abord sync_ovh.ps1 pour créer le fichier de configuration"
+        Write-Error "ERREUR: Fichier .ovh_config.json introuvable!"
+        Write-Info "ASTUCE: Exécutez d'abord SYNC_OVH.bat pour créer le fichier de configuration"
         return $null
     }
 }
 
-# Exporter les données depuis la base locale
-function Export-LocalData {
-    Write-Info "`n📤 Export des données locales..."
-    
-    # Activer l'environnement virtuel si il existe
+# Activer l'environnement virtuel
+function Activate-Venv {
     if (Test-Path "venv\Scripts\Activate.ps1") {
         & .\venv\Scripts\Activate.ps1
+        return $true
     } elseif (Test-Path "env\Scripts\Activate.ps1") {
         & .\env\Scripts\Activate.ps1
+        return $true
+    }
+    return $false
+}
+
+# Exporter les données locales
+function Export-LocalData {
+    Write-Info "`nExport des donnees locales..."
+    
+    if (-not (Activate-Venv)) {
+        Write-Warning "ATTENTION: Environnement virtuel non trouve, continuons quand meme..."
     }
     
     # Nom du fichier d'export avec timestamp
     $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-    $exportFile = "export_data_$timestamp.json"
+    $exportFile = "export_data_local_$timestamp.json"
     
-    Write-Info "📁 Fichier d'export: $exportFile"
+    Write-Info "Fichier d'export: $exportFile"
     
-    # Exporter les données
+    # Exporter les donnees (exclure les sessions et contenttypes)
     try {
-        python manage.py dumpdata --exclude contenttypes --exclude sessions --exclude admin.logentry --exclude auth.permission > $exportFile
+        python manage.py dumpdata --exclude contenttypes --exclude sessions --exclude admin.logentry --exclude auth.permission > $exportFile 2>&1
+        
         if ($LASTEXITCODE -eq 0) {
             $fileSize = (Get-Item $exportFile).Length / 1MB
-            Write-Success "✅ Données exportées avec succès! (Taille: $([math]::Round($fileSize, 2)) MB)"
+            Write-Success "OK: Donnees exportees avec succes! (Taille: $([math]::Round($fileSize, 2)) MB)"
             return $exportFile
         } else {
-            Write-Error "❌ Erreur lors de l'export"
+            Write-Error "ERREUR: Erreur lors de l'export"
             return $null
         }
     } catch {
-        Write-Error "❌ Erreur: $_"
+        Write-Error "ERREUR: $_"
         return $null
     }
 }
 
 # Importer les données depuis OVH
-function Import-FromOvh {
-    param($config, $localFile)
-    
-    Write-Info "`n📥 Transfert du fichier vers OVH..."
-    
-    $ovhHost = "$($config.ovh_user)@$($config.ovh_host)"
-    $remotePath = "$($config.ovh_project_path)/export_data.json"
-    
-    # Transférer le fichier via SCP
-    try {
-        Write-Info "🔌 Connexion à OVH..."
-        scp $localFile "${ovhHost}:${remotePath}"
-        
-        if ($LASTEXITCODE -eq 0) {
-            Write-Success "✅ Fichier transféré vers OVH!"
-            
-            # Importer sur le serveur
-            Write-Info "📥 Import des données sur le serveur OVH..."
-            $importCmd = "ssh $ovhHost 'cd $($config.ovh_project_path) && source venv/bin/activate && python manage.py loaddata export_data.json --settings=erp_project.settings_production'"
-            
-            Write-Warning "⚠️  ATTENTION: Cette opération va écraser les données existantes sur OVH!"
-            $confirm = Read-Host "Voulez-vous continuer? (oui/non)"
-            
-            if ($confirm -eq "oui") {
-                Invoke-Expression $importCmd
-                if ($LASTEXITCODE -eq 0) {
-                    Write-Success "✅ Données importées sur OVH avec succès!"
-                } else {
-                    Write-Error "❌ Erreur lors de l'import sur OVH"
-                }
-            } else {
-                Write-Warning "❌ Opération annulée"
-            }
-        } else {
-            Write-Error "❌ Erreur lors du transfert"
-        }
-    } catch {
-        Write-Error "❌ Erreur: $_"
-        Write-Info "💡 Assurez-vous que SSH/SCP est configuré correctement"
-    }
-}
-
-# Sauvegarder les données OVH vers local
-function Backup-FromOvh {
+function Pull-FromOvh {
     param($config)
     
-    Write-Info "`n📥 Sauvegarde des données depuis OVH..."
+    Write-Info "`nRecuperation des donnees depuis OVH..."
     
     $ovhHost = "$($config.ovh_user)@$($config.ovh_host)"
     $remotePath = "$($config.ovh_project_path)"
     
     # Exporter sur le serveur OVH
-    Write-Info "📤 Export des données sur OVH..."
-    $exportCmd = "ssh $ovhHost 'cd $remotePath && source venv/bin/activate && python manage.py dumpdata --exclude contenttypes --exclude sessions --exclude admin.logentry --exclude auth.permission > backup_ovh_$(date +%Y%m%d_%H%M%S).json && ls -lh backup_ovh_*.json | tail -1'"
+    Write-Info "Export des donnees sur le serveur OVH..."
+    $exportCmd = "ssh $ovhHost 'cd $remotePath && source venv/bin/activate && python manage.py dumpdata --exclude contenttypes --exclude sessions --exclude admin.logentry --exclude auth.permission > export_data_ovh_`$(date +%Y%m%d_%H%M%S).json && ls -t export_data_ovh_*.json | head -1'"
     
-    Invoke-Expression $exportCmd
+    $result = Invoke-Expression $exportCmd 2>&1
+    $remoteFile = $result -split "`n" | Select-Object -First 1
+    
+    if ([string]::IsNullOrWhiteSpace($remoteFile)) {
+        Write-Error "ERREUR: Impossible d'exporter depuis OVH"
+        return $null
+    }
+    
+    $remoteFile = $remoteFile.Trim()
     
     # Télécharger le fichier
     $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-    $localFile = "backup_ovh_$timestamp.json"
+    $localFile = "export_data_ovh_$timestamp.json"
     
-    Write-Info "📥 Téléchargement du fichier..."
-    $latestBackup = "ssh $ovhHost 'cd $remotePath && ls -t backup_ovh_*.json | head -1'"
-    $backupName = Invoke-Expression $latestBackup
+    Write-Info "Telechargement du fichier depuis OVH..."
+    scp "${ovhHost}:${remotePath}/${remoteFile}" $localFile 2>&1
     
-    if ($backupName) {
-        scp "${ovhHost}:${remotePath}/${backupName}" $localFile
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "OK: Fichier telecharge: $localFile"
+        return $localFile
+    } else {
+        Write-Error "ERREUR: Impossible de telecharger le fichier"
+        return $null
+    }
+}
+
+# Pousser les données vers OVH
+function Push-ToOvh {
+    param($config, $localFile)
+    
+    Write-Info "`nTransfert des donnees vers OVH..."
+    
+    $ovhHost = "$($config.ovh_user)@$($config.ovh_host)"
+    $remotePath = "$($config.ovh_project_path)"
+    
+    # Transférer le fichier via SCP
+    try {
+        Write-Info "Connexion a OVH..."
+        $remoteFile = "export_data_import.json"
+        scp $localFile "${ovhHost}:${remotePath}/${remoteFile}" 2>&1
         
         if ($LASTEXITCODE -eq 0) {
-            Write-Success "✅ Sauvegarde téléchargée: $localFile"
-            return $localFile
+            Write-Success "OK: Fichier transfere vers OVH!"
+            
+            # Importer sur le serveur
+            Write-Info "Import des donnees sur le serveur OVH..."
+            Write-Warning "ATTENTION: Cette operation va fusionner les donnees sur OVH"
+            
+            $importCmd = "ssh $ovhHost 'cd $remotePath && source venv/bin/activate && python manage.py loaddata $remoteFile --settings=erp_project.settings_production 2>&1'"
+            
+            $importResult = Invoke-Expression $importCmd
+            
+            if ($LASTEXITCODE -eq 0) {
+                Write-Success "OK: Donnees importees sur OVH avec succes!"
+                
+                # Redemarrer Gunicorn
+                Write-Info "Redemarrage de Gunicorn..."
+                ssh $ovhHost "sudo systemctl restart erp 2>/dev/null || sudo systemctl restart gunicorn 2>/dev/null || echo 'Service non trouve'"
+                
+                return $true
+            } else {
+                Write-Error "ERREUR lors de l'import sur OVH"
+                Write-Host $importResult
+                return $false
+            }
         } else {
-            Write-Error "❌ Erreur lors du téléchargement"
+            Write-Error "ERREUR lors du transfert"
+            return $false
         }
+    } catch {
+        Write-Error "ERREUR: $_"
+        Write-Info "ASTUCE: Assurez-vous que SSH/SCP est configure correctement"
+        return $false
+    }
+}
+
+# Importer localement
+function Import-Local {
+    param($importFile)
+    
+    Write-Info "`nImport des donnees dans la base locale..."
+    
+    if (-not (Activate-Venv)) {
+        Write-Warning "ATTENTION: Environnement virtuel non trouve"
     }
     
-    return $null
+    Write-Warning "ATTENTION: Cette operation va fusionner les donnees locales"
+    $confirm = Read-Host "Voulez-vous continuer? (oui/non)"
+    
+    if ($confirm -ne "oui") {
+        Write-Warning "Operation annulee"
+        return $false
+    }
+    
+    try {
+        python manage.py loaddata $importFile 2>&1
+        
+        if ($LASTEXITCODE -eq 0) {
+            Write-Success "OK: Donnees importees localement avec succes!"
+            return $true
+        } else {
+            Write-Error "ERREUR lors de l'import local"
+            return $false
+        }
+    } catch {
+        Write-Error "ERREUR: $_"
+        return $false
+    }
 }
 
 # Fonction principale
 function Main {
     Write-Host "`n========================================" -ForegroundColor Yellow
-    Write-Host "🔄 Synchronisation des Données ERP" -ForegroundColor Yellow
+    Write-Host "Synchronisation des DONNEES ERP" -ForegroundColor Yellow
     Write-Host "========================================`n" -ForegroundColor Yellow
     
     $config = Get-OvhConfig
@@ -161,27 +214,45 @@ function Main {
     }
     
     switch ($Action.ToLower()) {
-        "export" {
-            if ($Direction -eq "local_to_ovh") {
-                $exportFile = Export-LocalData
-                if ($exportFile) {
-                    Import-FromOvh -config $config -localFile $exportFile
-                }
-            } else {
-                Write-Error "❌ Direction non supportée pour export"
+        "push" {
+            # Local -> OVH
+            $exportFile = Export-LocalData
+            if ($exportFile) {
+                Push-ToOvh -config $config -localFile $exportFile
             }
         }
-        "backup" {
-            Backup-FromOvh -config $config
+        "pull" {
+            # OVH -> Local
+            $importFile = Pull-FromOvh -config $config
+            if ($importFile) {
+                Import-Local -importFile $importFile
+            }
+        }
+        "sync" {
+            # Bidirectionnel: Push puis Pull
+            Write-Info "Synchronisation bidirectionnelle..."
+            Write-Info "1. Envoi des donnees locales vers OVH..."
+            $exportFile = Export-LocalData
+            if ($exportFile) {
+                Push-ToOvh -config $config -localFile $exportFile
+            }
+            
+            Write-Info "`n2. Recuperation des donnees depuis OVH..."
+            $importFile = Pull-FromOvh -config $config
+            if ($importFile) {
+                Import-Local -importFile $importFile
+            }
         }
         default {
-            Write-Error "❌ Action inconnue: $Action"
-            Write-Info "Usage: .\sync_data_ovh.ps1 [export|backup] [local_to_ovh|ovh_to_local]"
+            Write-Error "ERREUR: Action inconnue: $Action"
+            Write-Info "Usage: .\sync_data_ovh.ps1 [push|pull|sync]"
+            Write-Info "  push = Envoyer local -> OVH"
+            Write-Info "  pull = Recuperer OVH -> local"
+            Write-Info "  sync = Synchronisation bidirectionnelle"
         }
     }
     
-    Write-Success "`n✅ Opération terminée!"
+    Write-Success "`nOK: Operation terminee!"
 }
 
 Main
-

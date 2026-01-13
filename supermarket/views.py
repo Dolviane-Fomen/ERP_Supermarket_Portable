@@ -19219,3 +19219,253 @@ def travail_livreur(request):
         'is_livreur_view': True,  # Flag pour identifier la vue livreur
     }
     return render(request, 'supermarket/commandes/dashboard.html', context)
+
+# ==================== MODULE ANALYSE FINANCIÈRE ====================
+
+def login_financier(request):
+    """Page de connexion pour le module Analyse Financière - Réservé aux comptables"""
+    # Toujours afficher la page de connexion, même si l'utilisateur est déjà connecté
+    if request.user.is_authenticated and request.method == 'GET':
+        logout(request)
+        request.session.flush()
+    
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        
+        if username and password:
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                try:
+                    compte = Compte.objects.get(user=user, actif=True)
+                    if compte.agence:
+                        # Vérifier que le type de compte est comptable ou admin
+                        if compte.type_compte not in ['comptable', 'admin']:
+                            type_display = compte.get_type_compte_display()
+                            messages.error(
+                                request, 
+                                f'Accès refusé. Ce module est réservé uniquement aux comptables et aux administrateurs. '
+                                f'Votre type de compte ({type_display}) n\'est pas autorisé.'
+                            )
+                            return render(request, 'supermarket/financier/login.html')
+                        
+                        login(request, user)
+                        # Stocker l'agence dans la session
+                        request.session['agence_id'] = compte.agence.id_agence
+                        request.session['agence_nom'] = compte.agence.nom_agence
+                        messages.success(request, f'Connexion réussie ! Bienvenue {compte.nom_complet}')
+                        # Rediriger vers la page demandée (next) ou vers le dashboard
+                        next_url = request.GET.get('next', 'dashboard_financier')
+                        return redirect(next_url)
+                    else:
+                        messages.error(request, 'Votre compte n\'est pas lié à une agence.')
+                except Compte.DoesNotExist:
+                    messages.error(request, 'Compte non trouvé ou inactif.')
+            else:
+                messages.error(request, 'Nom d\'utilisateur ou mot de passe incorrect.')
+        else:
+            messages.error(request, 'Veuillez remplir tous les champs.')
+    
+    return render(request, 'supermarket/financier/login.html')
+
+def logout_financier(request):
+    """Déconnexion du module Analyse Financière"""
+    logout(request)
+    request.session.flush()
+    messages.success(request, 'Vous avez été déconnecté avec succès.')
+    return redirect('index')
+
+def check_comptable_access(request):
+    """Vérifier que l'utilisateur est un comptable ou admin"""
+    if not request.user.is_authenticated:
+        # Rediriger vers la page de login financier avec le paramètre next
+        from django.http import HttpResponseRedirect
+        from django.urls import reverse
+        login_url = reverse('login_financier')
+        return None, HttpResponseRedirect(f'{login_url}?next={request.path}')
+    
+    try:
+        compte = Compte.objects.get(user=request.user, actif=True)
+        if compte.type_compte not in ['comptable', 'admin']:
+            messages.error(request, 'Accès refusé. Ce module est réservé aux comptables.')
+            return None, redirect('index')
+        return compte, None
+    except Compte.DoesNotExist:
+        messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+        return None, redirect('index')
+
+def dashboard_financier(request):
+    """Dashboard principal du module Analyse Financière"""
+    compte, redirect_response = check_comptable_access(request)
+    if redirect_response:
+        return redirect_response
+    
+    agence = get_user_agence(request)
+    if not agence:
+        messages.error(request, 'Votre compte n\'est pas correctement lié à une agence.')
+        return redirect('login_financier')
+    
+    # Calculer les statistiques financières
+    from datetime import datetime, timedelta
+    from django.db.models import Sum, Count, Avg
+    
+    # Période : 30 derniers jours
+    date_debut = timezone.now().date() - timedelta(days=30)
+    
+    # Chiffre d'affaires (ventes)
+    ca_total = FactureVente.objects.filter(
+        agence=agence,
+        date__gte=date_debut
+    ).aggregate(total=Sum('nette_a_payer'))['total'] or Decimal('0')
+    
+    # Dépenses (achats validés)
+    depenses_total = FactureAchat.objects.filter(
+        agence=agence,
+        date_achat__gte=date_debut,
+        statut__in=['validee', 'payee']
+    ).aggregate(total=Sum('prix_total_global'))['total'] or Decimal('0')
+    
+    # Calculer la marge (approximative : CA - Coût d'achat des articles vendus)
+    marge_totale = Decimal('0')
+    ventes_lignes = LigneFactureVente.objects.filter(
+        facture_vente__agence=agence,
+        facture_vente__date__gte=date_debut
+    ).select_related('article', 'facture_vente')
+    
+    for ligne in ventes_lignes:
+        if ligne.article:
+            prix_vente = Decimal(str(ligne.prix_unitaire))
+            prix_achat = Decimal(str(ligne.article.prix_achat))
+            quantite = Decimal(str(ligne.quantite))
+            marge_ligne = (prix_vente - prix_achat) * quantite
+            marge_totale += marge_ligne
+    
+    # Résultat net
+    resultat_net = ca_total - depenses_total
+    
+    # Statistiques supplémentaires
+    nb_ventes = FactureVente.objects.filter(agence=agence, date__gte=date_debut).count()
+    nb_achats = FactureAchat.objects.filter(agence=agence, date_achat__gte=date_debut, statut__in=['validee', 'payee']).count()
+    
+    # CA moyen par vente
+    ca_moyen = ca_total / nb_ventes if nb_ventes > 0 else Decimal('0')
+    
+    # Évolution du CA sur 7 derniers jours (pour graphique)
+    evolution_ca = []
+    evolution_depenses = []
+    labels_jours = []
+    
+    for i in range(7, 0, -1):
+        date_jour = timezone.now().date() - timedelta(days=i)
+        labels_jours.append(date_jour.strftime('%d/%m'))
+        
+        ca_jour = FactureVente.objects.filter(
+            agence=agence,
+            date=date_jour
+        ).aggregate(total=Sum('nette_a_payer'))['total'] or Decimal('0')
+        
+        dep_jour = FactureAchat.objects.filter(
+            agence=agence,
+            date_achat=date_jour,
+            statut__in=['validee', 'payee']
+        ).aggregate(total=Sum('prix_total_global'))['total'] or Decimal('0')
+        
+        evolution_ca.append(float(ca_jour))
+        evolution_depenses.append(float(dep_jour))
+    
+    # Top 5 articles les plus vendus
+    top_articles = LigneFactureVente.objects.filter(
+        facture_vente__agence=agence,
+        facture_vente__date__gte=date_debut
+    ).values('article__designation').annotate(
+        total_vente=Sum(F('quantite') * F('prix_unitaire')),
+        quantite_totale=Sum('quantite')
+    ).order_by('-total_vente')[:5]
+    
+    context = {
+        'agence': agence,
+        'compte': compte,
+        'ca_total': float(ca_total),
+        'depenses_total': float(depenses_total),
+        'marge_totale': float(marge_totale),
+        'resultat_net': float(resultat_net),
+        'nb_ventes': nb_ventes,
+        'nb_achats': nb_achats,
+        'ca_moyen': float(ca_moyen),
+        'pourcentage_marge': float((marge_totale / ca_total * 100) if ca_total > 0 else 0),
+        'evolution_ca': evolution_ca,
+        'evolution_depenses': evolution_depenses,
+        'labels_jours': labels_jours,
+        'top_articles': top_articles,
+        'date_debut': date_debut,
+        'date_fin': timezone.now().date(),
+    }
+    return render(request, 'supermarket/financier/dashboard_financier.html', context)
+
+def suivi_statistique(request):
+    """Vue pour le suivi statistique"""
+    compte, redirect_response = check_comptable_access(request)
+    if redirect_response:
+        return redirect_response
+    
+    agence = get_user_agence(request)
+    if not agence:
+        messages.error(request, 'Votre compte n\'est pas correctement lié à une agence.')
+        return redirect('login_financier')
+    
+    context = {
+        'agence': agence,
+        'compte': compte,
+    }
+    return render(request, 'supermarket/financier/suivi_statistique.html', context)
+
+def etat_depense(request):
+    """Vue pour l'état des dépenses"""
+    compte, redirect_response = check_comptable_access(request)
+    if redirect_response:
+        return redirect_response
+    
+    agence = get_user_agence(request)
+    if not agence:
+        messages.error(request, 'Votre compte n\'est pas correctement lié à une agence.')
+        return redirect('login_financier')
+    
+    context = {
+        'agence': agence,
+        'compte': compte,
+    }
+    return render(request, 'supermarket/financier/etat_depense.html', context)
+
+def etat_tresorerie(request):
+    """Vue pour l'état de trésorerie"""
+    compte, redirect_response = check_comptable_access(request)
+    if redirect_response:
+        return redirect_response
+    
+    agence = get_user_agence(request)
+    if not agence:
+        messages.error(request, 'Votre compte n\'est pas correctement lié à une agence.')
+        return redirect('login_financier')
+    
+    context = {
+        'agence': agence,
+        'compte': compte,
+    }
+    return render(request, 'supermarket/financier/etat_tresorerie.html', context)
+
+def etat_resultat(request):
+    """Vue pour l'état de résultat"""
+    compte, redirect_response = check_comptable_access(request)
+    if redirect_response:
+        return redirect_response
+    
+    agence = get_user_agence(request)
+    if not agence:
+        messages.error(request, 'Votre compte n\'est pas correctement lié à une agence.')
+        return redirect('login_financier')
+    
+    context = {
+        'agence': agence,
+        'compte': compte,
+    }
+    return render(request, 'supermarket/financier/etat_resultat.html', context)

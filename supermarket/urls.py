@@ -253,4 +253,13 @@ urlpatterns = [
     path('comptes/<int:compte_id>/supprimer/', views.supprimer_compte, name='supprimer_compte'),
     path('comptes/<int:compte_id>/activer-desactiver/', views.activer_desactiver_compte, name='activer_desactiver_compte'),
     path('comptes/<int:compte_id>/reinitialiser-mot-de-passe/', views.reinitialiser_mot_de_passe, name='reinitialiser_mot_de_passe'),
+    
+    # ===== MODULE ANALYSE FINANCIÈRE =====
+    path('financier/login/', views.login_financier, name='login_financier'),
+    path('financier/logout/', views.logout_financier, name='logout_financier'),
+    path('financier/', views.dashboard_financier, name='dashboard_financier'),
+    path('financier/suivi-statistique/', views.suivi_statistique, name='suivi_statistique'),
+    path('financier/etat-depense/', views.etat_depense, name='etat_depense'),
+    path('financier/etat-tresorerie/', views.etat_tresorerie, name='etat_tresorerie'),
+    path('financier/etat-resultat/', views.etat_resultat, name='etat_resultat'),
 ]
