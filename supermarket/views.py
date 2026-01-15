@@ -19225,7 +19225,7 @@ def travail_livreur(request):
 # ==================== MODULE ANALYSE FINANCIÈRE ====================
 
 def login_financier(request):
-    """Page de connexion pour le module Analyse Financière - Réservé aux comptables"""
+    """Page de connexion pour le module Analyse Financière - Réservé aux analystes financières et administrateurs"""
     # Toujours afficher la page de connexion, même si l'utilisateur est déjà connecté
     if request.user.is_authenticated and request.method == 'GET':
         logout(request)
@@ -19241,12 +19241,12 @@ def login_financier(request):
                 try:
                     compte = Compte.objects.get(user=user, actif=True)
                     if compte.agence:
-                        # Vérifier que le type de compte est comptable ou admin
-                        if compte.type_compte not in ['comptable', 'admin']:
+                        # Vérifier que le type de compte est analyste_financiere ou admin
+                        if compte.type_compte not in ['analyste_financiere', 'admin']:
                             type_display = compte.get_type_compte_display()
                             messages.error(
                                 request, 
-                                f'Accès refusé. Ce module est réservé uniquement aux comptables et aux administrateurs. '
+                                f'Accès refusé. Ce module est réservé uniquement aux analystes financières et aux administrateurs. '
                                 f'Votre type de compte ({type_display}) n\'est pas autorisé.'
                             )
                             return render(request, 'supermarket/financier/login.html')
@@ -19278,7 +19278,7 @@ def logout_financier(request):
     return redirect('index')
 
 def check_comptable_access(request):
-    """Vérifier que l'utilisateur est un comptable ou admin"""
+    """Vérifier que l'utilisateur est un analyste financière ou admin"""
     if not request.user.is_authenticated:
         # Rediriger vers la page de login financier avec le paramètre next
         from django.http import HttpResponseRedirect
@@ -19288,8 +19288,8 @@ def check_comptable_access(request):
     
     try:
         compte = Compte.objects.get(user=request.user, actif=True)
-        if compte.type_compte not in ['comptable', 'admin']:
-            messages.error(request, 'Accès refusé. Ce module est réservé aux comptables.')
+        if compte.type_compte not in ['analyste_financiere', 'admin']:
+            messages.error(request, 'Accès refusé. Ce module est réservé aux analystes financières et administrateurs.')
             return None, redirect('index')
         return compte, None
     except Compte.DoesNotExist:
@@ -19319,56 +19319,104 @@ def dashboard_financier(request):
         date__gte=date_debut
     ).aggregate(total=Sum('nette_a_payer'))['total'] or Decimal('0')
     
-    # Dépenses (achats validés) - TOUTES LES AGENCES
-    depenses_total = FactureAchat.objects.filter(
-        date_achat__gte=date_debut,
-        statut__in=['validee', 'payee']
-    ).aggregate(total=Sum('prix_total_global'))['total'] or Decimal('0')
+    # Dépenses (module Dépense) - TOUTES LES AGENCES
+    # Convertir date_debut en datetime pour le filtre
+    from datetime import time as time_class
+    date_debut_dt = datetime.combine(date_debut, time_class.min)
+    depenses_total = Depense.objects.filter(
+        date__gte=date_debut_dt
+    ).aggregate(total=Sum('montant'))['total'] or Decimal('0')
     
-    # Calculer la marge (approximative : CA - Coût d'achat des articles vendus) - TOUTES LES AGENCES
-    marge_totale = Decimal('0')
-    ventes_lignes = LigneFactureVente.objects.filter(
-        facture_vente__date__gte=date_debut
-    ).select_related('article', 'facture_vente')
+    # Calculer la marge totale (somme de toutes les marges de toutes les agences) - TOUTES LES AGENCES
+    # Optimisation : Calcul direct en base de données avec agrégation au lieu de boucle Python
+    # La marge = (Prix de vente - Prix d'achat) × Quantité pour chaque ligne de vente
+    from django.db.models import ExpressionWrapper, DecimalField
     
-    for ligne in ventes_lignes:
-        if ligne.article:
-            prix_vente = Decimal(str(ligne.prix_unitaire))
-            prix_achat = Decimal(str(ligne.article.prix_achat))
-            quantite = Decimal(str(ligne.quantite))
-            marge_ligne = (prix_vente - prix_achat) * quantite
-            marge_totale += marge_ligne
+    # Calculer la marge totale directement en SQL pour toutes les agences
+    marge_totale_result = LigneFactureVente.objects.filter(
+        facture_vente__date__gte=date_debut,
+        article__isnull=False
+    ).aggregate(
+        total_marge=Sum(
+            ExpressionWrapper(
+                (F('prix_unitaire') - F('article__prix_achat')) * F('quantite'),
+                output_field=DecimalField(max_digits=15, decimal_places=2)
+            )
+        )
+    )['total_marge'] or Decimal('0')
     
-    # Résultat net (Bénéfice) = CA - Dépenses
-    resultat_net = ca_total - depenses_total
+    marge_totale = Decimal(str(marge_totale_result))
+    
+    # Résultat net (Bénéfice) = Marge - Dépenses
+    # La marge est le bénéfice brut, donc Résultat = Marge - Dépenses
+    resultat_net = marge_totale - depenses_total
     
     # Statistiques supplémentaires - TOUTES LES AGENCES
     nb_ventes = FactureVente.objects.filter(date__gte=date_debut).count()
-    nb_achats = FactureAchat.objects.filter(date_achat__gte=date_debut, statut__in=['validee', 'payee']).count()
+    nb_depenses = Depense.objects.filter(date__gte=date_debut_dt).count()
     
     # CA moyen par vente
     ca_moyen = ca_total / nb_ventes if nb_ventes > 0 else Decimal('0')
     
-    # Évolution du CA sur 7 derniers jours (pour graphique) - TOUTES LES AGENCES
+    # Évolution sur 30 derniers jours (pour graphique) - TOUTES LES AGENCES
+    # Optimisation : Utiliser des agrégations groupées au lieu de boucles avec requêtes individuelles
+    date_fin_evolution = timezone.now().date()
+    date_debut_evolution = date_fin_evolution - timedelta(days=30)
+    
+    # Récupérer le CA groupé par date (une seule requête SQL)
+    ca_par_date = FactureVente.objects.filter(
+        date__range=[date_debut_evolution, date_fin_evolution]
+    ).values('date').annotate(
+        total_ca=Sum('nette_a_payer')
+    ).order_by('date')
+    
+    # Récupérer les dépenses groupées par date (une seule requête SQL)
+    depenses_par_date = Depense.objects.filter(
+        date__gte=datetime.combine(date_debut_evolution, time_class.min),
+        date__lte=datetime.combine(date_fin_evolution, time_class.max)
+    ).extra(
+        select={'date_only': "DATE(date)"}
+    ).values('date_only').annotate(
+        total_depenses=Sum('montant')
+    ).order_by('date_only')
+    
+    # Récupérer les marges groupées par date (une seule requête SQL)
+    marges_par_date = LigneFactureVente.objects.filter(
+        facture_vente__date__range=[date_debut_evolution, date_fin_evolution],
+        article__isnull=False
+    ).values('facture_vente__date').annotate(
+        total_marge=Sum(
+            ExpressionWrapper(
+                (F('prix_unitaire') - F('article__prix_achat')) * F('quantite'),
+                output_field=DecimalField(max_digits=15, decimal_places=2)
+            )
+        )
+    ).order_by('facture_vente__date')
+    
+    # Créer des dictionnaires pour accès rapide
+    ca_dict = {str(item['date']): float(item['total_ca'] or 0) for item in ca_par_date}
+    depenses_dict = {str(item['date_only']): float(item['total_depenses'] or 0) for item in depenses_par_date}
+    marges_dict = {str(item['facture_vente__date']): float(item['total_marge'] or 0) for item in marges_par_date}
+    
+    # Construire les listes pour les 30 derniers jours
     evolution_ca = []
     evolution_depenses = []
+    evolution_resultat = []
     labels_jours = []
     
-    for i in range(7, 0, -1):
-        date_jour = timezone.now().date() - timedelta(days=i)
+    for i in range(30, 0, -1):
+        date_jour = date_fin_evolution - timedelta(days=i)
+        date_jour_str = str(date_jour)
         labels_jours.append(date_jour.strftime('%d/%m'))
         
-        ca_jour = FactureVente.objects.filter(
-            date=date_jour
-        ).aggregate(total=Sum('nette_a_payer'))['total'] or Decimal('0')
+        ca_jour = ca_dict.get(date_jour_str, 0.0)
+        dep_jour = depenses_dict.get(date_jour_str, 0.0)
+        marge_jour = marges_dict.get(date_jour_str, 0.0)
+        resultat_jour = marge_jour - dep_jour
         
-        dep_jour = FactureAchat.objects.filter(
-            date_achat=date_jour,
-            statut__in=['validee', 'payee']
-        ).aggregate(total=Sum('prix_total_global'))['total'] or Decimal('0')
-        
-        evolution_ca.append(float(ca_jour))
-        evolution_depenses.append(float(dep_jour))
+        evolution_ca.append(ca_jour)
+        evolution_depenses.append(dep_jour)
+        evolution_resultat.append(resultat_jour)
     
     # Top 5 articles les plus vendus - TOUTES LES AGENCES
     top_articles = LigneFactureVente.objects.filter(
@@ -19386,11 +19434,12 @@ def dashboard_financier(request):
         'marge_totale': float(marge_totale),
         'resultat_net': float(resultat_net),
         'nb_ventes': nb_ventes,
-        'nb_achats': nb_achats,
+        'nb_achats': nb_depenses,
         'ca_moyen': float(ca_moyen),
         'pourcentage_marge': float((marge_totale / ca_total * 100) if ca_total > 0 else 0),
         'evolution_ca': evolution_ca,
         'evolution_depenses': evolution_depenses,
+        'evolution_resultat': evolution_resultat,
         'labels_jours': labels_jours,
         'top_articles': top_articles,
         'date_debut': date_debut,
@@ -19420,7 +19469,7 @@ def suivi_statistique(request):
     return render(request, 'supermarket/financier/suivi_statistique.html', context)
 
 def etat_depense(request):
-    """Vue pour l'état des dépenses"""
+    """Vue pour l'état des dépenses - Toutes les agences"""
     compte, redirect_response = check_comptable_access(request)
     if redirect_response:
         return redirect_response
@@ -19430,9 +19479,13 @@ def etat_depense(request):
         messages.error(request, 'Votre compte n\'est pas correctement lié à une agence.')
         return redirect('login_financier')
     
+    # Récupérer toutes les agences
+    agences = Agence.objects.all().order_by('nom_agence')
+    
     context = {
         'agence': agence,
         'compte': compte,
+        'agences': agences,
     }
     return render(request, 'supermarket/financier/etat_depense.html', context)
 
@@ -19454,7 +19507,7 @@ def etat_tresorerie(request):
     return render(request, 'supermarket/financier/etat_tresorerie.html', context)
 
 def etat_resultat(request):
-    """Vue pour l'état de résultat"""
+    """Vue pour l'état de résultat - Toutes les agences"""
     compte, redirect_response = check_comptable_access(request)
     if redirect_response:
         return redirect_response
@@ -19464,11 +19517,513 @@ def etat_resultat(request):
         messages.error(request, 'Votre compte n\'est pas correctement lié à une agence.')
         return redirect('login_financier')
     
+    # Récupérer toutes les agences
+    agences = Agence.objects.all().order_by('nom_agence')
+    
     context = {
         'agence': agence,
         'compte': compte,
+        'agences': agences,
     }
     return render(request, 'supermarket/financier/etat_resultat.html', context)
+
+def generer_etat_depense(request):
+    """Générer l'état des dépenses pour toutes les agences sur une période donnée"""
+    # Vérifier l'authentification pour les requêtes AJAX
+    if not request.user.is_authenticated:
+        return JsonResponse({'success': False, 'error': 'Non authentifié. Veuillez vous reconnecter.'}, status=401)
+    
+    try:
+        compte = Compte.objects.get(user=request.user, actif=True)
+        if compte.type_compte not in ['analyste_financiere', 'admin']:
+            return JsonResponse({'success': False, 'error': 'Accès refusé. Ce module est réservé aux analystes financières et administrateurs.'}, status=403)
+    except Compte.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Votre compte n\'est pas configuré correctement.'}, status=403)
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Méthode non autorisée'}, status=405)
+    
+    try:
+        date_debut_str = request.POST.get('date_debut')
+        date_fin_str = request.POST.get('date_fin')
+        
+        if not date_debut_str or not date_fin_str:
+            return JsonResponse({'success': False, 'error': 'Les dates sont obligatoires'})
+        
+        from datetime import datetime
+        date_debut = datetime.strptime(date_debut_str, '%Y-%m-%d').date()
+        date_fin = datetime.strptime(date_fin_str, '%Y-%m-%d').date()
+        
+        # Récupérer toutes les agences
+        agences = Agence.objects.all().order_by('nom_agence')
+        
+        # Dépenses par agence
+        depenses_par_agence = {}
+        total_general = Decimal('0')
+        
+        for agence in agences:
+            # Convertir les dates en datetime pour le filtre (start et end de la journée)
+            from datetime import time as time_class
+            date_debut_dt = datetime.combine(date_debut, time_class.min)
+            date_fin_dt = datetime.combine(date_fin, time_class.max)
+            
+            # Récupérer les dépenses de cette agence pour la période
+            depenses_agence = Depense.objects.filter(
+                agence=agence,
+                date__range=[date_debut_dt, date_fin_dt]
+            ).order_by('date')
+            
+            # Préparer les données des dépenses
+            liste_depenses = []
+            total_agence = Decimal('0')
+            
+            for depense in depenses_agence:
+                # Sérialiser la date en string ISO pour JSON
+                if depense.date:
+                    # Convertir datetime avec timezone en datetime naive puis en string
+                    if hasattr(depense.date, 'replace'):
+                        date_naive = depense.date.replace(tzinfo=None)
+                        date_str = date_naive.strftime('%Y-%m-%d %H:%M:%S')
+                    else:
+                        date_str = str(depense.date)
+                else:
+                    date_str = None
+                    
+                liste_depenses.append({
+                    'date': date_str,
+                    'libelle': depense.libelle,
+                    'montant': float(depense.montant),
+                })
+                total_agence += depense.montant
+            
+            if liste_depenses:
+                depenses_par_agence[agence.id_agence] = {
+                    'nom_agence': agence.nom_agence,
+                    'depenses': liste_depenses,
+                    'total': float(total_agence),
+                }
+                total_general += total_agence
+        
+        # Stocker dans la session pour l'export
+        request.session['etat_depense'] = {
+            'date_debut': str(date_debut),
+            'date_fin': str(date_fin),
+            'depenses_par_agence': depenses_par_agence,
+            'total_general': float(total_general),
+        }
+        
+        return JsonResponse({
+            'success': True,
+            'depenses_par_agence': depenses_par_agence,
+            'total_general': float(total_general),
+            'date_debut': str(date_debut),
+            'date_fin': str(date_fin),
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'success': False, 'error': f'Erreur: {str(e)}'})
+
+def export_etat_depense_excel(request):
+    """Exporter l'état des dépenses en Excel"""
+    compte, redirect_response = check_comptable_access(request)
+    if redirect_response:
+        return redirect_response
+    
+    try:
+        # Récupérer les données depuis la session
+        etat_data = request.session.get('etat_depense')
+        
+        if not etat_data:
+            return JsonResponse({'success': False, 'error': 'Aucun état généré'})
+        
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        except ImportError:
+            return JsonResponse({'success': False, 'error': 'Module openpyxl non installé'})
+        
+        from django.http import HttpResponse
+        
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = f"État Dépenses {etat_data['date_debut']} - {etat_data['date_fin']}"
+        
+        # Styles
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=11)
+        agence_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+        total_fill = PatternFill(start_color="FFC000", end_color="FFC000", fill_type="solid")
+        
+        row = 1
+        
+        # En-têtes des colonnes
+        headers = ['Date', 'Libellé', 'Montant (FCFA)']
+        
+        # Par agence
+        for agence_id, agence_data in etat_data['depenses_par_agence'].items():
+            # En-tête Agence
+            ws.merge_cells(f'A{row}:C{row}')
+            ws[f'A{row}'] = f"AGENCE: {agence_data['nom_agence']}"
+            ws[f'A{row}'].font = Font(bold=True, size=11)
+            ws[f'A{row}'].fill = agence_fill
+            ws[f'A{row}'].alignment = Alignment(horizontal="left", vertical="center")
+            row += 1
+            
+            # En-têtes du tableau
+            for col, header in enumerate(headers, 1):
+                cell = ws.cell(row=row, column=col)
+                cell.value = header
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            row += 1
+            
+            # Dépenses de l'agence
+            for depense in agence_data['depenses']:
+                # Date (colonne A) - depense['date'] est déjà une string formatée 'YYYY-MM-DD HH:MM:SS'
+                date_value = depense.get('date', '')
+                if date_value:
+                    try:
+                        # Parser la string pour créer un objet datetime pour Excel
+                        from datetime import datetime
+                        # Parser le format 'YYYY-MM-DD HH:MM:SS' ou 'YYYY-MM-DD'
+                        date_str_clean = date_value.split(' ')[0] if ' ' in date_value else date_value
+                        date_obj = datetime.strptime(date_str_clean, '%Y-%m-%d')
+                        ws.cell(row=row, column=1, value=date_obj).number_format = 'DD/MM/YYYY HH:MM'
+                    except (ValueError, AttributeError):
+                        # En cas d'erreur de parsing, utiliser la string telle quelle
+                        ws.cell(row=row, column=1, value=date_value)
+                else:
+                    ws.cell(row=row, column=1, value="")
+                ws.cell(row=row, column=1).alignment = Alignment(vertical="center")
+                
+                # Libellé (colonne B)
+                ws.cell(row=row, column=2, value=depense['libelle']).alignment = Alignment(vertical="center")
+                
+                # Montant (colonne C)
+                cell_montant = ws.cell(row=row, column=3, value=depense['montant'])
+                cell_montant.number_format = '#,##0.00'
+                cell_montant.alignment = Alignment(horizontal="right", vertical="center")
+                
+                row += 1
+            
+            # Total de l'agence
+            ws.merge_cells(f'A{row}:B{row}')
+            cell_total_agence_label = ws.cell(row=row, column=1, value=f"TOTAL {agence_data['nom_agence']}")
+            cell_total_agence_label.font = Font(bold=True, size=11)
+            cell_total_agence_label.alignment = Alignment(horizontal="right", vertical="center")
+            
+            cell_total_agence = ws.cell(row=row, column=3, value=agence_data['total'])
+            cell_total_agence.font = Font(bold=True, size=11)
+            cell_total_agence.number_format = '#,##0.00'
+            cell_total_agence.alignment = Alignment(horizontal="right", vertical="center")
+            cell_total_agence.fill = total_fill
+            
+            row += 1
+            row += 1  # Ligne vide entre les agences
+        
+        # Total général
+        ws.merge_cells(f'A{row}:B{row}')
+        cell_total_general_label = ws.cell(row=row, column=1, value="TOTAL GÉNÉRAL")
+        cell_total_general_label.font = Font(bold=True, size=12)
+        cell_total_general_label.alignment = Alignment(horizontal="right", vertical="center")
+        
+        cell_total_general = ws.cell(row=row, column=3, value=etat_data['total_general'])
+        cell_total_general.font = Font(bold=True, size=12)
+        cell_total_general.number_format = '#,##0.00'
+        cell_total_general.alignment = Alignment(horizontal="right", vertical="center")
+        cell_total_general.fill = total_fill
+        
+        # Ajuster largeurs colonnes
+        ws.column_dimensions['A'].width = 20
+        ws.column_dimensions['B'].width = 50
+        ws.column_dimensions['C'].width = 20
+        
+        # Réponse HTTP
+        filename = f"Etat_Depenses_{etat_data['date_debut']}_{etat_data['date_fin']}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        wb.save(response)
+        return response
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'success': False, 'error': f'Erreur export: {str(e)}'})
+
+def generer_etat_resultat(request):
+    """Générer l'état des résultats pour toutes les agences sur une période donnée"""
+    # Vérifier l'authentification pour les requêtes AJAX
+    if not request.user.is_authenticated:
+        return JsonResponse({'success': False, 'error': 'Non authentifié. Veuillez vous reconnecter.'}, status=401)
+    
+    try:
+        compte = Compte.objects.get(user=request.user, actif=True)
+        if compte.type_compte not in ['comptable', 'admin']:
+            return JsonResponse({'success': False, 'error': 'Accès refusé. Ce module est réservé aux comptables.'}, status=403)
+    except Compte.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Votre compte n\'est pas configuré correctement.'}, status=403)
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Méthode non autorisée'}, status=405)
+    
+    try:
+        date_debut_str = request.POST.get('date_debut')
+        date_fin_str = request.POST.get('date_fin')
+        
+        if not date_debut_str or not date_fin_str:
+            return JsonResponse({'success': False, 'error': 'Les dates sont obligatoires'})
+        
+        from datetime import datetime, time
+        from django.db.models import ExpressionWrapper, DecimalField
+        date_debut = datetime.strptime(date_debut_str, '%Y-%m-%d').date()
+        date_fin = datetime.strptime(date_fin_str, '%Y-%m-%d').date()
+        
+        # Récupérer toutes les agences sauf "Agence Principale" et "Super Market Principal"
+        agences = Agence.objects.exclude(
+            nom_agence__in=['Agence Principale', 'Super Market Principal']
+        ).order_by('nom_agence')
+        
+        # Résultats par agence
+        resultats_par_agence = {}
+        total_ca_general = Decimal('0')
+        total_depenses_general = Decimal('0')
+        total_marge_general = Decimal('0')
+        total_resultat_general = Decimal('0')
+        
+        # Convertir les dates en datetime pour les filtres
+        date_debut_dt = datetime.combine(date_debut, time.min)
+        date_fin_dt = datetime.combine(date_fin, time.max)
+        
+        for agence in agences:
+            # Chiffre d'affaires de l'agence (ventes)
+            ca_agence = FactureVente.objects.filter(
+                agence=agence,
+                date__range=[date_debut, date_fin]
+            ).aggregate(total=Sum('nette_a_payer'))['total'] or Decimal('0')
+            
+            # Dépenses de l'agence
+            depenses_agence = Depense.objects.filter(
+                agence=agence,
+                date__range=[date_debut_dt, date_fin_dt]
+            ).aggregate(total=Sum('montant'))['total'] or Decimal('0')
+            
+            # Marge (Bénéfice brut) de l'agence
+            # Calculer la marge directement en SQL pour cette agence
+            marge_agence_result = LigneFactureVente.objects.filter(
+                facture_vente__agence=agence,
+                facture_vente__date__range=[date_debut, date_fin],
+                article__isnull=False
+            ).aggregate(
+                total_marge=Sum(
+                    ExpressionWrapper(
+                        (F('prix_unitaire') - F('article__prix_achat')) * F('quantite'),
+                        output_field=DecimalField(max_digits=15, decimal_places=2)
+                    )
+                )
+            )['total_marge'] or Decimal('0')
+            
+            marge_agence = Decimal(str(marge_agence_result))
+            
+            # Résultat = Bénéfice (Marge) - Dépenses
+            resultat_agence = marge_agence - depenses_agence
+            
+            # Stocker les résultats même si tout est à zéro (pour afficher toutes les agences)
+            resultats_par_agence[agence.id_agence] = {
+                'nom_agence': agence.nom_agence,
+                'ca': float(ca_agence),
+                'depenses': float(depenses_agence),
+                'marge': float(marge_agence),
+                'resultat': float(resultat_agence),
+            }
+            
+            total_ca_general += ca_agence
+            total_depenses_general += depenses_agence
+            total_marge_general += marge_agence
+            total_resultat_general += resultat_agence
+        
+        # Stocker dans la session pour l'export
+        request.session['etat_resultat'] = {
+            'date_debut': str(date_debut),
+            'date_fin': str(date_fin),
+            'resultats_par_agence': resultats_par_agence,
+            'total_ca': float(total_ca_general),
+            'total_depenses': float(total_depenses_general),
+            'total_marge': float(total_marge_general),
+            'total_resultat': float(total_resultat_general),
+        }
+        
+        return JsonResponse({
+            'success': True,
+            'resultats_par_agence': resultats_par_agence,
+            'total_ca': float(total_ca_general),
+            'total_depenses': float(total_depenses_general),
+            'total_marge': float(total_marge_general),
+            'total_resultat': float(total_resultat_general),
+            'date_debut': str(date_debut),
+            'date_fin': str(date_fin),
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'success': False, 'error': f'Erreur: {str(e)}'})
+
+def export_etat_resultat_excel(request):
+    """Exporter l'état des résultats en Excel"""
+    compte, redirect_response = check_comptable_access(request)
+    if redirect_response:
+        return redirect_response
+    
+    try:
+        # Récupérer les données depuis la session
+        etat_data = request.session.get('etat_resultat')
+        
+        if not etat_data:
+            return JsonResponse({'success': False, 'error': 'Aucun état généré'})
+        
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        except ImportError:
+            return JsonResponse({'success': False, 'error': 'Module openpyxl non installé'})
+        
+        from django.http import HttpResponse
+        
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = f"État Résultats {etat_data['date_debut']} - {etat_data['date_fin']}"
+        
+        # Styles
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=12)
+        agence_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+        agence_font = Font(bold=True, size=11)
+        total_fill = PatternFill(start_color="FFC000", end_color="FFC000", fill_type="solid")
+        total_font = Font(bold=True, size=12)
+        grand_total_fill = PatternFill(start_color="70AD47", end_color="70AD47", fill_type="solid")
+        grand_total_font = Font(bold=True, color="FFFFFF", size=13)
+        
+        row = 1
+        
+        # Titre du document
+        ws.merge_cells(f'A{row}:E{row}')
+        ws[f'A{row}'] = f"ÉTAT DES RÉSULTATS - Période du {etat_data['date_debut']} au {etat_data['date_fin']}"
+        ws[f'A{row}'].font = Font(bold=True, size=14, color="2C3E50")
+        ws[f'A{row}'].alignment = Alignment(horizontal="center", vertical="center")
+        row += 2
+        
+        # En-têtes des colonnes
+        headers = ['Agence', 'Chiffre d\'Affaires (FCFA)', 'Dépenses (FCFA)', 'Marge/Bénéfice (FCFA)', 'Résultat Net (FCFA)']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=col)
+            cell.value = header
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        row += 1
+        
+        # Données par agence
+        for agence_id, agence_data in etat_data['resultats_par_agence'].items():
+            # Nom de l'agence
+            ws.cell(row=row, column=1, value=agence_data['nom_agence']).font = agence_font
+            ws.cell(row=row, column=1).fill = agence_fill
+            ws.cell(row=row, column=1).alignment = Alignment(horizontal="left", vertical="center")
+            
+            # CA
+            cell_ca = ws.cell(row=row, column=2, value=agence_data['ca'])
+            cell_ca.number_format = '#,##0.00'
+            cell_ca.alignment = Alignment(horizontal="right", vertical="center")
+            
+            # Dépenses
+            cell_dep = ws.cell(row=row, column=3, value=agence_data['depenses'])
+            cell_dep.number_format = '#,##0.00'
+            cell_dep.alignment = Alignment(horizontal="right", vertical="center")
+            
+            # Marge/Bénéfice
+            cell_marge = ws.cell(row=row, column=4, value=agence_data['marge'])
+            cell_marge.number_format = '#,##0.00'
+            cell_marge.alignment = Alignment(horizontal="right", vertical="center")
+            
+            # Résultat Net
+            cell_resultat = ws.cell(row=row, column=5, value=agence_data['resultat'])
+            cell_resultat.number_format = '#,##0.00'
+            cell_resultat.alignment = Alignment(horizontal="right", vertical="center")
+            # Colorer en vert si positif, rouge si négatif
+            if agence_data['resultat'] >= 0:
+                cell_resultat.font = Font(bold=True, color="006100")
+            else:
+                cell_resultat.font = Font(bold=True, color="C00000")
+            
+            row += 1
+        
+        # Ligne de séparation
+        row += 1
+        
+        # TOTAL GÉNÉRAL
+        ws.cell(row=row, column=1, value="TOTAL GÉNÉRAL").font = grand_total_font
+        ws.cell(row=row, column=1).fill = grand_total_fill
+        ws.cell(row=row, column=1).alignment = Alignment(horizontal="right", vertical="center")
+        
+        # Total CA
+        cell_total_ca = ws.cell(row=row, column=2, value=etat_data['total_ca'])
+        cell_total_ca.font = grand_total_font
+        cell_total_ca.fill = grand_total_fill
+        cell_total_ca.number_format = '#,##0.00'
+        cell_total_ca.alignment = Alignment(horizontal="right", vertical="center")
+        
+        # Total Dépenses
+        cell_total_dep = ws.cell(row=row, column=3, value=etat_data['total_depenses'])
+        cell_total_dep.font = grand_total_font
+        cell_total_dep.fill = grand_total_fill
+        cell_total_dep.number_format = '#,##0.00'
+        cell_total_dep.alignment = Alignment(horizontal="right", vertical="center")
+        
+        # Total Marge
+        total_marge_general = etat_data.get('total_marge', sum(ag['marge'] for ag in etat_data['resultats_par_agence'].values()))
+        cell_total_marge = ws.cell(row=row, column=4, value=total_marge_general)
+        cell_total_marge.font = grand_total_font
+        cell_total_marge.fill = grand_total_fill
+        cell_total_marge.number_format = '#,##0.00'
+        cell_total_marge.alignment = Alignment(horizontal="right", vertical="center")
+        
+        # Total Résultat
+        cell_total_resultat = ws.cell(row=row, column=5, value=etat_data['total_resultat'])
+        cell_total_resultat.font = grand_total_font
+        cell_total_resultat.fill = grand_total_fill
+        cell_total_resultat.number_format = '#,##0.00'
+        cell_total_resultat.alignment = Alignment(horizontal="right", vertical="center")
+        if etat_data['total_resultat'] >= 0:
+            cell_total_resultat.font = Font(bold=True, color="FFFFFF", size=13)
+        else:
+            cell_total_resultat.font = Font(bold=True, color="FFFFFF", size=13)
+        
+        # Ajuster la largeur des colonnes
+        ws.column_dimensions['A'].width = 30
+        ws.column_dimensions['B'].width = 25
+        ws.column_dimensions['C'].width = 25
+        ws.column_dimensions['D'].width = 25
+        ws.column_dimensions['E'].width = 25
+        
+        # Réponse HTTP
+        filename = f"Etat_Resultats_{etat_data['date_debut']}_{etat_data['date_fin']}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        wb.save(response)
+        return response
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'success': False, 'error': f'Erreur export: {str(e)}'})
 
 def generer_suivi_statistique(request):
     """Générer les statistiques de toutes les agences avec regroupement par catégorie de marge"""
@@ -19576,11 +20131,12 @@ def generer_suivi_statistique(request):
                 from datetime import timedelta
                 current_date += timedelta(days=1)
             
-            # Toujours inclure l'agence, même si elle n'a pas de ventes
-            statistiques_par_agence[agence.id_agence] = {
-                'nom_agence': agence.nom_agence,
-                'stats_journalieres': stats_journalieres,
-            }
+            # N'inclure l'agence que si elle a des ventes sur la période
+            if stats_journalieres:
+                statistiques_par_agence[agence.id_agence] = {
+                    'nom_agence': agence.nom_agence,
+                    'stats_journalieres': stats_journalieres,
+                }
         
         # Stocker dans la session pour l'export
         request.session['suivi_statistique'] = {

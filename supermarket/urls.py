@@ -262,8 +262,12 @@ urlpatterns = [
     path('financier/generer-suivi-statistique/', views.generer_suivi_statistique, name='generer_suivi_statistique'),
     path('financier/export-suivi-statistique-excel/', views.export_suivi_statistique_excel, name='export_suivi_statistique_excel'),
     path('financier/etat-depense/', views.etat_depense, name='etat_depense'),
+    path('financier/generer-etat-depense/', views.generer_etat_depense, name='generer_etat_depense'),
+    path('financier/export-etat-depense-excel/', views.export_etat_depense_excel, name='export_etat_depense_excel'),
     path('financier/etat-tresorerie/', views.etat_tresorerie, name='etat_tresorerie'),
     path('financier/etat-resultat/', views.etat_resultat, name='etat_resultat'),
+    path('financier/generer-etat-resultat/', views.generer_etat_resultat, name='generer_etat_resultat'),
+    path('financier/export-etat-resultat-excel/', views.export_etat_resultat_excel, name='export_etat_resultat_excel'),
     
     # ===== MODULE COMPTABILITÉ =====
     path('comptabiliter/login/', views.login_comptabiliter, name='login_comptabiliter'),

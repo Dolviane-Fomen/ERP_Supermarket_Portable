@@ -62,6 +62,7 @@ class Compte(models.Model):
             ('responsable_rh', 'Responsable Ressource Humaine'),
             ('assistant_comptable', 'Assistant Comptable'),
             ('responsable_achat', 'Responsable Achat'),
+            ('analyste_financiere', 'Analyste Financière'),
         ],
         default='vendeur',
         verbose_name="Type de compte"
