@@ -2,11 +2,359 @@
 
 {% block content %}
 <div class="content">
-    <h2><i class="fas fa-money-bill-wave" style="color: #f5576c; margin-right: 10px;"></i>État Dépense</h2>
+    <h2><i class="fas fa-money-bill-wave" style="color: #f5576c; margin-right: 10px;"></i>État Dépense - Toutes Agences</h2>
     
-    <div class="welcome-card">
-        <h3>Page en développement</h3>
-        <p>Cette fonctionnalité sera bientôt disponible. Elle permettra de consulter l'état détaillé des dépenses et charges.</p>
+    <style>
+        .filter-card {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+        }
+        .filter-card h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            font-weight: 700;
+        }
+        .filter-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 15px;
+            align-items: end;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .form-group label {
+            color: #2c3e50;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+        .form-group input {
+            padding: 12px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #f5576c;
+            box-shadow: 0 0 0 3px rgba(245, 87, 108, 0.1);
+        }
+        .btn-generate {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1em;
+        }
+        .btn-generate:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(245, 87, 108, 0.4);
+        }
+        .btn-export {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1em;
+            margin-left: 10px;
+        }
+        .btn-export:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+        }
+        .btn-export:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        .results-container {
+            display: none;
+        }
+        .results-container.active {
+            display: block;
+        }
+        .agence-section {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+        }
+        .agence-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .agence-header h3 {
+            margin: 0;
+            font-size: 1.4em;
+        }
+        .depenses-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .depenses-table th {
+            background: #366092;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #dee2e6;
+        }
+        .depenses-table td {
+            padding: 12px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .depenses-table tr:hover {
+            background: #f8f9fa;
+        }
+        .total-row {
+            background: #FFF4CC;
+            font-weight: 700;
+            font-size: 1.1em;
+        }
+        .total-general-row {
+            background: #FFE699;
+            font-weight: 700;
+            font-size: 1.2em;
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        #alertContainer {
+            margin-bottom: 20px;
+        }
+    </style>
+    
+    <!-- Formulaire de filtrage -->
+    <div class="filter-card">
+        <h3><i class="fas fa-calendar-alt"></i> Sélection de la Période</h3>
+        <form id="filterForm" class="filter-form">
+            <div class="form-group">
+                <label for="date_debut">Date de début</label>
+                <input type="date" id="date_debut" name="date_debut" required>
+            </div>
+            <div class="form-group">
+                <label for="date_fin">Date de fin</label>
+                <input type="date" id="date_fin" name="date_fin" required>
+            </div>
+            <div>
+                <button type="submit" class="btn-generate" id="btnGenerate">
+                    <i class="fas fa-search"></i> Générer État
+                </button>
+                <button type="button" class="btn-export" id="btnExport" disabled>
+                    <i class="fas fa-file-excel"></i> Exporter Excel
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Zone d'alertes -->
+    <div id="alertContainer"></div>
+    
+    <!-- Résultats -->
+    <div id="resultsContainer" class="results-container">
+        <!-- Les résultats seront injectés ici par JavaScript -->
     </div>
 </div>
+
+<script>
+document.getElementById('filterForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const date_debut = document.getElementById('date_debut').value;
+    const date_fin = document.getElementById('date_fin').value;
+    
+    if (!date_debut || !date_fin) {
+        showAlert('Veuillez sélectionner les dates', 'error');
+        return;
+    }
+    
+    if (date_debut > date_fin) {
+        showAlert('La date de début doit être antérieure à la date de fin', 'error');
+        return;
+    }
+    
+    // Afficher le loader
+    const btnGenerate = document.getElementById('btnGenerate');
+    const originalText = btnGenerate.innerHTML;
+    btnGenerate.disabled = true;
+    btnGenerate.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Génération...';
+    
+    try {
+        // Récupérer le token CSRF depuis les cookies
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        const csrftoken = getCookie('csrftoken') || '{{ csrf_token }}';
+        
+        const formData = new FormData();
+        formData.append('date_debut', date_debut);
+        formData.append('date_fin', date_fin);
+        formData.append('csrfmiddlewaretoken', csrftoken);
+        
+        const response = await fetch('{% url "generer_etat_depense" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': csrftoken
+            }
+        });
+        
+        // Vérifier si la réponse est du JSON
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            const text = await response.text();
+            console.error('Réponse non-JSON reçue:', text);
+            showAlert('Erreur: La réponse du serveur n\'est pas au format JSON. Vérifiez les logs du serveur.', 'error');
+            return;
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            displayResults(data);
+            document.getElementById('btnExport').disabled = false;
+            showAlert('État généré avec succès', 'info');
+        } else {
+            showAlert(data.error || 'Erreur lors de la génération', 'error');
+        }
+    } catch (error) {
+        console.error('Erreur:', error);
+        showAlert('Erreur de connexion: ' + error.message, 'error');
+    } finally {
+        btnGenerate.disabled = false;
+        btnGenerate.innerHTML = originalText;
+    }
+});
+
+function displayResults(data) {
+    const container = document.getElementById('resultsContainer');
+    let html = '';
+    
+    const depensesParAgence = data.depenses_par_agence;
+    
+    for (const [agenceId, agenceData] of Object.entries(depensesParAgence)) {
+        html += `<div class="agence-section">
+            <div class="agence-header">
+                <h3><i class="fas fa-store"></i> ${agenceData.nom_agence}</h3>
+            </div>
+            <table class="depenses-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Libellé</th>
+                        <th>Montant (FCFA)</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+        
+            for (const depense of agenceData.depenses) {
+            // Gérer les dates (peuvent être des strings ou des objets)
+            let dateStr = '';
+            if (depense.date) {
+                try {
+                    const date = new Date(depense.date);
+                    if (!isNaN(date.getTime())) {
+                        dateStr = date.toLocaleDateString('fr-FR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                    } else {
+                        dateStr = depense.date; // Utiliser la date telle quelle si elle est déjà formatée
+                    }
+                } catch (e) {
+                    dateStr = depense.date; // Utiliser la date telle quelle en cas d'erreur
+                }
+            }
+            
+            html += `<tr>
+                <td>${dateStr}</td>
+                <td>${depense.libelle}</td>
+                <td style="text-align: right;">${depense.montant.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            </tr>`;
+        }
+        
+        html += `<tr class="total-row">
+            <td colspan="2" style="text-align: right; font-weight: 700;">TOTAL ${agenceData.nom_agence}</td>
+            <td style="text-align: right; font-weight: 700;">${agenceData.total.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+        </tr>
+                </tbody>
+            </table>
+        </div>`;
+    }
+    
+    // Total général
+    html += `<div class="agence-section">
+        <table class="depenses-table">
+            <tbody>
+                <tr class="total-general-row">
+                    <td colspan="2" style="text-align: right; font-weight: 700; font-size: 1.2em;">TOTAL GÉNÉRAL (Toutes Agences)</td>
+                    <td style="text-align: right; font-weight: 700; font-size: 1.2em;">${data.total_general.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>`;
+    
+    container.innerHTML = html;
+    container.classList.add('active');
+}
+
+document.getElementById('btnExport').addEventListener('click', function() {
+    window.location.href = '{% url "export_etat_depense_excel" %}';
+});
+
+function showAlert(message, type) {
+    const container = document.getElementById('alertContainer');
+    const alertClass = type === 'error' ? 'alert-error' : 'alert-info';
+    container.innerHTML = `<div class="alert ${alertClass}">${message}</div>`;
+    setTimeout(() => {
+        container.innerHTML = '';
+    }, 5000);
+}
+</script>
 {% endblock %}
