@@ -20,7 +20,7 @@ from .models import (
     FactureTemporaire, Famille, Fournisseur, MouvementStock, PlanComptable, PlanTiers, CodeJournaux,
     TauxTaxe, FactureAchat, LigneFactureAchat, FactureTransfert, LigneFactureTransfert,
     Commande, Livraison, FactureCommande, StatistiqueClient, DocumentCommande, LigneCommande, Notification,
-    Livreur, SuiviClientAction,Depense,ChiffreAffaire
+    Livreur, SuiviClientAction,Depense,ChiffreAffaire,Tresorerie
 )
 from .decorators import (
     require_stock_modify_access,
@@ -20357,3 +20357,268 @@ def suivi_chiffre_affaire(request):
     }
 
     return render(request, 'supermarket/comptabiliter/suivi-chiffre-affaire.html', context)
+
+
+
+# supermarket/views.py
+
+# supermarket/views.py
+
+@login_required
+def suivi_tresorerie(request):
+    """
+    Saisie journalière de la trésorerie.
+    Affiche le CA et les soldes (Récupère automatiquement les soldes de la veille).
+    Pas d'export Excel ici.
+    """
+    from .models import Tresorerie, ChiffreAffaire
+    
+    # 1. Agence
+    try:
+        agence = get_user_agence(request)
+        if not agence: raise ValueError
+    except:
+        messages.error(request, "Agence non identifiée.")
+        return redirect('dashboard_comptabilite')
+
+    date_a_afficher = timezone.now().date()
+
+    # --- LOGIQUE DE REPORT DE SOLDE (ROLLING BALANCE) ---
+    try:
+        # 1. Est-ce qu'on a déjà enregistré quelque chose pour AUJOURD'HUI ?
+        treso = Tresorerie.objects.get(agence=agence, date=date_a_afficher)
+        
+        # Si oui, les valeurs initiales sont celles déjà enregistrées dans la fiche
+        valeurs_initiales = {
+            'banque': treso.banque_initial,
+            'caisse': treso.caisse_initial,
+            'om': treso.om_initial,
+            'momo': treso.momo_initial,
+            'sav': treso.sav_initial
+        }
+    except Tresorerie.DoesNotExist:
+        # 2. Si rien pour aujourd'hui, on cherche le DERNIER JOUR ENREGISTRÉ (Hier, avant-hier, etc.)
+        treso = None
+        
+        # "date__lt" signifie "date less than" (date strictement avant aujourd'hui)
+        # ".order_by('-date')" signifie "du plus récent au plus vieux"
+        # ".first()" prend le premier trouvé (donc le plus récent)
+        last_treso = Tresorerie.objects.filter(agence=agence, date__lt=date_a_afficher).order_by('-date').first()
+        
+        if last_treso:
+            # BINGO ! On a trouvé un jour précédent.
+            # On prend son SOLDE FINAL (calculé) pour en faire notre INITIAL
+            valeurs_initiales = {
+                'banque': last_treso.solde_banque_final,   # Le final d'hier...
+                'caisse': last_treso.solde_caisse_final,   # ...devient l'initial d'aujourd'hui
+                'om': last_treso.solde_om_final,
+                'momo': last_treso.solde_momo_final,
+                'sav': last_treso.solde_sav_final
+            }
+            messages.info(request, f"Soldes reportés du {last_treso.date}")
+        else:
+            # C'est la toute première fois qu'on utilise le logiciel
+            valeurs_initiales = {'banque': 0, 'caisse': 0, 'om': 0, 'momo': 0, 'sav': 0}
+
+
+    # 4. Récupération Chiffre d'Affaire (Pour affichage seulement)
+    try:
+        ca_obj = ChiffreAffaire.objects.get(agence=agence, date=date_a_afficher)
+    except ChiffreAffaire.DoesNotExist:
+        ca_obj = None
+
+    # 5. Enregistrement (POST)
+    if request.method == "POST":
+        try:
+            def get_val(name): return Decimal(request.POST.get(name) or 0)
+
+            Tresorerie.objects.update_or_create(
+                agence=agence,
+                date=date_a_afficher,
+                defaults={
+                    'banque_initial': get_val('banque_initial'),
+                    'banque_depot': get_val('banque_depot'), 'banque_retrait': get_val('banque_retrait'),
+                    
+                    'caisse_initial': get_val('caisse_initial'),
+                    'caisse_entree': get_val('caisse_entree'), 'caisse_sortie': get_val('caisse_sortie'),
+
+                    'om_initial': get_val('om_initial'),
+                    'om_depot': get_val('om_depot'), 'om_retrait': get_val('om_retrait'),
+
+                    'momo_initial': get_val('momo_initial'),
+                    'momo_depot': get_val('momo_depot'), 'momo_retrait': get_val('momo_retrait'),
+
+                    'sav_initial': get_val('sav_initial'),
+                    'sav_entree': get_val('sav_entree'), 'sav_sortie': get_val('sav_sortie'),
+                }
+            )
+            messages.success(request, "Trésorerie enregistrée.")
+            return redirect(f"{request.path}?date={date_a_afficher}")
+        except Exception as e:
+            messages.error(request, f"Erreur: {e}")
+
+    context = {
+        'treso': treso,
+        'init': valeurs_initiales,
+        'date_a_afficher': date_a_afficher,
+        'agence': agence,
+        'ca': ca_obj 
+    }
+    return render(request, 'supermarket/comptabiliter/suivi_tresorerie.html', context)
+
+@login_required
+def consulter_tresorerie(request):
+    """
+    Par défaut : 30 derniers jours.
+    Si filtre : 1 seule journée (Affichage + Export).
+    """
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from django.db.models import Sum
+    from .models import Tresorerie, ChiffreAffaire
+    
+    # 1. Identification Agence
+    try:
+        agence = get_user_agence(request)
+    except:
+        return redirect('dashboard_comptabilite')
+    
+    # --- 2. LOGIQUE HYBRIDE (30 jours OU 1 jour) ---
+    date_filter = request.GET.get('date') # On cherche une date unique
+    now = timezone.now().date()
+    
+    if date_filter:
+        # CAS FILTRÉ : On force le début et la fin à la MÊME date
+        date_obj = datetime.strptime(date_filter, '%Y-%m-%d').date()
+        date_debut = date_obj
+        date_fin = date_obj
+        mode_filtre = True
+    else:
+        # CAS PAR DÉFAUT : Période de 30 jours
+        date_fin = now
+        date_debut = now - timedelta(days=30)
+        mode_filtre = False
+
+    # 3. Récupération des données pour l'affichage HTML
+    historique = Tresorerie.objects.filter(
+        agence=agence, 
+        date__range=[date_debut, date_fin]
+    ).order_by('-date')
+
+    # Ajout du CA temporaire pour l'affichage tableau HTML
+    for t in historique:
+        try:
+            ca_obj = ChiffreAffaire.objects.get(agence=agence, date=t.date)
+            t.ca_temp = ca_obj.montant_realise
+        except ChiffreAffaire.DoesNotExist:
+            t.ca_temp = 0
+
+    # 4. EXPORT EXCEL (Votre code Excel reste identique, il s'adapte aux dates)
+    if request.GET.get('export') == 'excel':
+        
+        # Calculs (Si date_debut == date_fin, le total sera celui du jour unique, c'est parfait)
+        total_ca = ChiffreAffaire.objects.filter(
+            agence=agence, 
+            date__range=[date_debut, date_fin]
+        ).aggregate(Sum('montant_realise'))['montant_realise__sum'] or 0
+
+        # Derniers Soldes
+        last_treso = Tresorerie.objects.filter(
+            agence=agence, 
+            date__lte=date_fin
+        ).order_by('-date').first()
+
+        if last_treso:
+            banque = last_treso.solde_banque_final
+            caisse = last_treso.solde_caisse_final
+            om = last_treso.solde_om_final
+            momo = last_treso.solde_momo_final
+            sav = last_treso.solde_sav_final
+            total_dispo = last_treso.total_disponible
+            date_arrete = last_treso.date
+        else:
+            banque = caisse = om = momo = sav = total_dispo = 0
+            date_arrete = date_fin
+
+        # --- CRÉATION EXCEL ---
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        # Nom du fichier adapté
+        if mode_filtre:
+            filename = f"Bilan_Jour_{agence.nom_agence}_{date_debut}.xlsx"
+            titre_excel = f"BILAN JOURNALIER : {date_debut}"
+        else:
+            filename = f"Bilan_Periode_{agence.nom_agence}_{date_debut}_{date_fin}.xlsx"
+            titre_excel = f"Période du {date_debut} au {date_fin}"
+            
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Bilan"
+
+        # Styles (Votre code existant)
+        title_font = Font(bold=True, size=16, color="2c3e50")
+        subtitle_font = Font(size=12, italic=True, color="7f8c8d")
+        header_fill = PatternFill(start_color="34495e", end_color="34495e", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=12)
+        ca_fill = PatternFill(start_color="d1ecf1", end_color="d1ecf1", fill_type="solid")
+        total_fill = PatternFill(start_color="d4edda", end_color="d4edda", fill_type="solid")
+        total_font = Font(bold=True, size=12)
+        center_align = Alignment(horizontal="center", vertical="center")
+        right_align = Alignment(horizontal="right", vertical="center")
+
+        # Remplissage
+        ws.merge_cells('A1:B1')
+        ws['A1'] = f"BILAN : {agence.nom_agence.upper()}"
+        ws['A1'].font = title_font
+        ws['A1'].alignment = center_align
+
+        ws.merge_cells('A2:B2')
+        ws['A2'] = titre_excel # Utilisation du titre dynamique
+        ws['A2'].font = subtitle_font
+        ws['A2'].alignment = center_align
+
+        ws.append([])
+
+        ws.append(["LIBELLÉ", "MONTANT (FCFA)"])
+        ws['A4'].fill = header_fill; ws['A4'].font = header_font
+        ws['B4'].fill = header_fill; ws['B4'].font = header_font; ws['B4'].alignment = center_align
+
+        # CA
+        libelle_ca = "Chiffre d'Affaire (Journée)" if mode_filtre else "Chiffre d'Affaire CUMULÉ"
+        ws.append([libelle_ca, total_ca])
+        ws['A5'].fill = ca_fill; ws['B5'].fill = ca_fill; ws['B5'].font = Font(bold=True)
+
+        ws.append(["", ""])
+
+        # Trésorerie
+        ws.append([f"Solde Banque (au {date_arrete})", banque])
+        ws.append([f"Solde Caisse (au {date_arrete})", caisse])
+        ws.append([f"Solde Orange (au {date_arrete})", om])
+        ws.append([f"Solde MTN (au {date_arrete})", momo])
+        ws.append([f"Solde SAV (au {date_arrete})", sav])
+
+        ws.append(["", ""])
+
+        # Total
+        row_total = ws.max_row + 1
+        ws.append(["TOTAL DISPONIBLE", total_dispo])
+        ws.cell(row=row_total, column=1).fill = total_fill; ws.cell(row=row_total, column=1).font = total_font
+        ws.cell(row=row_total, column=2).fill = total_fill; ws.cell(row=row_total, column=2).font = total_font
+
+        ws.column_dimensions['A'].width = 40
+        ws.column_dimensions['B'].width = 25
+        for row in range(5, ws.max_row + 1):
+            ws.cell(row=row, column=2).alignment = right_align
+            ws.cell(row=row, column=2).number_format = '#,##0'
+
+        wb.save(response)
+        return response
+
+    context = {
+        'historique': historique,
+        # On renvoie la date unique si on filtre, sinon None
+        'date_filter': date_filter if mode_filtre else '', 
+        'agence': agence
+    }
+    return render(request, 'supermarket/comptabiliter/consulter_tresorerie.html', context)

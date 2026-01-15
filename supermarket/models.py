@@ -1,4 +1,6 @@
 from django.db import models
+import math
+from decimal import Decimal
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
 from decimal import Decimal
@@ -1185,7 +1187,107 @@ class ChiffreAffaire(models.Model):
     @property
     def pourcent_canr(self):
         return 100 - self.pourcent_car
-# Suppression des signaux - on utilisera une approche plus directe dans la vue
-#  Client
-# libele
 
+
+# supermarket/models.py
+
+# supermarket/models.py
+from django.db import models
+
+# Assurez-vous d'avoir ceci tout en haut du fichier :
+# ... autres imports ...
+
+class Tresorerie(models.Model):
+    agence = models.ForeignKey('Agence', on_delete=models.CASCADE)
+    date = models.DateField(verbose_name="Date")
+
+    # --- BANQUE ---
+    banque_initial = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    banque_depot = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    banque_retrait = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # --- CAISSE (Espèces) ---
+    caisse_initial = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    caisse_entree = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    caisse_sortie = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # --- ORANGE MONEY ---
+    om_initial = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    om_depot = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    om_retrait = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # --- MTN MOBILE MONEY ---
+    momo_initial = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    momo_depot = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    momo_retrait = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # --- SAV ---
+    sav_initial = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    sav_entree = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    sav_sortie = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    class Meta:
+        unique_together = ('agence', 'date')
+        ordering = ['-date']
+
+    # ==========================================
+    # LOGIQUES DE CALCUL DES FRAIS
+    # ==========================================
+
+    # --- 1. BANQUE (500F par tranche de 500k) ---
+    @property
+    def frais_banque(self):
+        if not self.banque_retrait or self.banque_retrait <= 0:
+            return 0
+        nombre_tranches = math.ceil(self.banque_retrait / 500000)
+        return nombre_tranches * 500
+
+    @property
+    def solde_banque_final(self):
+        return self.banque_initial + self.banque_depot - self.banque_retrait - self.frais_banque
+
+    # --- 2. ORANGE MONEY (1%) ---
+    @property
+    def frais_om(self):
+        if not self.om_retrait or self.om_retrait <= 0:
+            return Decimal('0') # On retourne un Decimal 0
+        
+        # CORRECTION ICI : On utilise Decimal('0.01') au lieu de 0.01
+        return self.om_retrait * Decimal('0.01')
+    @property
+    def solde_om_final(self):
+        return self.om_initial + self.om_depot - self.om_retrait - self.frais_om
+
+    # --- 3. MTN MONEY (Par paliers) ---
+    @property
+    def frais_momo(self):
+        montant = self.momo_retrait
+        if not montant or montant <= 0:
+            return Decimal('0')
+        
+        if montant <= 100:
+            return Decimal('0')
+        elif montant <= 3333:
+            return Decimal('50') # On retourne un Decimal
+        else:
+            # CORRECTION ICI : Decimal('0.01')
+            return montant * Decimal('0.01')
+
+    @property
+    def solde_momo_final(self):
+        return self.momo_initial + self.momo_depot - self.momo_retrait - self.frais_momo
+
+    # --- AUTRES SOLDES SIMPLES ---
+    @property
+    def solde_caisse_final(self):
+        return self.caisse_initial + self.caisse_entree - self.caisse_sortie
+    
+    @property
+    def solde_sav_final(self):
+        return self.sav_initial + self.sav_entree - self.sav_sortie
+
+    # --- TOTAL GLOBAL ---
+    @property
+    def total_disponible(self):
+        return (self.solde_banque_final + self.solde_caisse_final + 
+                self.solde_om_final + self.solde_momo_final + self.solde_sav_final)

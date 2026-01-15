@@ -1,0 +1,233 @@
+{% extends 'supermarket/stock/base_stock.html' %}
+{% block content %}
+
+<style>
+    /* --- STYLES GENERAUX --- */
+    .container-fluid {
+        max-width: 1400px; /* Plus large pour afficher toutes les colonnes */
+        margin: 30px auto;
+        padding: 0 20px;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 25px;
+    }
+
+    .page-title {
+        color: #2c3e50;
+        font-size: 1.8rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    /* --- CARTE FILTRE --- */
+    .filter-card {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        margin-bottom: 30px;
+        border-left: 5px solid #34495e; /* Rappel couleur thème */
+    }
+
+    .filter-form {
+        display: flex;
+        gap: 20px;
+        align-items: flex-end;
+        flex-wrap: wrap;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .form-group label {
+        font-weight: 600;
+        color: #7f8c8d;
+        margin-bottom: 8px;
+        font-size: 0.9em;
+        text-transform: uppercase;
+    }
+
+    .form-control {
+        padding: 12px 15px;
+        border: 1px solid #dfe6e9;
+        border-radius: 8px;
+        font-size: 1rem;
+        color: #2d3436;
+        background-color: #fdfdfd;
+        transition: all 0.3s ease;
+        min-width: 160px;
+    }
+
+    .form-control:focus {
+        border-color: #06beb6;
+        box-shadow: 0 0 0 3px rgba(6, 190, 182, 0.1);
+        outline: none;
+    }
+
+    /* --- BOUTONS --- */
+    .btn {
+        padding: 12px 25px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.95rem;
+        transition: transform 0.2s, box-shadow 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-decoration: none;
+    }
+
+    .btn-primary {
+        background-color: #34495e;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background-color: #2c3e50;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 10px rgba(44, 62, 80, 0.3);
+    }
+
+    .btn-success {
+        background-color: #27ae60;
+        color: white;
+    }
+
+    .btn-success:hover {
+        background-color: #219150;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 10px rgba(39, 174, 96, 0.3);
+    }
+
+    /* --- TABLEAU --- */
+    .table-container {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden; /* Pour les coins arrondis */
+        box-shadow: 0 5px 20px rgba(0,0,0,0.05);
+    }
+
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 800px; /* Force le scroll horizontal si écran trop petit */
+    }
+
+    .table thead {
+        background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+        color: white;
+    }
+
+    .table th {
+        padding: 18px 15px;
+        text-align: left;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        letter-spacing: 0.5px;
+    }
+
+    .table td {
+        padding: 16px 15px;
+        border-bottom: 1px solid #f1f2f6;
+        color: #555;
+        vertical-align: middle;
+    }
+
+    .table tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+
+    .table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    /* Mise en valeur des colonnes */
+    .date-col {
+        font-weight: 600;
+        color: #2c3e50;
+    }
+
+    .global-col {
+        background-color: #f0fff4; /* Vert très pâle */
+        color: #27ae60;
+        font-weight: 800;
+        font-size: 1.05em;
+        text-align: right;
+    }
+    
+    .number-cell {
+        font-family: 'Consolas', monospace; /* Alignement des chiffres */
+    }
+
+</style>
+
+<div class="container" style="max-width: 1200px; margin: 20px auto;">
+    <a href="{% url 'dashboard_comptabiliter' %}" class="btn-back">
+        <i class="fas fa-arrow-left"></i> Tableau de bord
+    </a>
+    <h2><i class="fas fa-list"></i> Historique Trésorerie</h2>
+    
+    <div style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+        <form method="GET" style="display: flex; gap: 10px; align-items: flex-end;">
+            <div style="flex-grow: 1; max-width: 300px;">
+                <label style="font-weight: bold; display: block; margin-bottom: 5px;">Filtrer par date :</label>
+                <input type="date" name="date" value="{{ date_filter }}" class="form-control" style="width: 75%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+            
+            <button type="submit" class="btn btn-primary" style="padding: 10px 20px;">
+                <i class="fas fa-search"></i> Rechercher
+            </button>
+            
+            <a href="{% url 'consulter_tresorerie' %}" class="btn" style="background: #95a5a6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+                Tout afficher
+            </a>
+            
+            <button type="submit" name="export" value="excel" class="btn btn-success" style="padding: 10px 20px;">
+                <i class="fas fa-file-excel"></i> Export Excel
+            </button>
+        </form>
+    </div>
+
+    <table class="table" style="width: 100%; background: white; border-collapse: collapse;">
+        <thead style="background: #2c3e50; color: white;">
+            <tr>
+                <th style="padding: 10px;">Date</th>
+                <th style="background-color: #17a2b8;">Chiffre d'Affaire</th>
+                <th>Banque (Final)</th>
+                <th>Caisse (Final)</th>
+                <th>OM (Final)</th>
+                <th>Momo (Final)</th>
+                <th>SAV (Final)</th>
+                <th>GLOBAL</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in historique %}
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 10px;">{{ t.date }}</td>
+                <td style="font-weight: bold; color: #17a2b8; background-color: #f8f9fa;">{{ t.ca_temp|default:"0" }}</td>
+                <td>{{ t.solde_banque_final }}</td>
+                <td>{{ t.solde_caisse_final }}</td>
+                <td>{{ t.solde_om_final }}</td>
+                <td>{{ t.solde_momo_final }}</td>
+                <td>{{ t.solde_sav_final }}</td>
+                <td style="font-weight: bold;">{{ t.total_disponible }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8" style="text-align: center; padding: 20px;">Aucune donnée trouvée.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

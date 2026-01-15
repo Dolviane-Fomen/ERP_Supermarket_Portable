@@ -1,0 +1,238 @@
+{% extends 'supermarket/stock/base_stock.html' %}
+
+{% load static %}
+
+{% block content %}
+<div class="container" style="max-width: 1200px; margin: 20px auto;">
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <a href="{% url 'dashboard_comptabiliter' %}" class="btn-back">
+            <i class="fas fa-arrow-left"></i> Tableau de bord
+        </a>
+        <h2 style="color: #2c3e50;"><i class="fas fa-coins"></i> Suivi Journalier - {{ agence.nom_agence }}</h2>
+        <a href="{% url 'consulter_tresorerie' %}" class="btn" style="background: #34495e; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">
+            <i class="fas fa-history"></i> Voir Historique
+        </a>
+    </div>
+
+    <form method="GET" style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 15px;">
+        <div>
+            <label><b>Date du jour :</b></label>
+            <input type="date" name="date" value="{% now 'Y-m-d' %}" readonly style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; background-color: #eee; color: #555; cursor: not-allowed;">
+        </div>
+    </form>
+
+    {% if treso and not request.GET.edit %}
+    
+    <div style="background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #c3e6cb; display: flex; justify-content: space-between; align-items: center;">
+        <span><i class="fas fa-check-circle"></i> La trésorerie de ce jour est déjà enregistrée.</span>
+        <a href="?date={{ date_a_afficher|date:'Y-m-d' }}&edit=true" class="btn" style="background: #ffc107; color: #333; font-weight: bold; text-decoration: none; padding: 8px 15px; border-radius: 5px;">
+            <i class="fas fa-edit"></i> Modifier
+        </a>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+        
+        <div class="card-treso view-mode" style="border-left: 5px solid #3498db;">
+            <h3>Chiffre d'Affaire</h3>
+            <div class="big-number">{{ ca.montant_realise|default:"0" }} <small>FCFA</small></div>
+        </div>
+
+        <div class="card-treso view-mode" style="border-left: 5px solid #0d47a1;">
+            <h3>Banque</h3>
+            <div class="recap-row"><span>Initial :</span> <b>{{ treso.banque_initial }}</b></div>
+            <div class="recap-row text-success"><span>+ Dépôt :</span> <b>{{ treso.banque_depot }}</b></div>
+            <div class="recap-row text-danger"><span>- Retrait :</span> <b>{{ treso.banque_retrait }}</b></div>
+            <hr>
+            <div class="recap-row total"><span>Solde Final :</span> <b>{{ treso.solde_banque_final }} FCFA</b></div>
+        </div>
+
+        <div class="card-treso view-mode" style="border-left: 5px solid #2ecc71;">
+            <h3>Caisse Espèces</h3>
+            <div class="recap-row"><span>Initial :</span> <b>{{ treso.caisse_initial }}</b></div>
+            <div class="recap-row text-success"><span>+ Entrée :</span> <b>{{ treso.caisse_entree }}</b></div>
+            <div class="recap-row text-danger"><span>- Sortie :</span> <b>{{ treso.caisse_sortie }}</b></div>
+            <hr>
+            <div class="recap-row total"><span>Solde Final :</span> <b>{{ treso.solde_caisse_final }} FCFA</b></div>
+        </div>
+
+        <div class="card-treso view-mode" style="border-left: 5px solid #e67e22;">
+            <h3>Orange Money</h3>
+            <div class="recap-row"><span>Initial :</span> <b>{{ treso.om_initial }}</b></div>
+            <div class="recap-row text-success"><span>+ Dépôt :</span> <b>{{ treso.om_depot }}</b></div>
+            <div class="recap-row text-danger"><span>- Retrait :</span> <b>{{ treso.om_retrait }}</b></div>
+            <hr>
+            <div class="recap-row total"><span>Solde Final :</span> <b>{{ treso.solde_om_final }} FCFA</b></div>
+        </div>
+
+        <div class="card-treso view-mode" style="border-left: 5px solid #f1c40f;">
+            <h3>MTN Money</h3>
+            <div class="recap-row"><span>Initial :</span> <b>{{ treso.momo_initial }}</b></div>
+            <div class="recap-row text-success"><span>+ Dépôt :</span> <b>{{ treso.momo_depot }}</b></div>
+            <div class="recap-row text-danger"><span>- Retrait :</span> <b>{{ treso.momo_retrait }}</b></div>
+            <hr>
+            <div class="recap-row total"><span>Solde Final :</span> <b>{{ treso.solde_momo_final }} FCFA</b></div>
+        </div>
+
+        <div class="card-treso view-mode" style="border-left: 5px solid #8e44ad;">
+            <h3>SAV</h3>
+            <div class="recap-row"><span>Initial :</span> <b>{{ treso.sav_initial }}</b></div>
+            <div class="recap-row text-success"><span>+ Entrée :</span> <b>{{ treso.sav_entree }}</b></div>
+            <div class="recap-row text-danger"><span>- Sortie :</span> <b>{{ treso.sav_sortie }}</b></div>
+            <hr>
+            <div class="recap-row total"><span>Solde Final :</span> <b>{{ treso.solde_sav_final }} FCFA</b></div>
+        </div>
+
+         <div class="card-treso view-mode" style="background: #2c3e50; color: white; grid-column: 1 / -1; text-align: center;">
+            <h3 style="color: white; border: none;">TOTAL DISPONIBLE GLOBAL</h3>
+            <div style="font-size: 2.5em; font-weight: bold;">{{ treso.total_disponible }} FCFA</div>
+        </div>
+
+    </div>
+
+    {% else %}
+
+    <form method="POST">
+        {% csrf_token %}
+        <input type="hidden" name="date" value="{{ date_a_afficher|date:'Y-m-d' }}">
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+            
+            <div class="card-treso" style="background: white; padding: 20px; border-radius: 10px; border-left: 5px solid #3498db; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                <div style="text-align: center; padding: 10px;">
+                    <span style="font-weight: bold; color: #2c3e50;">Chiffre d'Affaire (Module Vente)</span>
+                    <h3 style="font-size: 2em; color: #2c3e50; margin: 0;">{{ ca.montant_realise|default:"0" }}</h3>
+                </div>
+            </div>
+
+            <div class="card-treso" style="border-top: 5px solid #0d47a1;">
+                <h3>Banque</h3>
+                <div class="form-group">
+                    <label>Solde Initial</label>
+                    <input type="number" step="0.01" name="banque_initial" value="{{ treso.banque_initial|default:init.banque }}" readonly class="input-readonly">
+                </div>
+                <div class="form-group">
+                    <label class="text-success">+ Dépôt</label>
+                    <input type="number" step="0.01" name="banque_depot" value="{{ treso.banque_depot|default:0 }}">
+                </div>
+                <div class="form-group">
+                    <label class="text-danger">- Retrait</label>
+                    <input type="number" step="0.01" name="banque_retrait" value="{{ treso.banque_retrait|default:0 }}">
+                </div>
+            </div>
+
+            <div class="card-treso" style="border-top: 5px solid #2ecc71;">
+                <h3>Caisse Espèces</h3>
+                <div class="form-group">
+                    <label>Solde Initial</label>
+                    <input type="number" step="0.01" name="caisse_initial" value="{{ treso.caisse_initial|default:init.caisse }}" readonly class="input-readonly">
+                </div>
+                <div class="form-group">
+                    <label class="text-success">+ Entrée</label>
+                    <input type="number" step="0.01" name="caisse_entree" value="{{ treso.caisse_entree|default:0 }}">
+                </div>
+                <div class="form-group">
+                    <label class="text-danger">- Sortie</label>
+                    <input type="number" step="0.01" name="caisse_sortie" value="{{ treso.caisse_sortie|default:0 }}">
+                </div>
+            </div>
+
+            <div class="card-treso" style="border-top: 5px solid #e67e22;">
+                <h3>Orange Money</h3>
+                <div class="form-group">
+                    <label>Solde Initial</label>
+                    <input type="number" step="0.01" name="om_initial" value="{{ treso.om_initial|default:init.om }}" readonly class="input-readonly">
+                </div>
+                <div class="form-group">
+                    <label class="text-success">+ Dépôt</label>
+                    <input type="number" step="0.01" name="om_depot" value="{{ treso.om_depot|default:0 }}">
+                </div>
+                <div class="form-group">
+                    <label class="text-danger">- Retrait</label>
+                    <input type="number" step="0.01" name="om_retrait" value="{{ treso.om_retrait|default:0 }}">
+                </div>
+            </div>
+
+            <div class="card-treso" style="border-top: 5px solid #f1c40f;">
+                <h3>MTN Money</h3>
+                <div class="form-group">
+                    <label>Solde Initial</label>
+                    <input type="number" step="0.01" name="momo_initial" value="{{ treso.momo_initial|default:init.momo }}" readonly class="input-readonly">
+                </div>
+                <div class="form-group">
+                    <label class="text-success">+ Dépôt</label>
+                    <input type="number" step="0.01" name="momo_depot" value="{{ treso.momo_depot|default:0 }}">
+                </div>
+                <div class="form-group">
+                    <label class="text-danger">- Retrait</label>
+                    <input type="number" step="0.01" name="momo_retrait" value="{{ treso.momo_retrait|default:0 }}">
+                </div>
+            </div>
+
+            <div class="card-treso" style="border-top: 5px solid #8e44ad;">
+                <h3>SAV</h3>
+                <div class="form-group">
+                    <label>Solde Initial</label>
+                    <input type="number" step="0.01" name="sav_initial" value="{{ treso.sav_initial|default:init.sav }}" readonly class="input-readonly">
+                </div>
+                <div class="form-group">
+                    <label class="text-success">+ Entrée</label>
+                    <input type="number" step="0.01" name="sav_entree" value="{{ treso.sav_entree|default:0 }}">
+                </div>
+                <div class="form-group">
+                    <label class="text-danger">- Sortie</label>
+                    <input type="number" step="0.01" name="sav_sortie" value="{{ treso.sav_sortie|default:0 }}">
+                </div>
+            </div>
+
+        </div>
+
+        <button type="submit" class="btn" style="width: 100%; margin-top: 20px; padding: 15px; background: #2c3e50; color: white; font-size: 1.2em; border: none; border-radius: 8px; cursor: pointer;">
+            <i class="fas fa-save"></i> Enregistrer les mouvements
+        </button>
+    </form>
+
+    {% endif %} </div>
+
+<style>
+    .card-treso {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    }
+    .view-mode h3 {
+        margin-top: 0;
+        color: #2c3e50;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+    }
+    .recap-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        font-size: 0.95em;
+    }
+    .total {
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #2c3e50;
+        margin-top: 10px;
+    }
+    .big-number {
+        font-size: 2em;
+        font-weight: bold;
+        text-align: center;
+        color: #2c3e50;
+    }
+    /* Styles Formulaire */
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9em; }
+    .form-group input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+    .input-readonly { background: #e9ecef; cursor: not-allowed; color: #495057; font-weight: bold; }
+    .text-success { color: #27ae60 !important; }
+    .text-danger { color: #c0392b !important; }
+</style>
+{% endblock %}
+

@@ -268,9 +268,11 @@ urlpatterns = [
     # ===== MODULE COMPTABILITÉ =====
     path('comptabiliter/login/', views.login_comptabiliter, name='login_comptabiliter'),
     path('comptabiliter/dashboard/', views.dashboard_comptabiliter, name='dashboard_comptabiliter'),
-    path('comptabiliter/logout/', views.logout_comptabiliter, name='logout_comptabiliter'),
+    path('financier/logout/', views.logout_comptabiliter, name='logout_comptabiliter'),
     path('comptabiliter/creer-depense/', views.creer_depense, name='creer_depense'),
     path('comptabiliter/consulter-depenses/', views.consulter_depenses, name='consulter_depenses'),
     path('comptabiliter/suivi-chiffre-affaire/', views.suivi_chiffre_affaire, name='suivi_chiffre_affaire'),
+    path('comptabiliter/suivi_tresorerie/', views.suivi_tresorerie, name='suivi_tresorerie'),
+    path('comptabiliter/consulter_tresorerie/', views.consulter_tresorerie, name='consulter_tresorerie'),
 ]
 
