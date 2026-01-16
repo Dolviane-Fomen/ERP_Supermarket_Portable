@@ -287,6 +287,17 @@
             <i class="fas fa-save"></i> Enregistrer / Mettre à jour les mouvements (modifiable plusieurs fois)
         </button>
     </form>
+    
+    <script>
+        // Vérifier que le formulaire est bien soumis
+        document.querySelector('form[method="POST"]').addEventListener('submit', function(e) {
+            console.log('Formulaire soumis !');
+            // Afficher un message de chargement
+            const btn = this.querySelector('button[type="submit"]');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enregistrement en cours...';
+        });
+    </script>
     {% endif %}
 
 </div>

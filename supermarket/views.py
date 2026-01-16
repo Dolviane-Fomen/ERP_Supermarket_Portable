@@ -19574,17 +19574,32 @@ def generer_etat_tresorerie(request):
             )
             ca_agence = ventes_jour.aggregate(total=Sum(F('quantite') * F('prix_unitaire')))['total'] or Decimal('0')
             
+            # Variables pour stocker les valeurs Decimal avant conversion en float
+            banque_val = Decimal('0')
+            caisse_val = Decimal('0')
+            om_val = Decimal('0')
+            momo_val = Decimal('0')
+            sav_val = Decimal('0')
+            total_dispo_val = Decimal('0')
+            
             if treso:
-                # Utiliser les soldes finaux de la dernière trésorerie
+                # Utiliser les soldes finaux de la dernière trésorerie (déjà en Decimal)
+                banque_val = treso.solde_banque_final
+                caisse_val = treso.solde_caisse_final
+                om_val = treso.solde_om_final
+                momo_val = treso.solde_momo_final
+                sav_val = treso.solde_sav_final
+                total_dispo_val = treso.total_disponible
+                
                 tresorerie_par_agence[agence.id_agence] = {
                     'agence_nom': agence.nom_agence,
                     'ca': float(ca_agence),
-                    'banque': float(treso.solde_banque_final),
-                    'caisse': float(treso.solde_caisse_final),
-                    'om': float(treso.solde_om_final),
-                    'momo': float(treso.solde_momo_final),
-                    'sav': float(treso.solde_sav_final),
-                    'total_disponible': float(treso.total_disponible),
+                    'banque': float(banque_val),
+                    'caisse': float(caisse_val),
+                    'om': float(om_val),
+                    'momo': float(momo_val),
+                    'sav': float(sav_val),
+                    'total_disponible': float(total_dispo_val),
                     'date_derniere_maj': treso.date.strftime('%d/%m/%Y')
                 }
             else:
@@ -19601,14 +19616,14 @@ def generer_etat_tresorerie(request):
                     'date_derniere_maj': 'Aucune'
                 }
             
-            # Ajouter aux totaux globaux
+            # Ajouter aux totaux globaux (utiliser directement les Decimal)
             total_global['ca'] += ca_agence
-            total_global['banque'] += Decimal(str(tresorerie_par_agence[agence.id_agence]['banque']))
-            total_global['caisse'] += Decimal(str(tresorerie_par_agence[agence.id_agence]['caisse']))
-            total_global['om'] += Decimal(str(tresorerie_par_agence[agence.id_agence]['om']))
-            total_global['momo'] += Decimal(str(tresorerie_par_agence[agence.id_agence]['momo']))
-            total_global['sav'] += Decimal(str(tresorerie_par_agence[agence.id_agence]['sav']))
-            total_global['total_disponible'] += Decimal(str(tresorerie_par_agence[agence.id_agence]['total_disponible']))
+            total_global['banque'] += banque_val
+            total_global['caisse'] += caisse_val
+            total_global['om'] += om_val
+            total_global['momo'] += momo_val
+            total_global['sav'] += sav_val
+            total_global['total_disponible'] += total_dispo_val
         
         # Convertir les totaux en float pour JSON
         total_global_float = {k: float(v) for k, v in total_global.items()}
@@ -21221,7 +21236,17 @@ def suivi_tresorerie(request):
     # 5. Enregistrement (POST) avec mise à jour automatique des soldes (PROBLÈME 2 RÉSOLU)
     if request.method == "POST":
         try:
-            def get_val(name): return Decimal(request.POST.get(name) or 0)
+            def get_val(name):
+                """Récupère une valeur POST et la convertit en Decimal de manière sécurisée"""
+                val = request.POST.get(name, '').strip()
+                if not val or val == '':
+                    return Decimal('0')
+                try:
+                    # Remplacer les virgules par des points pour la conversion
+                    val = val.replace(',', '.')
+                    return Decimal(str(val))
+                except (ValueError, TypeError, Exception):
+                    return Decimal('0')
 
             # Récupérer les valeurs saisies depuis le formulaire
             banque_initial = get_val('banque_initial')
@@ -21357,11 +21382,15 @@ def suivi_tresorerie(request):
                 f"Vous pouvez continuer à modifier les dépôts/retraits. "
                 f"Le solde initial ({treso.banque_initial} FCFA) reste fixe."
             )
-            # Redirection avec timestamp pour forcer le rafraîchissement
-            import time
-            return redirect(f"{request.path}?date={date_a_afficher}&t={int(time.time())}")
+            # Redirection vers le mode visualisation pour voir les résultats
+            from django.urls import reverse
+            # Rediriger vers la page sans le paramètre edit pour revenir en mode visualisation
+            return redirect(reverse('suivi_tresorerie'))
         except Exception as e:
-            messages.error(request, f"Erreur: {e}")
+            import traceback
+            traceback.print_exc()
+            messages.error(request, f"Erreur lors de l'enregistrement: {str(e)}")
+            # En cas d'erreur, rester sur la page pour afficher le message
 
     # Debug : vérifier les valeurs initiales
     print(f"DEBUG - Valeurs initiales: {valeurs_initiales}")
@@ -21417,11 +21446,16 @@ def consulter_tresorerie(request):
 
     # 3. Récupération des données pour l'affichage HTML
     # Utiliser date__lte pour inclure la date de fin (aujourd'hui)
+    # IMPORTANT: Utiliser date__lte avec date_fin pour inclure aujourd'hui
     historique = Tresorerie.objects.filter(
         agence=agence, 
         date__gte=date_debut,
         date__lte=date_fin
     ).order_by('-date')
+    
+    # Debug: vérifier si aujourd'hui est inclus
+    print(f"DEBUG HISTORIQUE - date_debut: {date_debut}, date_fin: {date_fin}, now: {now}")
+    print(f"DEBUG HISTORIQUE - Nombre d'entrées: {historique.count()}")
 
     # Ajout du CA temporaire pour l'affichage tableau HTML (calculé depuis les ventes)
     for t in historique:
