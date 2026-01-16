@@ -63,6 +63,7 @@
     .container {
         display: flex;
         justify-content: flex-start;
+        
     }
     .menu-bar {
         width: 250px;
@@ -392,6 +393,62 @@
         .kpis { grid-template-columns: repeat(2, 1fr); }
         .cards { grid-template-columns: 1fr; }
     }
+
+    .btn-action {
+        padding: 12px 20px;
+        border-radius: 8px;
+        text-decoration: none;
+        color: white;
+        font-weight: bold;
+        transition: transform 0.2s;
+    }
+    .btn-action:hover { transform: translateY(-2px); color: white;}
+    .btn-saisir { background: #3498db; }
+    .btn-history { background: #34495e; }
+
+    /* GRILLE STATS (GLOBAL & CA) */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+    }
+    .stat-card {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+    .total-card { background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%); color: white; }
+    .ca-card { background: white; border-left: 5px solid #17a2b8; }
+    
+    .total-card h3 { color: #ecf0f1; margin: 0; font-size: 0.9em; opacity: 0.8; }
+    .ca-card h3 { color: #7f8c8d; margin: 0; font-size: 0.9em; }
+
+    .value { font-size: 2.2em; font-weight: bold; margin: 5px 0; }
+    .icon-box { font-size: 2.5em; opacity: 0.2; }
+
+    /* GRILLE COMPTES */
+    .accounts-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-top: 20px;
+    }
+    .account-card {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        border-top: 4px solid #ccc; /* Couleur par défaut, écrasée en inline */
+        box-shadow: 0 3px 10px rgba(0,0,0,0.03);
+        text-align: center;
+        transition: transform 0.2s;
+    }
+    .account-card:hover { transform: translateY(-5px); }
+    .acc-header { font-weight: bold; color: #555; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .acc-amount { font-size: 1.4em; font-weight: bold; color: #2c3e50; }
     
     /* Styles notifications (Identiques) */
     .notification-bell { position: relative; transition: transform 0.2s; }
@@ -434,7 +491,7 @@
         <h2>GESTION COMPTABLE</h2>
         
         <div class="menu-item has-submenu" onclick="toggleSubmenu(event)">
-            <span><i class="fas fa-box icon"></i>Suivi Tresorerie</span>
+            <span><i class="fas fa-box icon"></i>Suivi Depanse</span>
            <div class="submenu">
             <a href="{% url 'creer_depense' %}"  class="submenu-item">
                 <i class="fas fa-plus" style="margin-right: 10px; color: #28a745;"></i>
@@ -463,10 +520,169 @@
          </div>
 
                            
-        </div>     
-    <div class="content">
+     </div>     
+        <div  style="width: 5500px; margin: 30px 50px;">
+
+            <div style="justify-content: space-between; align-items: center; margin-bottom: 30px; flex-direction: row; display: flex;">
+                <div>
+                    <h2 style="color: #2c3e50; margin: 0;"><i class="fas fa-tachometer-alt"></i> Tableau de Bord Financier</h2>
+                    <p style="color: #7f8c8d; margin-top: 5px;">Agence : <strong>{{ agence.nom_agence }}</strong> | Date : {{ today|date:"d M Y" }}</p>
+                </div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <a href="{% url 'suivi_tresorerie' %}" class="btn-action btn-saisir">
+                        <i class="fas fa-edit"></i> Saisir Journée
+                    </a>
+                    <a href="{% url 'consulter_tresorerie' %}" class="btn-action btn-history">
+                        <i class="fas fa-history"></i> Historique
+                    </a>
+                </div>
+            </div>
+        
+            <div class="stats-grid">
+                <div class="stat-card total-card">
+                    <div class="icon-box"><i class="fas fa-wallet"></i></div>
+                    <div class="stat-content">
+                        <h3>DISPONIBLE GLOBAL</h3>
+                        <div class="value">{{ treso.total_disponible|default:0|stringformat:"0.0f" }} <small>FCFA</small></div>
+                        <small>Total de tous les comptes</small>
+                    </div>
+                </div>
+        
+                <div class="stat-card ca-card">
+                    <div class="icon-box"><i class="fas fa-shopping-cart"></i></div>
+                    <div class="stat-content">
+                        <h3>CA DU JOUR</h3>
+                        <div class="value">{{ ca_du_jour|stringformat:"0.0f" }} <small>FCFA</small></div>
+                        <small>Ventes enregistrées aujourd'hui</small>
+                    </div>
+                </div>
+            </div>
+            <h3 style="margin-top: 30px; color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+                <i class="fas fa-file-invoice-dollar"></i> Dépenses (Jour)
+            </h3>
+             <div class="stats-grid" style="flex-direction: row; display: flex;">
+                 <div class="stat-card ca-card" style="border-top-color: #e74c3c; width:50%">
+                <div class="stat-card">
+                    <i class="fas fa-file-invoice-dollar" style="color: #e74c3c;"></i>
+                </div>
+                <div class="acc-amount" style="color: #c0392b;">
+                    - {{ depenses_du_jour|default:0|stringformat:"0.0f" }} FCFA
+                </div>
+            </div>
+            <div class="stat-card ca-card" style="border-top-color: #c4fdc4; width:50%; align-items: cente ">
+                <a class="submenu-item" style="color: #424546;" href="{% url 'creer_depense' %}">Ajouter une Depance</a>
+            </div>
+        </div>
+
             
-    </div>
+        
+            <h3 style="margin-top: 30px; color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+                <i class="fas fa-coins"></i> État des Comptes (Dernier solde connu)
+            </h3>
+        
+            <div class="accounts-grid">
+                
+                <div class="account-card" style="border-top-color: #0d47a1;">
+                    <div class="acc-header">
+                        <i class="fas fa-university" style="color: #0d47a1;"></i> Banque
+                    </div>
+                    <div class="acc-amount">{{ treso.solde_banque_final|default:0|stringformat:"0.0f" }} FCFA</div>
+                </div>
+        
+                <div class="account-card" style="border-top-color: #2ecc71;">
+                    <div class="acc-header">
+                        <i class="fas fa-cash-register" style="color: #2ecc71;"></i> Caisse Espèces
+                    </div>
+                    <div class="acc-amount">{{ treso.solde_caisse_final|default:0|stringformat:"0.0f" }} FCFA</div>
+                </div>
+        
+                <div class="account-card" style="border-top-color: #e67e22;">
+                    <div class="acc-header">
+                        <i class="fas fa-mobile-alt" style="color: #e67e22;"></i> Orange Money
+                    </div>
+                    <div class="acc-amount">{{ treso.solde_om_final|default:0|stringformat:"0.0f" }} FCFA</div>
+                </div>
+        
+                <div class="account-card" style="border-top-color: #f1c40f;">
+                    <div class="acc-header">
+                        <i class="fas fa-mobile-alt" style="color: #f1c40f;"></i> MTN Money
+                    </div>
+                    <div class="acc-amount">{{ treso.solde_momo_final|default:0|stringformat:"0.0f" }} FCFA</div>
+                </div>
+        
+                <div class="account-card" style="border-top-color: #8e44ad;">
+                    <div class="acc-header">
+                        <i class="fas fa-tools" style="color: #8e44ad;"></i> SAV
+                    </div>
+                    <div class="acc-amount">{{ treso.solde_sav_final|default:0|stringformat:"0.0f" }} FCFA</div>
+                </div>
+        
+            </div>
+
+
+         <div style="margin-top: 40px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="color: #2c3e50; font-size: 1.2em; margin: 0;">
+                    <i class="fas fa-chart-line"></i> Historique Analyse C.A. (5 derniers jours)
+                </h3>
+                <a href="{% url 'suivi_chiffre_affaire' %}" style="font-size: 0.9em; color: #3498db; text-decoration: none;">
+                    Voir tout <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+    
+            <div style="background: white; border-radius: 12px; padding: 0; box-shadow: 0 5px 15px rgba(0,0,0,0.05); overflow: hidden;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead style="background: #34495e; color: white;">
+                        <tr>
+                            <th style="padding: 15px; text-align: left;">Date</th>
+                            <th style="padding: 15px; text-align: center;">Objectif (Prev.)</th>
+                            <th style="padding: 15px; text-align: center;">Réalisé</th>
+                            <th style="padding: 15px; text-align: center;">Performance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ca in historique_ca %}
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 15px; font-weight: bold; color: #2c3e50;">
+                                {{ ca.date|date:"d M Y" }}
+                            </td>
+                            <td style="padding: 15px; text-align: center; color: #7f8c8d;">
+                                {{ ca.montant_previsionnel|default:0|stringformat:"0.0f" }} FCFA
+                            </td>
+                            <td style="padding: 15px; text-align: center; font-weight: bold;">
+                                {{ ca.montant_realise|default:0|stringformat:"0.0f" }} FCFA
+                            </td>
+                            <td style="padding: 15px; text-align: center;">
+                                <span style="
+                                    padding: 5px 10px; 
+                                    border-radius: 20px; 
+                                    font-size: 0.9em; 
+                                    font-weight: bold;
+                                    background-color: {% if ca.pourcent_car >= 100 %}#d4edda{% elif ca.pourcent_car >= 50 %}#fff3cd{% else %}#f8d7da{% endif %};
+                                    color: {% if ca.pourcent_car >= 100 %}#155724{% elif ca.pourcent_car >= 50 %}#856404{% else %}#721c24{% endif %};
+                                ">
+                                    {{ ca.pourcent_car }}%
+                                </span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" style="padding: 20px; text-align: center; color: #999;">
+                                Aucune donnée d'analyse enregistrée récemment.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+            
+            
+    
+        </div>
+        
+        </div>
 </div>
 
 

@@ -18477,12 +18477,13 @@ def logout_comptes(request):
 @require_comptes_access
 def gestion_comptes(request):
     """Vue pour lister tous les comptes utilisateurs"""
+    
     agence = get_user_agence(request)
     if not agence:
         messages.error(request, 'Votre compte n\'est pas correctement lié à une agence.')
         return redirect('login_comptes')
     
-    comptes = Compte.objects.filter(agence=agence).order_by('nom', 'prenom')
+    comptes = Compte.objects.all().order_by('nom', 'prenom')
     
     context = {
         'comptes': comptes,
@@ -20745,47 +20746,86 @@ def logout_comptabiliter(request):
 
 @login_required
 def dashboard_comptabiliter(request):
-    """Dashboard principal du module de gestion de stock"""
+    """Dashboard principal du module de comptabilité/trésorerie"""
+    # Imports nécessaires
+    from django.db.models import Sum, F, DecimalField
+    from django.utils.timezone import localtime
+    from .models import Tresorerie, ChiffreAffaire, Compte, LigneFactureVente, Depense
+    
     try:
-        # Récupérer l'agence de l'utilisateur
+        # 1. Récupérer l'agence
         agence = get_user_agence(request)
         if not agence:
-            messages.error(request, 'Votre compte n\'est pas configuré correctement.')
-            # return redirect('logout_stock')
+            messages.error(request, "Votre compte n'est pas configuré correctement (Pas d'agence).")
+            # On continue pour ne pas planter, mais l'affichage sera vide
+        
+        # 2. Gestion Date / Heure (LOCALE)
+        now = timezone.now()
+        local_now = localtime(now) # Heure du Cameroun
+        today = local_now.date()
 
-       
+        # 3. CALCUL DU CA (Ventes du jour)
+        # On calcule en direct depuis les lignes de facture
+        ventes_du_jour = LigneFactureVente.objects.filter(
+            facture_vente__agence=agence,
+            facture_vente__date=today
+        )
         
+        resultat_ca = ventes_du_jour.aggregate(
+            total=Sum(F('quantite') * F('prix_unitaire'), output_field=DecimalField())
+        )['total']
         
-        # Récupérer le nom de l'utilisateur
-        try:
-            compte = Compte.objects.get(user=request.user, actif=True)
-            nom_utilisateur = compte.nom_complet
-        except Compte.DoesNotExist:
-            nom_utilisateur = request.user.username
+        ca_du_jour = resultat_ca if resultat_ca is not None else 0
 
-        context = {
-            'agence': agence,
-            'nom_utilisateur': nom_utilisateur,
-        }
+        # 4. CALCUL DES DÉPENSES (Journée entière)
+        # On définit le début de la journée à 00:00:00
+        debut_journee = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
         
-        return render(request, 'supermarket/comptabiliter/dashboard.html', context)
-        
-    except Exception as e:
-        messages.error(request, f'Erreur lors du chargement du dashboard: {str(e)}')
-        # Récupérer le nom de l'utilisateur même en cas d'erreur
+        depenses_du_jour = Depense.objects.filter(
+            agence=agence,
+            date__gte=debut_journee  # Tout ce qui est après minuit
+        ).aggregate(Sum('montant'))['montant__sum'] or 0
+
+
+        historique_ca = ChiffreAffaire.objects.filter(
+            agence=agence
+        ).order_by('-date')[:5]
+
+        # 5. Récupérer la Trésorerie (Dernier solde connu)
+        last_treso = Tresorerie.objects.filter(agence=agence).order_by('-date').first()
+
+        # 6. Récupérer le nom de l'utilisateur
         try:
             compte = Compte.objects.get(user=request.user, actif=True)
             nom_utilisateur = compte.nom_complet
         except:
-            nom_utilisateur = request.user.username if request.user.is_authenticated else "Utilisateur"
+            nom_utilisateur = request.user.username
 
+        # 7. Envoi au Template
+        context = {
+            'agence': agence,
+            'today': today,
+            'ca_du_jour': ca_du_jour,
+            'depenses_du_jour': depenses_du_jour,
+            'treso': last_treso,
+            'historique_ca': historique_ca,
+            'nom_utilisateur': nom_utilisateur,
+        }
+        return render(request, 'supermarket/comptabiliter/dashboard.html', context)
+        
+    except Exception as e:
+        # Gestion d'erreur globale pour ne pas planter la page
+        messages.error(request, f'Erreur Dashboard: {str(e)}')
+        # Fallback pour éviter l'écran blanc
         return render(request, 'supermarket/comptabiliter/dashboard.html', {
             'agence': None,
-            'nom_utilisateur': nom_utilisateur,
+            'nom_utilisateur': request.user.username,
+            'ca_du_jour': 0, 
+            'depenses_du_jour': 0,
+            'treso': None
         })
 
-
-login_required
+@login_required
 def creer_depense(request): 
     """Vue pour créer une nouvelle dépense"""
     if request.method == 'POST':
@@ -20882,10 +20922,17 @@ def creer_depense(request):
 
 
 @login_required
+@login_required
 def consulter_depenses(request):
     """
     Affiche les dépenses FILTRÉES PAR AGENCE et permet l'export Excel.
     """
+    # Imports locaux pour éviter les erreurs
+    from .models import Depense, Compte
+    from django.db.models import Sum
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill
+    from datetime import datetime, timedelta
     
     # 1. Récupérer l'agence
     try:
@@ -20914,9 +20961,11 @@ def consulter_depenses(request):
     if date_debut_str and date_fin_str:
         try:
             date_debut = datetime.strptime(date_debut_str, '%Y-%m-%d')
+            # On force le début de journée
             date_debut = timezone.make_aware(date_debut.replace(hour=0, minute=0, second=0))
             
             date_fin = datetime.strptime(date_fin_str, '%Y-%m-%d')
+            # On force la fin de journée
             date_fin = timezone.make_aware(date_fin.replace(hour=23, minute=59, second=59))
             
             # Ajout du filtre de date au filtre d'agence existant
@@ -20924,14 +20973,14 @@ def consulter_depenses(request):
             periode_info = f"Du {date_debut_str} au {date_fin_str}"
             
         except ValueError:
-            date_debut = now - timedelta(hours=24)
+            date_debut = now.replace(hour=0, minute=0, second=0, microsecond=0)
             depenses = depenses.filter(date__gte=date_debut)
-            periode_info = "Dernières 24 heures (Erreur date)"
+            periode_info = "Aujourd'hui (Erreur date)"
     else:
-        date_debut = now - timedelta(hours=24)
-        # On garde le filtre agence et on ajoute le filtre date
+        # PAR DÉFAUT : AUJOURD'HUI (Depuis Minuit)
+        date_debut = now.replace(hour=0, minute=0, second=0, microsecond=0)
         depenses = depenses.filter(date__gte=date_debut)
-        periode_info = "Dernières 24 heures"
+        periode_info = "Aujourd'hui"
 
     # Calcul du total
     total_general = depenses.aggregate(Sum('montant'))['montant__sum'] or 0
@@ -20996,7 +21045,7 @@ def consulter_depenses(request):
         'nom_utilisateur': nom_utilisateur,
     }
     return render(request, 'supermarket/comptabiliter/consulter_depenses.html', context)
-
+    
 @login_required
 def suivi_chiffre_affaire(request):
     # --- IMPORTS NÉCESSAIRES ---
