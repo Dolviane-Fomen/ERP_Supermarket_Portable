@@ -22,76 +22,102 @@
         </div>
     </form>
 
-    {% if treso and not request.GET.edit %}
+
+    {% if not request.GET.edit %}
+    <!-- MODE VISUALISATION : Afficher les valeurs actuelles -->
+    <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #2ecc71;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span><i class="fas fa-eye"></i> Mode Visualisation - Vous consultez les soldes actuels</span>
+            <a href="?edit=1" class="btn" style="background: #3498db; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+                <i class="fas fa-edit"></i> Modifier
+            </a>
+        </div>
+    </div>
     
-    <div style="background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #c3e6cb; display: flex; justify-content: space-between; align-items: center;">
-        <span><i class="fas fa-check-circle"></i> La trésorerie de ce jour est déjà enregistrée.</span>
-        <a href="?date={{ date_a_afficher|date:'Y-m-d' }}&edit=true" class="btn" style="background: #ffc107; color: #333; font-weight: bold; text-decoration: none; padding: 8px 15px; border-radius: 5px;">
-            <i class="fas fa-edit"></i> Modifier
-        </a>
-    </div>
-
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+        <!-- Affichage en mode visualisation -->
+        <div class="card-treso" style="background: white; padding: 20px; border-radius: 10px; border-left: 5px solid #3498db;">
+            <div style="text-align: center; padding: 10px;">
+                <span style="font-weight: bold; color: #2c3e50;">Chiffre d'Affaire (Module Vente)</span>
+                <h3 style="font-size: 2em; color: #2c3e50; margin: 0;">{{ ca.montant_realise|default:"0" }}</h3>
+            </div>
+        </div>
         
-        <div class="card-treso view-mode" style="border-left: 5px solid #3498db;">
-            <h3>Chiffre d'Affaire</h3>
-            <div class="big-number">{{ ca.montant_realise|default:"0" }} <small>FCFA</small></div>
-        </div>
-
-        <div class="card-treso view-mode" style="border-left: 5px solid #0d47a1;">
+        <!-- Banque - Mode Visualisation -->
+        <div class="card-treso" style="border-top: 5px solid #0d47a1;">
             <h3>Banque</h3>
-            <div class="recap-row"><span>Initial :</span> <b>{{ treso.banque_initial }}</b></div>
-            <div class="recap-row text-success"><span>+ Dépôt :</span> <b>{{ treso.banque_depot }}</b></div>
-            <div class="recap-row text-danger"><span>- Retrait :</span> <b>{{ treso.banque_retrait }}</b></div>
-            <hr>
-            <div class="recap-row total"><span>Solde Final :</span> <b>{{ treso.solde_banque_final }} FCFA</b></div>
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label style="font-weight: bold; color: #0d47a1;">Solde Actuel</label>
+                <div style="font-size: 1.3em; font-weight: bold; color: #0d47a1; text-align: center; padding: 10px; background: #e3f2fd; border-radius: 4px;">
+                    {% if treso %}{{ treso.solde_banque_final|floatformat:2 }}{% else %}{{ init.banque|floatformat:2|default:"0,00" }}{% endif %} FCFA
+                </div>
+            </div>
         </div>
-
-        <div class="card-treso view-mode" style="border-left: 5px solid #2ecc71;">
+        
+        <!-- Caisse - Mode Visualisation -->
+        <div class="card-treso" style="border-top: 5px solid #2ecc71;">
             <h3>Caisse Espèces</h3>
-            <div class="recap-row"><span>Initial :</span> <b>{{ treso.caisse_initial }}</b></div>
-            <div class="recap-row text-success"><span>+ Entrée :</span> <b>{{ treso.caisse_entree }}</b></div>
-            <div class="recap-row text-danger"><span>- Sortie :</span> <b>{{ treso.caisse_sortie }}</b></div>
-            <hr>
-            <div class="recap-row total"><span>Solde Final :</span> <b>{{ treso.solde_caisse_final }} FCFA</b></div>
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label style="font-weight: bold; color: #2ecc71;">Solde Actuel</label>
+                <div style="font-size: 1.3em; font-weight: bold; color: #2ecc71; text-align: center; padding: 10px; background: #e8f5e9; border-radius: 4px;">
+                    {% if treso %}{{ treso.solde_caisse_final|floatformat:2 }}{% else %}{{ init.caisse|floatformat:2|default:"0,00" }}{% endif %} FCFA
+                </div>
+            </div>
         </div>
-
-        <div class="card-treso view-mode" style="border-left: 5px solid #e67e22;">
+        
+        <!-- Orange Money - Mode Visualisation -->
+        <div class="card-treso" style="border-top: 5px solid #e67e22;">
             <h3>Orange Money</h3>
-            <div class="recap-row"><span>Initial :</span> <b>{{ treso.om_initial }}</b></div>
-            <div class="recap-row text-success"><span>+ Dépôt :</span> <b>{{ treso.om_depot }}</b></div>
-            <div class="recap-row text-danger"><span>- Retrait :</span> <b>{{ treso.om_retrait }}</b></div>
-            <hr>
-            <div class="recap-row total"><span>Solde Final :</span> <b>{{ treso.solde_om_final }} FCFA</b></div>
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label style="font-weight: bold; color: #e67e22;">Solde Actuel</label>
+                <div style="font-size: 1.3em; font-weight: bold; color: #e67e22; text-align: center; padding: 10px; background: #fff3e0; border-radius: 4px;">
+                    {% if treso %}{{ treso.solde_om_final|floatformat:2 }}{% else %}{{ init.om|floatformat:2|default:"0,00" }}{% endif %} FCFA
+                </div>
+            </div>
         </div>
-
-        <div class="card-treso view-mode" style="border-left: 5px solid #f1c40f;">
-            <h3>MTN Money</h3>
-            <div class="recap-row"><span>Initial :</span> <b>{{ treso.momo_initial }}</b></div>
-            <div class="recap-row text-success"><span>+ Dépôt :</span> <b>{{ treso.momo_depot }}</b></div>
-            <div class="recap-row text-danger"><span>- Retrait :</span> <b>{{ treso.momo_retrait }}</b></div>
-            <hr>
-            <div class="recap-row total"><span>Solde Final :</span> <b>{{ treso.solde_momo_final }} FCFA</b></div>
+        
+        <!-- MTN Money - Mode Visualisation -->
+        <div class="card-treso" style="border-top: 5px solid #f1c40f;">
+            <h3>MTN Mobile Money</h3>
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label style="font-weight: bold; color: #f1c40f;">Solde Actuel</label>
+                <div style="font-size: 1.3em; font-weight: bold; color: #f1c40f; text-align: center; padding: 10px; background: #fffde7; border-radius: 4px;">
+                    {% if treso %}{{ treso.solde_momo_final|floatformat:2 }}{% else %}{{ init.momo|floatformat:2|default:"0,00" }}{% endif %} FCFA
+                </div>
+            </div>
         </div>
-
-        <div class="card-treso view-mode" style="border-left: 5px solid #8e44ad;">
+        
+        <!-- SAV - Mode Visualisation -->
+        <div class="card-treso" style="border-top: 5px solid #8e44ad;">
             <h3>SAV</h3>
-            <div class="recap-row"><span>Initial :</span> <b>{{ treso.sav_initial }}</b></div>
-            <div class="recap-row text-success"><span>+ Entrée :</span> <b>{{ treso.sav_entree }}</b></div>
-            <div class="recap-row text-danger"><span>- Sortie :</span> <b>{{ treso.sav_sortie }}</b></div>
-            <hr>
-            <div class="recap-row total"><span>Solde Final :</span> <b>{{ treso.solde_sav_final }} FCFA</b></div>
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label style="font-weight: bold; color: #8e44ad;">Solde Actuel</label>
+                <div style="font-size: 1.3em; font-weight: bold; color: #8e44ad; text-align: center; padding: 10px; background: #f3e5f5; border-radius: 4px;">
+                    {% if treso %}{{ treso.solde_sav_final|floatformat:2 }}{% else %}{{ init.sav|floatformat:2|default:"0,00" }}{% endif %} FCFA
+                </div>
+            </div>
         </div>
-
-         <div class="card-treso view-mode" style="background: #2c3e50; color: white; grid-column: 1 / -1; text-align: center;">
-            <h3 style="color: white; border: none;">TOTAL DISPONIBLE GLOBAL</h3>
-            <div style="font-size: 2.5em; font-weight: bold;">{{ treso.total_disponible }} FCFA</div>
+        
+        <!-- Total Global - Mode Visualisation -->
+        <div class="card-treso" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px;">
+            <h3 style="color: white;">Total Disponible</h3>
+            <div style="font-size: 2em; font-weight: bold; text-align: center; margin-top: 10px;">
+                {% if treso %}{{ treso.total_disponible|floatformat:2 }}{% else %}{{ total_global|floatformat:2|default:"0,00" }}{% endif %} FCFA
+            </div>
         </div>
-
     </div>
-
+    
     {% else %}
-
+    <!-- MODE ÉDITION : Formulaire pour modifier -->
+    <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span><i class="fas fa-edit"></i> Mode Édition - Modifiez les dépôts et retraits</span>
+            <a href="?" class="btn" style="background: #6c757d; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+                <i class="fas fa-times"></i> Annuler
+            </a>
+        </div>
+    </div>
+    
     <form method="POST">
         {% csrf_token %}
         <input type="hidden" name="date" value="{{ date_a_afficher|date:'Y-m-d' }}">
@@ -107,92 +133,163 @@
 
             <div class="card-treso" style="border-top: 5px solid #0d47a1;">
                 <h3>Banque</h3>
-                <div class="form-group">
-                    <label>Solde Initial</label>
-                    <input type="number" step="0.01" name="banque_initial" value="{{ treso.banque_initial|default:init.banque }}" readonly class="input-readonly">
+                <div class="form-group" style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #0d47a1;">
+                    <label style="font-weight: bold; color: #0d47a1; font-size: 0.9em;">Solde Initial <small style="color: #666; font-weight: normal;">(Fixe pour la journée)</small></label>
+                    <div id="display_banque_initial" style="font-size: 1.2em; font-weight: bold; color: #0d47a1; text-align: center; padding: 8px; background: #e3f2fd; border-radius: 4px; margin-top: 5px; border: 2px solid #0d47a1;">
+                        <span id="banque_initial_display_text">{{ init.banque|floatformat:2|default:"0,00" }} FCFA</span>
+                    </div>
+                    <input type="hidden" name="banque_initial" id="banque_initial" value="{{ init.banque|default:0 }}" data-initial-value="{{ init.banque|default:0 }}">
                 </div>
                 <div class="form-group">
-                    <label class="text-success">+ Dépôt</label>
-                    <input type="number" step="0.01" name="banque_depot" value="{{ treso.banque_depot|default:0 }}">
+                    <label class="text-success">+ Dépôt <small style="color: #666;">(Montant à ajouter)</small></label>
+                    <input type="number" step="0.01" name="banque_depot" id="banque_depot" value="0" placeholder="Montant à ajouter au dépôt existant" data-existant="{% if treso %}{{ treso.banque_depot|default:0 }}{% else %}0{% endif %}" oninput="calculerSoldes()">
+                    {% if treso and treso.banque_depot > 0 %}
+                    <small style="color: #666; display: block; margin-top: 5px;">Dépôt actuel enregistré: {{ treso.banque_depot|floatformat:2 }} FCFA</small>
+                    {% endif %}
                 </div>
                 <div class="form-group">
-                    <label class="text-danger">- Retrait</label>
-                    <input type="number" step="0.01" name="banque_retrait" value="{{ treso.banque_retrait|default:0 }}">
+                    <label class="text-danger">- Retrait <small style="color: #666;">(Montant à ajouter)</small></label>
+                    <input type="number" step="0.01" name="banque_retrait" id="banque_retrait" value="0" placeholder="Montant à ajouter au retrait existant" data-existant="{% if treso %}{{ treso.banque_retrait|default:0 }}{% else %}0{% endif %}" oninput="calculerSoldes()">
+                    {% if treso and treso.banque_retrait > 0 %}
+                    <small style="color: #666; display: block; margin-top: 5px;">Retrait actuel enregistré: {{ treso.banque_retrait|floatformat:2 }} FCFA</small>
+                    {% endif %}
+                </div>
+                <div class="form-group" style="margin-top: 10px; padding-top: 10px; border-top: 2px solid #0d47a1;">
+                    <label style="font-weight: bold; color: #0d47a1;">Solde Final (Temps Réel)</label>
+                    <div id="solde_banque_final" style="font-size: 1.3em; font-weight: bold; color: #0d47a1; text-align: center; padding: 8px; background: #e3f2fd; border-radius: 4px;">0 FCFA</div>
                 </div>
             </div>
 
             <div class="card-treso" style="border-top: 5px solid #2ecc71;">
                 <h3>Caisse Espèces</h3>
-                <div class="form-group">
-                    <label>Solde Initial</label>
-                    <input type="number" step="0.01" name="caisse_initial" value="{{ treso.caisse_initial|default:init.caisse }}" readonly class="input-readonly">
+                <div class="form-group" style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #2ecc71;">
+                    <label style="font-weight: bold; color: #2ecc71; font-size: 0.9em;">Solde Initial <small style="color: #666; font-weight: normal;">(Fixe pour la journée)</small></label>
+                    <div id="display_caisse_initial" style="font-size: 1.2em; font-weight: bold; color: #2ecc71; text-align: center; padding: 8px; background: #e8f5e9; border-radius: 4px; margin-top: 5px; border: 2px solid #2ecc71;">
+                        <span id="caisse_initial_display_text">{{ init.caisse|floatformat:2|default:"0,00" }} FCFA</span>
+                    </div>
+                    <input type="hidden" name="caisse_initial" id="caisse_initial" value="{{ init.caisse|default:0 }}" data-initial-value="{{ init.caisse|default:0 }}">
                 </div>
                 <div class="form-group">
-                    <label class="text-success">+ Entrée</label>
-                    <input type="number" step="0.01" name="caisse_entree" value="{{ treso.caisse_entree|default:0 }}">
+                    <label class="text-success">+ Entrée <small style="color: #666;">(Montant à ajouter)</small></label>
+                    <input type="number" step="0.01" name="caisse_entree" id="caisse_entree" value="0" placeholder="Montant à ajouter" data-existant="{% if treso %}{{ treso.caisse_entree|default:0 }}{% else %}0{% endif %}" oninput="calculerSoldes()">
+                    {% if treso and treso.caisse_entree > 0 %}
+                    <small style="color: #666; display: block; margin-top: 5px;">Entrée actuelle: {{ treso.caisse_entree|floatformat:2 }} FCFA</small>
+                    {% endif %}
                 </div>
                 <div class="form-group">
-                    <label class="text-danger">- Sortie</label>
-                    <input type="number" step="0.01" name="caisse_sortie" value="{{ treso.caisse_sortie|default:0 }}">
+                    <label class="text-danger">- Sortie <small style="color: #666;">(Montant à ajouter)</small></label>
+                    <input type="number" step="0.01" name="caisse_sortie" id="caisse_sortie" value="0" placeholder="Montant à ajouter" data-existant="{% if treso %}{{ treso.caisse_sortie|default:0 }}{% else %}0{% endif %}" oninput="calculerSoldes()">
+                    {% if treso and treso.caisse_sortie > 0 %}
+                    <small style="color: #666; display: block; margin-top: 5px;">Sortie actuelle: {{ treso.caisse_sortie|floatformat:2 }} FCFA</small>
+                    {% endif %}
+                </div>
+                <div class="form-group" style="margin-top: 10px; padding-top: 10px; border-top: 2px solid #2ecc71;">
+                    <label style="font-weight: bold; color: #2ecc71;">Solde Final (Temps Réel)</label>
+                    <div id="solde_caisse_final" style="font-size: 1.3em; font-weight: bold; color: #2ecc71; text-align: center; padding: 8px; background: #e8f5e9; border-radius: 4px;">0 FCFA</div>
                 </div>
             </div>
 
             <div class="card-treso" style="border-top: 5px solid #e67e22;">
                 <h3>Orange Money</h3>
-                <div class="form-group">
-                    <label>Solde Initial</label>
-                    <input type="number" step="0.01" name="om_initial" value="{{ treso.om_initial|default:init.om }}" readonly class="input-readonly">
+                <div class="form-group" style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #e67e22;">
+                    <label style="font-weight: bold; color: #e67e22; font-size: 0.9em;">Solde Initial <small style="color: #666; font-weight: normal;">(Fixe pour la journée)</small></label>
+                    <div id="display_om_initial" style="font-size: 1.2em; font-weight: bold; color: #e67e22; text-align: center; padding: 8px; background: #fff3e0; border-radius: 4px; margin-top: 5px; border: 2px solid #e67e22;">
+                        <span id="om_initial_display_text">{{ init.om|floatformat:2|default:"0,00" }} FCFA</span>
+                    </div>
+                    <input type="hidden" name="om_initial" id="om_initial" value="{{ init.om|default:0 }}" data-initial-value="{{ init.om|default:0 }}">
                 </div>
                 <div class="form-group">
-                    <label class="text-success">+ Dépôt</label>
-                    <input type="number" step="0.01" name="om_depot" value="{{ treso.om_depot|default:0 }}">
+                    <label class="text-success">+ Dépôt <small style="color: #666;">(Montant à ajouter)</small></label>
+                    <input type="number" step="0.01" name="om_depot" id="om_depot" value="0" placeholder="Montant à ajouter" data-existant="{% if treso %}{{ treso.om_depot|default:0 }}{% else %}0{% endif %}" oninput="calculerSoldes()">
+                    {% if treso and treso.om_depot > 0 %}
+                    <small style="color: #666; display: block; margin-top: 5px;">Dépôt actuel: {{ treso.om_depot|floatformat:2 }} FCFA</small>
+                    {% endif %}
                 </div>
                 <div class="form-group">
-                    <label class="text-danger">- Retrait</label>
-                    <input type="number" step="0.01" name="om_retrait" value="{{ treso.om_retrait|default:0 }}">
+                    <label class="text-danger">- Retrait <small style="color: #666;">(Montant à ajouter)</small></label>
+                    <input type="number" step="0.01" name="om_retrait" id="om_retrait" value="0" placeholder="Montant à ajouter" data-existant="{% if treso %}{{ treso.om_retrait|default:0 }}{% else %}0{% endif %}" oninput="calculerSoldes()">
+                    {% if treso and treso.om_retrait > 0 %}
+                    <small style="color: #666; display: block; margin-top: 5px;">Retrait actuel: {{ treso.om_retrait|floatformat:2 }} FCFA</small>
+                    {% endif %}
+                </div>
+                <div class="form-group" style="margin-top: 10px; padding-top: 10px; border-top: 2px solid #e67e22;">
+                    <label style="font-weight: bold; color: #e67e22;">Solde Final (Temps Réel)</label>
+                    <div id="solde_om_final" style="font-size: 1.3em; font-weight: bold; color: #e67e22; text-align: center; padding: 8px; background: #fff3e0; border-radius: 4px;">0 FCFA</div>
                 </div>
             </div>
 
             <div class="card-treso" style="border-top: 5px solid #f1c40f;">
                 <h3>MTN Money</h3>
-                <div class="form-group">
-                    <label>Solde Initial</label>
-                    <input type="number" step="0.01" name="momo_initial" value="{{ treso.momo_initial|default:init.momo }}" readonly class="input-readonly">
+                <div class="form-group" style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #f1c40f;">
+                    <label style="font-weight: bold; color: #f1c40f; font-size: 0.9em;">Solde Initial <small style="color: #666; font-weight: normal;">(Fixe pour la journée)</small></label>
+                    <div id="display_momo_initial" style="font-size: 1.2em; font-weight: bold; color: #f1c40f; text-align: center; padding: 8px; background: #fffde7; border-radius: 4px; margin-top: 5px; border: 2px solid #f1c40f;">
+                        <span id="momo_initial_display_text">{{ init.momo|floatformat:2|default:"0,00" }} FCFA</span>
+                    </div>
+                    <input type="hidden" name="momo_initial" id="momo_initial" value="{{ init.momo|default:0 }}" data-initial-value="{{ init.momo|default:0 }}">
                 </div>
                 <div class="form-group">
-                    <label class="text-success">+ Dépôt</label>
-                    <input type="number" step="0.01" name="momo_depot" value="{{ treso.momo_depot|default:0 }}">
+                    <label class="text-success">+ Dépôt <small style="color: #666;">(Montant à ajouter)</small></label>
+                    <input type="number" step="0.01" name="momo_depot" id="momo_depot" value="0" placeholder="Montant à ajouter" data-existant="{% if treso %}{{ treso.momo_depot|default:0 }}{% else %}0{% endif %}" oninput="calculerSoldes()">
+                    {% if treso and treso.momo_depot > 0 %}
+                    <small style="color: #666; display: block; margin-top: 5px;">Dépôt actuel: {{ treso.momo_depot|floatformat:2 }} FCFA</small>
+                    {% endif %}
                 </div>
                 <div class="form-group">
-                    <label class="text-danger">- Retrait</label>
-                    <input type="number" step="0.01" name="momo_retrait" value="{{ treso.momo_retrait|default:0 }}">
+                    <label class="text-danger">- Retrait <small style="color: #666;">(Montant à ajouter)</small></label>
+                    <input type="number" step="0.01" name="momo_retrait" id="momo_retrait" value="0" placeholder="Montant à ajouter" data-existant="{% if treso %}{{ treso.momo_retrait|default:0 }}{% else %}0{% endif %}" oninput="calculerSoldes()">
+                    {% if treso and treso.momo_retrait > 0 %}
+                    <small style="color: #666; display: block; margin-top: 5px;">Retrait actuel: {{ treso.momo_retrait|floatformat:2 }} FCFA</small>
+                    {% endif %}
+                </div>
+                <div class="form-group" style="margin-top: 10px; padding-top: 10px; border-top: 2px solid #f1c40f;">
+                    <label style="font-weight: bold; color: #f1c40f;">Solde Final (Temps Réel)</label>
+                    <div id="solde_momo_final" style="font-size: 1.3em; font-weight: bold; color: #f1c40f; text-align: center; padding: 8px; background: #fffde7; border-radius: 4px;">0 FCFA</div>
                 </div>
             </div>
 
             <div class="card-treso" style="border-top: 5px solid #8e44ad;">
                 <h3>SAV</h3>
-                <div class="form-group">
-                    <label>Solde Initial</label>
-                    <input type="number" step="0.01" name="sav_initial" value="{{ treso.sav_initial|default:init.sav }}" readonly class="input-readonly">
+                <div class="form-group" style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #8e44ad;">
+                    <label style="font-weight: bold; color: #8e44ad; font-size: 0.9em;">Solde Initial <small style="color: #666; font-weight: normal;">(Fixe pour la journée)</small></label>
+                    <div id="display_sav_initial" style="font-size: 1.2em; font-weight: bold; color: #8e44ad; text-align: center; padding: 8px; background: #f3e5f5; border-radius: 4px; margin-top: 5px; border: 2px solid #8e44ad;">
+                        <span id="sav_initial_display_text">{{ init.sav|floatformat:2|default:"0,00" }} FCFA</span>
+                    </div>
+                    <input type="hidden" name="sav_initial" id="sav_initial" value="{{ init.sav|default:0 }}" data-initial-value="{{ init.sav|default:0 }}">
                 </div>
                 <div class="form-group">
-                    <label class="text-success">+ Entrée</label>
-                    <input type="number" step="0.01" name="sav_entree" value="{{ treso.sav_entree|default:0 }}">
+                    <label class="text-success">+ Entrée <small style="color: #666;">(Montant à ajouter)</small></label>
+                    <input type="number" step="0.01" name="sav_entree" id="sav_entree" value="0" placeholder="Montant à ajouter" data-existant="{% if treso %}{{ treso.sav_entree|default:0 }}{% else %}0{% endif %}" oninput="calculerSoldes()">
+                    {% if treso and treso.sav_entree > 0 %}
+                    <small style="color: #666; display: block; margin-top: 5px;">Entrée actuelle: {{ treso.sav_entree|floatformat:2 }} FCFA</small>
+                    {% endif %}
                 </div>
                 <div class="form-group">
-                    <label class="text-danger">- Sortie</label>
-                    <input type="number" step="0.01" name="sav_sortie" value="{{ treso.sav_sortie|default:0 }}">
+                    <label class="text-danger">- Sortie <small style="color: #666;">(Montant à ajouter)</small></label>
+                    <input type="number" step="0.01" name="sav_sortie" id="sav_sortie" value="0" placeholder="Montant à ajouter" data-existant="{% if treso %}{{ treso.sav_sortie|default:0 }}{% else %}0{% endif %}" oninput="calculerSoldes()">
+                    {% if treso and treso.sav_sortie > 0 %}
+                    <small style="color: #666; display: block; margin-top: 5px;">Sortie actuelle: {{ treso.sav_sortie|floatformat:2 }} FCFA</small>
+                    {% endif %}
                 </div>
+                <div class="form-group" style="margin-top: 10px; padding-top: 10px; border-top: 2px solid #8e44ad;">
+                    <label style="font-weight: bold; color: #8e44ad;">Solde Final (Temps Réel)</label>
+                    <div id="solde_sav_final" style="font-size: 1.3em; font-weight: bold; color: #8e44ad; text-align: center; padding: 8px; background: #f3e5f5; border-radius: 4px;">0 FCFA</div>
+                </div>
+            </div>
+
+            <div class="card-treso" style="background: #2c3e50; color: white; grid-column: 1 / -1; text-align: center; margin-top: 20px;">
+                <h3 style="color: white; border: none; margin-bottom: 10px;">TOTAL DISPONIBLE GLOBAL (Temps Réel)</h3>
+                <div id="total_global_realtime" style="font-size: 2.5em; font-weight: bold; color: white;">0 FCFA</div>
             </div>
 
         </div>
 
         <button type="submit" class="btn" style="width: 100%; margin-top: 20px; padding: 15px; background: #2c3e50; color: white; font-size: 1.2em; border: none; border-radius: 8px; cursor: pointer;">
-            <i class="fas fa-save"></i> Enregistrer les mouvements
+            <i class="fas fa-save"></i> Enregistrer / Mettre à jour les mouvements (modifiable plusieurs fois)
         </button>
     </form>
+    {% endif %}
 
-    {% endif %} </div>
+</div>
 
 <style>
     .card-treso {
@@ -234,5 +331,242 @@
     .text-success { color: #27ae60 !important; }
     .text-danger { color: #c0392b !important; }
 </style>
+
+<script>
+// Fonction pour formater les montants
+function formaterMontant(montant) {
+    if (isNaN(montant) || montant === null || montant === undefined) {
+        return '0,00 FCFA';
+    }
+    return montant.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' FCFA';
+}
+
+// Fonction pour obtenir une valeur numérique depuis un input
+function getValue(id) {
+    const element = document.getElementById(id);
+    if (!element) {
+        console.warn('Element not found:', id);
+        return 0;
+    }
+    const val = element.value;
+    const numVal = parseFloat(val);
+    return isNaN(numVal) ? 0 : numVal;
+}
+
+function calculerSoldes() {
+    // Vérifier que tous les éléments existent
+    if (!document.getElementById('banque_initial')) {
+        console.error('Element banque_initial not found');
+        return;
+    }
+    
+    // Calcul des frais banque (500F par tranche de 500k)
+    function calculerFraisBanque(retrait) {
+        if (retrait <= 0) return 0;
+        const nombreTranches = Math.ceil(retrait / 500000);
+        return nombreTranches * 500;
+    }
+    
+    // Calcul des frais Orange Money (1%)
+    function calculerFraisOM(retrait) {
+        if (retrait <= 0) return 0;
+        return retrait * 0.01;
+    }
+    
+    // Calcul des frais MTN Money (par paliers)
+    function calculerFraisMomo(retrait) {
+        if (retrait <= 0) return 0;
+        if (retrait <= 100) return 0;
+        if (retrait <= 3333) return 50;
+        return retrait * 0.01;
+    }
+    
+    // BANQUE
+    const banque_initial = getValue('banque_initial');
+    const banque_depot_saisi = getValue('banque_depot'); // Nouveau dépôt saisi
+    const banque_retrait_saisi = getValue('banque_retrait'); // Nouveau retrait saisi
+    
+    // Récupérer les dépôts/retraits existants depuis les data-attributes ou les valeurs par défaut
+    const banque_depot_existant = parseFloat(document.getElementById('banque_depot').getAttribute('data-existant')) || 0;
+    const banque_retrait_existant = parseFloat(document.getElementById('banque_retrait').getAttribute('data-existant')) || 0;
+    
+    // Calculer les totaux (existants + nouveaux)
+    const banque_depot_total = banque_depot_existant + banque_depot_saisi;
+    const banque_retrait_total = banque_retrait_existant + banque_retrait_saisi;
+    
+    // Calculer les frais sur le retrait total
+    const frais_banque = calculerFraisBanque(banque_retrait_total);
+    
+    // Solde final = Initial + Dépôt total - Retrait total - Frais
+    const solde_banque = banque_initial + banque_depot_total - banque_retrait_total - frais_banque;
+    document.getElementById('solde_banque_final').textContent = formaterMontant(solde_banque);
+    
+    // CAISSE
+    const caisse_initial = getValue('caisse_initial');
+    const caisse_entree_saisi = getValue('caisse_entree');
+    const caisse_sortie_saisi = getValue('caisse_sortie');
+    
+    const caisse_entree_existant = parseFloat(document.getElementById('caisse_entree').getAttribute('data-existant')) || 0;
+    const caisse_sortie_existant = parseFloat(document.getElementById('caisse_sortie').getAttribute('data-existant')) || 0;
+    
+    const caisse_entree_total = caisse_entree_existant + caisse_entree_saisi;
+    const caisse_sortie_total = caisse_sortie_existant + caisse_sortie_saisi;
+    
+    const solde_caisse = caisse_initial + caisse_entree_total - caisse_sortie_total;
+    document.getElementById('solde_caisse_final').textContent = formaterMontant(solde_caisse);
+    
+    // ORANGE MONEY
+    const om_initial = getValue('om_initial');
+    const om_depot_saisi = getValue('om_depot');
+    const om_retrait_saisi = getValue('om_retrait');
+    
+    const om_depot_existant = parseFloat(document.getElementById('om_depot').getAttribute('data-existant')) || 0;
+    const om_retrait_existant = parseFloat(document.getElementById('om_retrait').getAttribute('data-existant')) || 0;
+    
+    const om_depot_total = om_depot_existant + om_depot_saisi;
+    const om_retrait_total = om_retrait_existant + om_retrait_saisi;
+    
+    const frais_om = calculerFraisOM(om_retrait_total);
+    const solde_om = om_initial + om_depot_total - om_retrait_total - frais_om;
+    document.getElementById('solde_om_final').textContent = formaterMontant(solde_om);
+    
+    // MTN MONEY
+    const momo_initial = getValue('momo_initial');
+    const momo_depot_saisi = getValue('momo_depot');
+    const momo_retrait_saisi = getValue('momo_retrait');
+    
+    const momo_depot_existant = parseFloat(document.getElementById('momo_depot').getAttribute('data-existant')) || 0;
+    const momo_retrait_existant = parseFloat(document.getElementById('momo_retrait').getAttribute('data-existant')) || 0;
+    
+    const momo_depot_total = momo_depot_existant + momo_depot_saisi;
+    const momo_retrait_total = momo_retrait_existant + momo_retrait_saisi;
+    
+    const frais_momo = calculerFraisMomo(momo_retrait_total);
+    const solde_momo = momo_initial + momo_depot_total - momo_retrait_total - frais_momo;
+    document.getElementById('solde_momo_final').textContent = formaterMontant(solde_momo);
+    
+    // SAV
+    const sav_initial = getValue('sav_initial');
+    const sav_entree_saisi = getValue('sav_entree');
+    const sav_sortie_saisi = getValue('sav_sortie');
+    
+    const sav_entree_existant = parseFloat(document.getElementById('sav_entree').getAttribute('data-existant')) || 0;
+    const sav_sortie_existant = parseFloat(document.getElementById('sav_sortie').getAttribute('data-existant')) || 0;
+    
+    const sav_entree_total = sav_entree_existant + sav_entree_saisi;
+    const sav_sortie_total = sav_sortie_existant + sav_sortie_saisi;
+    
+    const solde_sav = sav_initial + sav_entree_total - sav_sortie_total;
+    document.getElementById('solde_sav_final').textContent = formaterMontant(solde_sav);
+    
+    // TOTAL GLOBAL (recalculé avec les nouveaux totaux)
+    const total_global = solde_banque + solde_caisse + solde_om + solde_momo + solde_sav;
+    const totalElement = document.getElementById('total_global_realtime');
+    if (totalElement) {
+        totalElement.textContent = formaterMontant(total_global);
+    }
+}
+
+// Afficher les soldes initiaux au chargement avec formatage
+function afficherSoldesInitiaux() {
+    console.log('=== AFFICHAGE DES SOLDES INITIAUX ===');
+    // Récupérer les valeurs depuis les inputs hidden et formater avec séparateurs de milliers
+    const inputs = [
+        {canal: 'banque', spanId: 'banque_initial_display_text'},
+        {canal: 'caisse', spanId: 'caisse_initial_display_text'},
+        {canal: 'om', spanId: 'om_initial_display_text'},
+        {canal: 'momo', spanId: 'momo_initial_display_text'},
+        {canal: 'sav', spanId: 'sav_initial_display_text'}
+    ];
+    
+    inputs.forEach(function(item) {
+        const inputId = item.canal + '_initial';
+        const inputEl = document.getElementById(inputId);
+        const spanEl = document.getElementById(item.spanId);
+        
+        if (!inputEl) {
+            console.error(`Input ${inputId} non trouvé`);
+            return;
+        }
+        
+        if (!spanEl) {
+            console.error(`Span ${item.spanId} non trouvé`);
+            return;
+        }
+        
+        // Essayer de récupérer la valeur depuis l'attribut data-initial-value ou value
+        let valeurStr = inputEl.getAttribute('data-initial-value') || inputEl.value || '0';
+        
+        // Nettoyer la chaîne : remplacer les virgules par des points et supprimer les espaces
+        valeurStr = valeurStr.toString().trim().replace(/\s/g, '').replace(',', '.');
+        
+        // Si la chaîne contient "FCFA" ou d'autres textes, les supprimer
+        valeurStr = valeurStr.replace(/[^\d.-]/g, '');
+        
+        let valeur = parseFloat(valeurStr);
+        if (isNaN(valeur)) {
+            valeur = 0;
+            console.warn(`${item.canal}: Impossible de parser "${valeurStr}", utilisation de 0`);
+        }
+        
+        console.log(`${item.canal}: valeur=${valeur}, data-initial-value="${inputEl.getAttribute('data-initial-value')}", value="${inputEl.value}"`);
+        
+        // Formater et afficher directement dans le span
+        const valeurFormatee = formaterMontant(valeur);
+        spanEl.textContent = valeurFormatee;
+        console.log(`${item.canal}: Affiché = "${valeurFormatee}"`);
+    });
+    console.log('=== FIN AFFICHAGE ===');
+}
+
+// Debug: Afficher toutes les valeurs des inputs hidden au chargement
+function debugAfficherValeurs() {
+    console.log('=== DEBUG VALEURS INPUTS ===');
+    const inputs = ['banque', 'caisse', 'om', 'momo', 'sav'];
+    inputs.forEach(function(canal) {
+        const inputId = canal + '_initial';
+        const inputEl = document.getElementById(inputId);
+        if (inputEl) {
+            console.log(`${canal}: value="${inputEl.value}", data-initial-value="${inputEl.getAttribute('data-initial-value')}"`);
+        } else {
+            console.error(`${canal}: Input ${inputId} non trouvé`);
+        }
+    });
+    console.log('=== FIN DEBUG ===');
+}
+
+// Calculer les soldes au chargement de la page
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM chargé, initialisation...');
+    debugAfficherValeurs();
+    
+    // Attendre un peu pour s'assurer que tous les éléments sont chargés
+    setTimeout(function() {
+        console.log('Premier appel après 100ms');
+        afficherSoldesInitiaux();
+        calculerSoldes();
+    }, 100);
+    
+    // Recalculer aussi après un délai plus long
+    setTimeout(function() {
+        console.log('Deuxième appel après 500ms');
+        debugAfficherValeurs();
+        if (document.getElementById('banque_initial')) {
+            afficherSoldesInitiaux();
+            calculerSoldes();
+        } else {
+            console.error('Element banque_initial non trouvé après 500ms');
+        }
+    }, 500);
+    
+    // Dernier essai après 1 seconde
+    setTimeout(function() {
+        console.log('Troisième appel après 1000ms');
+        debugAfficherValeurs();
+        afficherSoldesInitiaux();
+        calculerSoldes();
+    }, 1000);
+});
+</script>
 {% endblock %}
 

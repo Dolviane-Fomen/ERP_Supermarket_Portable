@@ -19490,7 +19490,7 @@ def etat_depense(request):
     return render(request, 'supermarket/financier/etat_depense.html', context)
 
 def etat_tresorerie(request):
-    """Vue pour l'état de trésorerie"""
+    """Vue pour l'état de trésorerie - Toutes les agences"""
     compte, redirect_response = check_comptable_access(request)
     if redirect_response:
         return redirect_response
@@ -19500,11 +19500,249 @@ def etat_tresorerie(request):
         messages.error(request, 'Votre compte n\'est pas correctement lié à une agence.')
         return redirect('login_financier')
     
+    # Récupérer toutes les agences sauf "Agence Principale" et "Super Market Principal"
+    agences = Agence.objects.exclude(
+        nom_agence__in=['Agence Principale', 'Super Market Principal']
+    ).order_by('nom_agence')
+    
     context = {
         'agence': agence,
         'compte': compte,
+        'agences': agences,
     }
     return render(request, 'supermarket/financier/etat_tresorerie.html', context)
+
+def generer_etat_tresorerie(request):
+    """Générer l'état de trésorerie pour toutes les agences sur une période donnée"""
+    # Vérifier l'authentification pour les requêtes AJAX
+    if not request.user.is_authenticated:
+        return JsonResponse({'success': False, 'error': 'Non authentifié. Veuillez vous reconnecter.'}, status=401)
+    
+    try:
+        compte = Compte.objects.get(user=request.user, actif=True)
+        if compte.type_compte not in ['analyste_financiere', 'comptable', 'assistant_comptable', 'admin']:
+            return JsonResponse({'success': False, 'error': 'Accès refusé.'}, status=403)
+    except Compte.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Votre compte n\'est pas configuré correctement.'}, status=403)
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Méthode non autorisée'}, status=405)
+    
+    try:
+        date_debut_str = request.POST.get('date_debut')
+        date_fin_str = request.POST.get('date_fin')
+        
+        if not date_debut_str or not date_fin_str:
+            return JsonResponse({'success': False, 'error': 'Les dates sont obligatoires'})
+        
+        from datetime import datetime
+        from django.db.models import Sum, F
+        from decimal import Decimal
+        date_debut = datetime.strptime(date_debut_str, '%Y-%m-%d').date()
+        date_fin = datetime.strptime(date_fin_str, '%Y-%m-%d').date()
+        
+        # Récupérer toutes les agences sauf "Agence Principale" et "Super Market Principal"
+        agences = Agence.objects.exclude(
+            nom_agence__in=['Agence Principale', 'Super Market Principal']
+        ).order_by('nom_agence')
+        
+        # Trésorerie par agence
+        tresorerie_par_agence = {}
+        total_global = {
+            'ca': Decimal('0'),
+            'banque': Decimal('0'),
+            'caisse': Decimal('0'),
+            'om': Decimal('0'),
+            'momo': Decimal('0'),
+            'sav': Decimal('0'),
+            'total_disponible': Decimal('0')
+        }
+        
+        for agence in agences:
+            # Récupérer la dernière trésorerie de cette agence dans la période
+            # On prend le dernier jour de la période pour chaque agence
+            treso = Tresorerie.objects.filter(
+                agence=agence,
+                date__lte=date_fin
+            ).order_by('-date').first()
+            
+            # Calculer le CA pour cette agence du DERNIER JOUR de la période (date_fin)
+            # et non le cumulé sur toute la période
+            ventes_jour = LigneFactureVente.objects.filter(
+                facture_vente__agence=agence,
+                facture_vente__date=date_fin
+            )
+            ca_agence = ventes_jour.aggregate(total=Sum(F('quantite') * F('prix_unitaire')))['total'] or Decimal('0')
+            
+            if treso:
+                # Utiliser les soldes finaux de la dernière trésorerie
+                tresorerie_par_agence[agence.id_agence] = {
+                    'agence_nom': agence.nom_agence,
+                    'ca': float(ca_agence),
+                    'banque': float(treso.solde_banque_final),
+                    'caisse': float(treso.solde_caisse_final),
+                    'om': float(treso.solde_om_final),
+                    'momo': float(treso.solde_momo_final),
+                    'sav': float(treso.solde_sav_final),
+                    'total_disponible': float(treso.total_disponible),
+                    'date_derniere_maj': treso.date.strftime('%d/%m/%Y')
+                }
+            else:
+                # Aucune trésorerie trouvée pour cette agence
+                tresorerie_par_agence[agence.id_agence] = {
+                    'agence_nom': agence.nom_agence,
+                    'ca': float(ca_agence),
+                    'banque': 0.0,
+                    'caisse': 0.0,
+                    'om': 0.0,
+                    'momo': 0.0,
+                    'sav': 0.0,
+                    'total_disponible': 0.0,
+                    'date_derniere_maj': 'Aucune'
+                }
+            
+            # Ajouter aux totaux globaux
+            total_global['ca'] += ca_agence
+            total_global['banque'] += Decimal(str(tresorerie_par_agence[agence.id_agence]['banque']))
+            total_global['caisse'] += Decimal(str(tresorerie_par_agence[agence.id_agence]['caisse']))
+            total_global['om'] += Decimal(str(tresorerie_par_agence[agence.id_agence]['om']))
+            total_global['momo'] += Decimal(str(tresorerie_par_agence[agence.id_agence]['momo']))
+            total_global['sav'] += Decimal(str(tresorerie_par_agence[agence.id_agence]['sav']))
+            total_global['total_disponible'] += Decimal(str(tresorerie_par_agence[agence.id_agence]['total_disponible']))
+        
+        # Convertir les totaux en float pour JSON
+        total_global_float = {k: float(v) for k, v in total_global.items()}
+        
+        # Stocker dans la session pour l'export Excel
+        request.session['etat_tresorerie'] = {
+            'date_debut': date_debut_str,
+            'date_fin': date_fin_str,
+            'tresorerie_par_agence': tresorerie_par_agence,
+            'total_global': total_global_float
+        }
+        
+        return JsonResponse({
+            'success': True,
+            'data': {
+                'tresorerie_par_agence': tresorerie_par_agence,
+                'total_global': total_global_float,
+                'date_debut': date_debut_str,
+                'date_fin': date_fin_str
+            }
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'success': False, 'error': f'Erreur: {str(e)}'})
+
+def export_etat_tresorerie_excel(request):
+    """Exporter l'état de trésorerie en Excel"""
+    compte, redirect_response = check_comptable_access(request)
+    if redirect_response:
+        return redirect_response
+    
+    try:
+        # Récupérer les données depuis la session
+        etat_data = request.session.get('etat_tresorerie')
+        
+        if not etat_data:
+            return JsonResponse({'success': False, 'error': 'Aucun état généré'})
+        
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        except ImportError:
+            return JsonResponse({'success': False, 'error': 'Module openpyxl non installé'})
+        
+        from django.http import HttpResponse
+        
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = f"État Trésorerie {etat_data['date_debut']} - {etat_data['date_fin']}"
+        
+        # Styles
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=11)
+        agence_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+        total_fill = PatternFill(start_color="FFC000", end_color="FFC000", fill_type="solid")
+        ca_fill = PatternFill(start_color="d1ecf1", end_color="d1ecf1", fill_type="solid")
+        
+        row = 1
+        
+        # Titre
+        ws.merge_cells(f'A{row}:H{row}')
+        ws[f'A{row}'] = f"ÉTAT DE TRÉSORERIE - Période du {etat_data['date_debut']} au {etat_data['date_fin']}"
+        ws[f'A{row}'].font = Font(bold=True, size=14)
+        ws[f'A{row}'].alignment = Alignment(horizontal="center", vertical="center")
+        row += 2
+        
+        # En-têtes des colonnes
+        headers = ['Agence', 'Chiffre d\'Affaire', 'Banque', 'Caisse', 'Orange Money', 'MTN Money', 'SAV', 'Total Disponible']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=col, value=header)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        row += 1
+        
+        # Données par agence
+        for agence_id, agence_data in etat_data['tresorerie_par_agence'].items():
+            ws.cell(row=row, column=1, value=agence_data['agence_nom']).fill = agence_fill
+            ws.cell(row=row, column=2, value=agence_data['ca']).number_format = '#,##0.00'
+            ws.cell(row=row, column=3, value=agence_data['banque']).number_format = '#,##0.00'
+            ws.cell(row=row, column=4, value=agence_data['caisse']).number_format = '#,##0.00'
+            ws.cell(row=row, column=5, value=agence_data['om']).number_format = '#,##0.00'
+            ws.cell(row=row, column=6, value=agence_data['momo']).number_format = '#,##0.00'
+            ws.cell(row=row, column=7, value=agence_data['sav']).number_format = '#,##0.00'
+            ws.cell(row=row, column=8, value=agence_data['total_disponible']).number_format = '#,##0.00'
+            row += 1
+        
+        # Ligne de total
+        ws.cell(row=row, column=1, value="TOTAL GÉNÉRAL").fill = total_fill
+        ws.cell(row=row, column=1).font = Font(bold=True)
+        total_global = etat_data['total_global']
+        ws.cell(row=row, column=2, value=total_global['ca']).number_format = '#,##0.00'
+        ws.cell(row=row, column=2).fill = total_fill
+        ws.cell(row=row, column=2).font = Font(bold=True)
+        ws.cell(row=row, column=3, value=total_global['banque']).number_format = '#,##0.00'
+        ws.cell(row=row, column=3).fill = total_fill
+        ws.cell(row=row, column=3).font = Font(bold=True)
+        ws.cell(row=row, column=4, value=total_global['caisse']).number_format = '#,##0.00'
+        ws.cell(row=row, column=4).fill = total_fill
+        ws.cell(row=row, column=4).font = Font(bold=True)
+        ws.cell(row=row, column=5, value=total_global['om']).number_format = '#,##0.00'
+        ws.cell(row=row, column=5).fill = total_fill
+        ws.cell(row=row, column=5).font = Font(bold=True)
+        ws.cell(row=row, column=6, value=total_global['momo']).number_format = '#,##0.00'
+        ws.cell(row=row, column=6).fill = total_fill
+        ws.cell(row=row, column=6).font = Font(bold=True)
+        ws.cell(row=row, column=7, value=total_global['sav']).number_format = '#,##0.00'
+        ws.cell(row=row, column=7).fill = total_fill
+        ws.cell(row=row, column=7).font = Font(bold=True)
+        ws.cell(row=row, column=8, value=total_global['total_disponible']).number_format = '#,##0.00'
+        ws.cell(row=row, column=8).fill = total_fill
+        ws.cell(row=row, column=8).font = Font(bold=True)
+        
+        # Ajuster la largeur des colonnes
+        ws.column_dimensions['A'].width = 30
+        for col in range(2, 9):
+            ws.column_dimensions[chr(64 + col)].width = 18
+        
+        # Réponse HTTP
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        filename = f"Etat_Tresorerie_{etat_data['date_debut']}_{etat_data['date_fin']}.xlsx"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        wb.save(response)
+        return response
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'success': False, 'error': f'Erreur export: {str(e)}'})
 
 def etat_resultat(request):
     """Vue pour l'état de résultat - Toutes les agences"""
@@ -20924,8 +21162,8 @@ def suivi_chiffre_affaire(request):
 def suivi_tresorerie(request):
     """
     Saisie journalière de la trésorerie.
-    Affiche le CA et les soldes (Récupère automatiquement les soldes de la veille).
-    Pas d'export Excel ici.
+    Affiche le CA calculé depuis les ventes du jour et les soldes en temps réel.
+    Mise à jour automatique des soldes lors des transactions.
     """
     from .models import Tresorerie, ChiffreAffaire
     
@@ -20939,83 +21177,205 @@ def suivi_tresorerie(request):
 
     date_a_afficher = timezone.now().date()
 
+    # --- CALCUL DU CA DEPUIS LES VENTES DU JOUR (PROBLÈME 1 RÉSOLU) ---
+    # Calculer le CA directement depuis les FactureVente du jour
+    ventes_jour = LigneFactureVente.objects.filter(
+        facture_vente__agence=agence,
+        facture_vente__date=date_a_afficher
+    )
+    ca_du_jour = ventes_jour.aggregate(total=Sum(F('quantite') * F('prix_unitaire')))['total'] or Decimal('0')
+    
+    # Créer un objet CA temporaire pour l'affichage
+    class CAObject:
+        def __init__(self, montant):
+            self.montant_realise = montant
+    ca_obj = CAObject(ca_du_jour)
+
     # --- LOGIQUE DE REPORT DE SOLDE (ROLLING BALANCE) ---
+    # IMPORTANT : Le solde initial = solde final du jour précédent (solde actuel)
+    # Il reste FIXE pour toute la journée et est déterminé une seule fois au début
+    
+    # 1. Récupérer la trésorerie du jour si elle existe (pour les dépôts/retraits actuels)
     try:
-        # 1. Est-ce qu'on a déjà enregistré quelque chose pour AUJOURD'HUI ?
         treso = Tresorerie.objects.get(agence=agence, date=date_a_afficher)
-        
-        # Si oui, les valeurs initiales sont celles déjà enregistrées dans la fiche
-        valeurs_initiales = {
-            'banque': treso.banque_initial,
-            'caisse': treso.caisse_initial,
-            'om': treso.om_initial,
-            'momo': treso.momo_initial,
-            'sav': treso.sav_initial
-        }
     except Tresorerie.DoesNotExist:
-        # 2. Si rien pour aujourd'hui, on cherche le DERNIER JOUR ENREGISTRÉ (Hier, avant-hier, etc.)
         treso = None
-        
-        # "date__lt" signifie "date less than" (date strictement avant aujourd'hui)
-        # ".order_by('-date')" signifie "du plus récent au plus vieux"
-        # ".first()" prend le premier trouvé (donc le plus récent)
-        last_treso = Tresorerie.objects.filter(agence=agence, date__lt=date_a_afficher).order_by('-date').first()
-        
-        if last_treso:
-            # BINGO ! On a trouvé un jour précédent.
-            # On prend son SOLDE FINAL (calculé) pour en faire notre INITIAL
-            valeurs_initiales = {
-                'banque': last_treso.solde_banque_final,   # Le final d'hier...
-                'caisse': last_treso.solde_caisse_final,   # ...devient l'initial d'aujourd'hui
-                'om': last_treso.solde_om_final,
-                'momo': last_treso.solde_momo_final,
-                'sav': last_treso.solde_sav_final
-            }
-            messages.info(request, f"Soldes reportés du {last_treso.date}")
-        else:
-            # C'est la toute première fois qu'on utilise le logiciel
-            valeurs_initiales = {'banque': 0, 'caisse': 0, 'om': 0, 'momo': 0, 'sav': 0}
+    
+    # 2. DÉTERMINER LE SOLDE INITIAL (toujours depuis le jour précédent, même si treso existe)
+    # Chercher le DERNIER JOUR ENREGISTRÉ pour déterminer le solde initial
+    last_treso = Tresorerie.objects.filter(agence=agence, date__lt=date_a_afficher).order_by('-date').first()
+    
+    if last_treso:
+        # On prend le SOLDE FINAL du jour précédent comme INITIAL d'aujourd'hui (solde actuel)
+        valeurs_initiales = {
+            'banque': float(last_treso.solde_banque_final),
+            'caisse': float(last_treso.solde_caisse_final),
+            'om': float(last_treso.solde_om_final),
+            'momo': float(last_treso.solde_momo_final),
+            'sav': float(last_treso.solde_sav_final)
+        }
+    else:
+        # C'est la toute première fois qu'on utilise le logiciel
+        valeurs_initiales = {'banque': 0, 'caisse': 0, 'om': 0, 'momo': 0, 'sav': 0}
 
-
-    # 4. Récupération Chiffre d'Affaire (Pour affichage seulement)
-    try:
-        ca_obj = ChiffreAffaire.objects.get(agence=agence, date=date_a_afficher)
-    except ChiffreAffaire.DoesNotExist:
-        ca_obj = None
-
-    # 5. Enregistrement (POST)
+    # 5. Enregistrement (POST) avec mise à jour automatique des soldes (PROBLÈME 2 RÉSOLU)
     if request.method == "POST":
         try:
             def get_val(name): return Decimal(request.POST.get(name) or 0)
 
-            Tresorerie.objects.update_or_create(
+            # Récupérer les valeurs saisies depuis le formulaire
+            banque_initial = get_val('banque_initial')
+            banque_depot_saisi = get_val('banque_depot')  # Nouveau montant saisi
+            banque_retrait_saisi = get_val('banque_retrait')  # Nouveau montant saisi
+            
+            # Vérifier si une trésorerie existe déjà pour aujourd'hui
+            treso_existante = Tresorerie.objects.filter(agence=agence, date=date_a_afficher).first()
+            
+            if treso_existante:
+                # Si elle existe, AJOUTER les nouveaux montants aux montants existants
+                # Seulement si un montant > 0 est saisi, sinon conserver la valeur existante
+                banque_depot = treso_existante.banque_depot + banque_depot_saisi if banque_depot_saisi > 0 else treso_existante.banque_depot
+                banque_retrait = treso_existante.banque_retrait + banque_retrait_saisi if banque_retrait_saisi > 0 else treso_existante.banque_retrait
+                
+                caisse_entree_saisi = get_val('caisse_entree')
+                caisse_sortie_saisi = get_val('caisse_sortie')
+                caisse_entree = treso_existante.caisse_entree + caisse_entree_saisi if caisse_entree_saisi > 0 else treso_existante.caisse_entree
+                caisse_sortie = treso_existante.caisse_sortie + caisse_sortie_saisi if caisse_sortie_saisi > 0 else treso_existante.caisse_sortie
+                
+                om_depot_saisi = get_val('om_depot')
+                om_retrait_saisi = get_val('om_retrait')
+                om_depot = treso_existante.om_depot + om_depot_saisi if om_depot_saisi > 0 else treso_existante.om_depot
+                om_retrait = treso_existante.om_retrait + om_retrait_saisi if om_retrait_saisi > 0 else treso_existante.om_retrait
+                
+                momo_depot_saisi = get_val('momo_depot')
+                momo_retrait_saisi = get_val('momo_retrait')
+                momo_depot = treso_existante.momo_depot + momo_depot_saisi if momo_depot_saisi > 0 else treso_existante.momo_depot
+                momo_retrait = treso_existante.momo_retrait + momo_retrait_saisi if momo_retrait_saisi > 0 else treso_existante.momo_retrait
+                
+                sav_entree_saisi = get_val('sav_entree')
+                sav_sortie_saisi = get_val('sav_sortie')
+                sav_entree = treso_existante.sav_entree + sav_entree_saisi if sav_entree_saisi > 0 else treso_existante.sav_entree
+                sav_sortie = treso_existante.sav_sortie + sav_sortie_saisi if sav_sortie_saisi > 0 else treso_existante.sav_sortie
+            else:
+                # Si elle n'existe pas, utiliser directement les valeurs saisies
+                banque_depot = banque_depot_saisi
+                banque_retrait = banque_retrait_saisi
+                caisse_entree = get_val('caisse_entree')
+                caisse_sortie = get_val('caisse_sortie')
+                om_depot = get_val('om_depot')
+                om_retrait = get_val('om_retrait')
+                momo_depot = get_val('momo_depot')
+                momo_retrait = get_val('momo_retrait')
+                sav_entree = get_val('sav_entree')
+                sav_sortie = get_val('sav_sortie')
+            
+            # Récupérer les valeurs initiales (pour compatibilité avec le code existant)
+            caisse_initial = get_val('caisse_initial')
+            om_initial = get_val('om_initial')
+            momo_initial = get_val('momo_initial')
+            sav_initial = get_val('sav_initial')
+
+            # IMPORTANT : Le solde initial reste FIXE (celui calculé au début de la journée)
+            # Si une trésorerie existe déjà, on conserve son solde initial
+            # Sinon, on utilise les valeurs_initiales calculées depuis le jour précédent
+            # Seuls les dépôts/retraits peuvent être modifiés
+            
+            if treso_existante:
+                # Si elle existe, on conserve les soldes initiaux existants (fixes pour la journée)
+                banque_initial_val = treso_existante.banque_initial
+                caisse_initial_val = treso_existante.caisse_initial
+                om_initial_val = treso_existante.om_initial
+                momo_initial_val = treso_existante.momo_initial
+                sav_initial_val = treso_existante.sav_initial
+            else:
+                # Si elle n'existe pas, on utilise les valeurs initiales calculées
+                banque_initial_val = Decimal(str(valeurs_initiales['banque']))
+                caisse_initial_val = Decimal(str(valeurs_initiales['caisse']))
+                om_initial_val = Decimal(str(valeurs_initiales['om']))
+                momo_initial_val = Decimal(str(valeurs_initiales['momo']))
+                sav_initial_val = Decimal(str(valeurs_initiales['sav']))
+            
+            # Créer ou mettre à jour la trésorerie
+            treso, created = Tresorerie.objects.update_or_create(
                 agence=agence,
                 date=date_a_afficher,
                 defaults={
-                    'banque_initial': get_val('banque_initial'),
-                    'banque_depot': get_val('banque_depot'), 'banque_retrait': get_val('banque_retrait'),
+                    # Les soldes initiaux sont FIXES (conservés s'ils existent, sinon calculés)
+                    'banque_initial': banque_initial_val,
+                    'caisse_initial': caisse_initial_val,
+                    'om_initial': om_initial_val,
+                    'momo_initial': momo_initial_val,
+                    'sav_initial': sav_initial_val,
                     
-                    'caisse_initial': get_val('caisse_initial'),
-                    'caisse_entree': get_val('caisse_entree'), 'caisse_sortie': get_val('caisse_sortie'),
-
-                    'om_initial': get_val('om_initial'),
-                    'om_depot': get_val('om_depot'), 'om_retrait': get_val('om_retrait'),
-
-                    'momo_initial': get_val('momo_initial'),
-                    'momo_depot': get_val('momo_depot'), 'momo_retrait': get_val('momo_retrait'),
-
-                    'sav_initial': get_val('sav_initial'),
-                    'sav_entree': get_val('sav_entree'), 'sav_sortie': get_val('sav_sortie'),
+                    # Seuls les dépôts/retraits peuvent être modifiés
+                    'banque_depot': banque_depot,
+                    'banque_retrait': banque_retrait,
+                    'caisse_entree': caisse_entree,
+                    'caisse_sortie': caisse_sortie,
+                    'om_depot': om_depot,
+                    'om_retrait': om_retrait,
+                    'momo_depot': momo_depot,
+                    'momo_retrait': momo_retrait,
+                    'sav_entree': sav_entree,
+                    'sav_sortie': sav_sortie,
                 }
             )
-            messages.success(request, "Trésorerie enregistrée.")
-            return redirect(f"{request.path}?date={date_a_afficher}")
+            
+            # Mise à jour automatique : mettre à jour les soldes initiaux du jour suivant
+            # avec les soldes finaux calculés du jour actuel
+            date_suivante = date_a_afficher + timedelta(days=1)
+            Tresorerie.objects.update_or_create(
+                agence=agence,
+                date=date_suivante,
+                defaults={
+                    'banque_initial': treso.solde_banque_final,
+                    'caisse_initial': treso.solde_caisse_final,
+                    'om_initial': treso.solde_om_final,
+                    'momo_initial': treso.solde_momo_final,
+                    'sav_initial': treso.solde_sav_final,
+                    # Les dépôts/retraits restent à 0 pour le jour suivant
+                    'banque_depot': 0,
+                    'banque_retrait': 0,
+                    'caisse_entree': 0,
+                    'caisse_sortie': 0,
+                    'om_depot': 0,
+                    'om_retrait': 0,
+                    'momo_depot': 0,
+                    'momo_retrait': 0,
+                    'sav_entree': 0,
+                    'sav_sortie': 0,
+                }
+            )
+            
+            # Récupérer les valeurs finales pour le message
+            treso.refresh_from_db()
+            messages.success(
+                request, 
+                f"Trésorerie mise à jour avec succès ! "
+                f"Banque: {treso.banque_depot} FCFA dépôt, "
+                f"Solde final: {treso.solde_banque_final} FCFA. "
+                f"Vous pouvez continuer à modifier les dépôts/retraits. "
+                f"Le solde initial ({treso.banque_initial} FCFA) reste fixe."
+            )
+            # Redirection avec timestamp pour forcer le rafraîchissement
+            import time
+            return redirect(f"{request.path}?date={date_a_afficher}&t={int(time.time())}")
         except Exception as e:
             messages.error(request, f"Erreur: {e}")
 
+    # Debug : vérifier les valeurs initiales
+    print(f"DEBUG - Valeurs initiales: {valeurs_initiales}")
+    print(f"DEBUG - Treso existe: {treso is not None}")
+    if treso:
+        print(f"DEBUG - Treso banque_initial: {treso.banque_initial}")
+    
+    # Calculer le total global pour l'affichage
+    total_global = sum(valeurs_initiales.values())
+    
     context = {
         'treso': treso,
         'init': valeurs_initiales,
+        'total_global': total_global,
         'date_a_afficher': date_a_afficher,
         'agence': agence,
         'ca': ca_obj 
@@ -21056,27 +21416,51 @@ def consulter_tresorerie(request):
         mode_filtre = False
 
     # 3. Récupération des données pour l'affichage HTML
+    # Utiliser date__lte pour inclure la date de fin (aujourd'hui)
     historique = Tresorerie.objects.filter(
         agence=agence, 
-        date__range=[date_debut, date_fin]
+        date__gte=date_debut,
+        date__lte=date_fin
     ).order_by('-date')
 
-    # Ajout du CA temporaire pour l'affichage tableau HTML
+    # Ajout du CA temporaire pour l'affichage tableau HTML (calculé depuis les ventes)
     for t in historique:
-        try:
-            ca_obj = ChiffreAffaire.objects.get(agence=agence, date=t.date)
-            t.ca_temp = ca_obj.montant_realise
-        except ChiffreAffaire.DoesNotExist:
-            t.ca_temp = 0
+        # Calculer le CA directement depuis les FactureVente du jour
+        ventes_jour = LigneFactureVente.objects.filter(
+            facture_vente__agence=agence,
+            facture_vente__date=t.date
+        )
+        ca_du_jour = ventes_jour.aggregate(total=Sum(F('quantite') * F('prix_unitaire')))['total'] or Decimal('0')
+        t.ca_temp = ca_du_jour
 
     # 4. EXPORT EXCEL (Votre code Excel reste identique, il s'adapte aux dates)
     if request.GET.get('export') == 'excel':
         
-        # Calculs (Si date_debut == date_fin, le total sera celui du jour unique, c'est parfait)
-        total_ca = ChiffreAffaire.objects.filter(
-            agence=agence, 
-            date__range=[date_debut, date_fin]
-        ).aggregate(Sum('montant_realise'))['montant_realise__sum'] or 0
+        # Calculs du CA depuis les ventes
+        # IMPORTANT : Utiliser exactement la même logique que le tableau HTML
+        # Si une seule journée dans l'historique, utiliser le CA de cette journée (déjà calculé)
+        # Sinon, calculer le total cumulé
+        
+        # Convertir le queryset en liste pour pouvoir vérifier la longueur
+        historique_list = list(historique)
+        
+        if len(historique_list) == 1:
+            # Une seule journée : utiliser le CA déjà calculé pour cette journée (comme dans le tableau HTML)
+            total_ca = historique_list[0].ca_temp if hasattr(historique_list[0], 'ca_temp') else Decimal('0')
+        elif mode_filtre and date_debut == date_fin:
+            # Mode filtre avec une seule date : calculer pour cette date uniquement
+            ventes_periode = LigneFactureVente.objects.filter(
+                facture_vente__agence=agence,
+                facture_vente__date=date_debut
+            )
+            total_ca = ventes_periode.aggregate(total=Sum(F('quantite') * F('prix_unitaire')))['total'] or Decimal('0')
+        else:
+            # Période de plusieurs jours : calculer le total cumulé
+            ventes_periode = LigneFactureVente.objects.filter(
+                facture_vente__agence=agence,
+                facture_vente__date__range=[date_debut, date_fin]
+            )
+            total_ca = ventes_periode.aggregate(total=Sum(F('quantite') * F('prix_unitaire')))['total'] or Decimal('0')
 
         # Derniers Soldes
         last_treso = Tresorerie.objects.filter(

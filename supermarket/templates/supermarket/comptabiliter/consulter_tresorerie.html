@@ -189,8 +189,8 @@
                 <i class="fas fa-search"></i> Rechercher
             </button>
             
-            <a href="{% url 'consulter_tresorerie' %}" class="btn" style="background: #95a5a6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
-                Tout afficher
+            <a href="{% url 'consulter_tresorerie' %}" class="btn" style="background: #17a2b8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+                <i class="fas fa-sync-alt"></i> Rafraîchir / Tout afficher
             </a>
             
             <button type="submit" name="export" value="excel" class="btn btn-success" style="padding: 10px 20px;">
@@ -215,14 +215,14 @@
         <tbody>
             {% for t in historique %}
             <tr style="border-bottom: 1px solid #eee;">
-                <td style="padding: 10px;">{{ t.date }}</td>
-                <td style="font-weight: bold; color: #17a2b8; background-color: #f8f9fa;">{{ t.ca_temp|default:"0" }}</td>
-                <td>{{ t.solde_banque_final }}</td>
-                <td>{{ t.solde_caisse_final }}</td>
-                <td>{{ t.solde_om_final }}</td>
-                <td>{{ t.solde_momo_final }}</td>
-                <td>{{ t.solde_sav_final }}</td>
-                <td style="font-weight: bold;">{{ t.total_disponible }}</td>
+                <td style="padding: 10px;">{{ t.date|date:"d/m/Y" }}</td>
+                <td style="font-weight: bold; color: #17a2b8; background-color: #f8f9fa;">{{ t.ca_temp|floatformat:2|default:"0,00" }}</td>
+                <td>{{ t.solde_banque_final|floatformat:2 }}</td>
+                <td>{{ t.solde_caisse_final|floatformat:2 }}</td>
+                <td>{{ t.solde_om_final|floatformat:2 }}</td>
+                <td>{{ t.solde_momo_final|floatformat:2 }}</td>
+                <td>{{ t.solde_sav_final|floatformat:2 }}</td>
+                <td style="font-weight: bold;">{{ t.total_disponible|floatformat:2 }}</td>
             </tr>
             {% empty %}
             <tr><td colspan="8" style="text-align: center; padding: 20px;">Aucune donnée trouvée.</td></tr>
