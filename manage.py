@@ -3,12 +3,14 @@
 import os
 import sys
 
-
 def main():
     """Run administrative tasks."""
-    # Utiliser la base partagée sur OVH pour synchronisation temps réel
-    # Changez en 'erp_project.settings' si vous voulez utiliser SQLite local
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'erp_project.settings_shared_db')
+    
+    # --- CORRECTION ICI ---
+    # On pointe vers 'erp_project.settings' (votre fichier SQLite local)
+    # Au lieu de 'erp_project.settings_shared_db' (la base OVH PostgreSQL)
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'erp_project.settings')
+
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:

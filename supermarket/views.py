@@ -20,7 +20,7 @@ from .models import (
     FactureTemporaire, Famille, Fournisseur, MouvementStock, PlanComptable, PlanTiers, CodeJournaux,
     TauxTaxe, FactureAchat, LigneFactureAchat, FactureTransfert, LigneFactureTransfert,
     Commande, Livraison, FactureCommande, StatistiqueClient, DocumentCommande, LigneCommande, Notification,
-    Livreur, SuiviClientAction,Depense,ChiffreAffaire,Tresorerie
+    Livreur, SuiviClientAction,Depense,ChiffreAffaire,Tresorerie,Beneficiaire
 )
 from .decorators import (
     require_stock_modify_access,
@@ -20882,15 +20882,13 @@ from .models import Depense, Compte, Agence
 
 @login_required
 def creer_depense(request): 
-    """Vue pour créer une nouvelle dépense liée à l'agence"""
+    # On importe le bon modèle
+    from .models import Beneficiaire, Depense
     
-    # 1. Récupérer l'agence de l'utilisateur
     try:
         agence = get_user_agence(request)
-        if not agence:
-            raise ValueError("Agence non trouvée")
-    except Exception:
-        messages.error(request, "Impossible d'identifier votre agence.")
+        if not agence: raise ValueError
+    except:
         return redirect('dashboard_comptabiliter')
 
     if request.method == 'POST':
@@ -20898,97 +20896,108 @@ def creer_depense(request):
             libelle = request.POST.get('libelle')
             date = request.POST.get('date')
             montant = request.POST.get('montant')
+            nom_beneficiaire = request.POST.get('nom_employe') # On garde le name HTML
             
-            if not all([libelle, date, montant]):
-                messages.error(request, 'Veuillez remplir tous les champs obligatoires.')
+            if not all([libelle, date, montant, nom_beneficiaire]):
+                messages.error(request, 'Champs obligatoires manquants.')
                 return redirect('creer_depense')
             
-            # 2. CRÉATION AVEC L'AGENCE (Correction ici)
+            # --- CRÉATION AUTOMATIQUE DU BÉNÉFICIAIRE ---
+            nom_propre = nom_beneficiaire.strip().upper()
+            
+            # On utilise Beneficiaire ici, pas Employe
+            beneficiaire_obj, created = Beneficiaire.objects.get_or_create(
+                agence=agence,
+                nom_complet=nom_propre
+            )
+
             Depense.objects.create(
                 libelle=libelle, 
                 date=date,
                 montant=montant,
-                agence=agence  # INDISPENSABLE
+                agence=agence,
+                beneficiaire=beneficiaire_obj # <-- Changement ici
             )
             
-            messages.success(request, 'Dépense enregistrée avec succès!')
-            return redirect('dashboard_comptabiliter') # Vérifiez que ce nom d'URL est bon
+            messages.success(request, 'Dépense enregistrée !')
+            return redirect('dashboard_comptabiliter')
             
         except Exception as e:
-            messages.error(request, f'Erreur lors de la création : {str(e)}')
+            messages.error(request, f'Erreur : {str(e)}')
             return redirect('creer_depense')
     
-    return render(request, 'supermarket/comptabiliter/creer-depense.html')
+    # On récupère les bénéficiaires existants pour la liste déroulante
+    beneficiaires_existants = Beneficiaire.objects.filter(agence=agence).order_by('nom_complet')
+    
+    return render(request, 'supermarket/comptabiliter/creer-depense.html', {
+        'employes_existants': beneficiaires_existants # On garde la même variable pour le template
+    })
 
 
-@login_required
 @login_required
 def consulter_depenses(request):
-    """
-    Affiche les dépenses FILTRÉES PAR AGENCE et permet l'export Excel.
-    """
-    # Imports locaux pour éviter les erreurs
-    from .models import Depense, Compte
+    """Affiche les dépenses avec filtre par Employé et export Excel complet"""
+    # --- CORRECTION 1 : On importe Beneficiaire et HttpResponse ---
+    from .models import Depense, Compte, Beneficiaire
     from django.db.models import Sum
+    from django.utils.timezone import localtime
+    from django.http import HttpResponse # Indispensable pour l'export Excel
     import openpyxl
     from openpyxl.styles import Font, Alignment, PatternFill
-    from datetime import datetime, timedelta
-    
-    # 1. Récupérer l'agence
+    from datetime import datetime
+
+    # 1. Agence & Utilisateur
     try:
         agence = get_user_agence(request)
-        if not agence:
-            messages.error(request, 'Votre compte n\'est pas configuré correctement.')
-            return redirect('dashboard_comptabiliter')
+        if not agence: return redirect('dashboard_comptabiliter')
+        
+        try:
+            compte = Compte.objects.get(user=request.user, actif=True)
+            nom_utilisateur = compte.nom_complet
+        except:
+            nom_utilisateur = request.user.username
     except:
         return redirect('login_comptabiliter')
 
-    # Récupérer le nom utilisateur
-    try:
-        compte = Compte.objects.get(user=request.user, actif=True)
-        nom_utilisateur = compte.nom_complet
-    except:
-        nom_utilisateur = request.user.username
-
-    # 2. Gestion des dates
+    # 2. Récupération des filtres
     date_debut_str = request.GET.get('date_debut')
     date_fin_str = request.GET.get('date_fin')
-    now = timezone.now()
     
-    # --- FILTRAGE DE BASE : Toujours filtrer par agence ---
+    # --- FILTRE DATE ---
+    now = timezone.now()
     depenses = Depense.objects.filter(agence=agence).order_by('-date')
 
     if date_debut_str and date_fin_str:
         try:
-            date_debut = datetime.strptime(date_debut_str, '%Y-%m-%d')
-            # On force le début de journée
-            date_debut = timezone.make_aware(date_debut.replace(hour=0, minute=0, second=0))
-            
-            date_fin = datetime.strptime(date_fin_str, '%Y-%m-%d')
-            # On force la fin de journée
-            date_fin = timezone.make_aware(date_fin.replace(hour=23, minute=59, second=59))
-            
-            # Ajout du filtre de date au filtre d'agence existant
-            depenses = depenses.filter(date__range=[date_debut, date_fin])
+            d_debut = timezone.make_aware(datetime.strptime(date_debut_str, '%Y-%m-%d').replace(hour=0, minute=0))
+            d_fin = timezone.make_aware(datetime.strptime(date_fin_str, '%Y-%m-%d').replace(hour=23, minute=59))
+            depenses = depenses.filter(date__range=[d_debut, d_fin])
             periode_info = f"Du {date_debut_str} au {date_fin_str}"
-            
         except ValueError:
-            date_debut = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            depenses = depenses.filter(date__gte=date_debut)
-            periode_info = "Aujourd'hui (Erreur date)"
+            periode_info = "Erreur Date"
     else:
-        # PAR DÉFAUT : AUJOURD'HUI (Depuis Minuit)
-        date_debut = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        depenses = depenses.filter(date__gte=date_debut)
+        # Par défaut : Aujourd'hui minuit
+        d_debut = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        depenses = depenses.filter(date__gte=d_debut)
         periode_info = "Aujourd'hui"
 
-    # Calcul du total
+    # --- FILTRE BÉNÉFICIAIRE (Nouveau système) ---
+    beneficiaire_id = request.GET.get('employe_id') # On garde le name du HTML 'employe_id'
+    
+    # On récupère la liste pour le menu déroulant
+    tous_beneficiaires = Beneficiaire.objects.filter(agence=agence).order_by('nom_complet')
+
+    if beneficiaire_id:
+        # On filtre sur le champ 'beneficiaire' du modèle Depense
+        depenses = depenses.filter(beneficiaire_id=beneficiaire_id)
+
+    # Calcul Total
     total_general = depenses.aggregate(Sum('montant'))['montant__sum'] or 0
 
     # 3. EXPORT EXCEL
     if request.GET.get('export') == 'excel':
         response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        response['Content-Disposition'] = f'attachment; filename="Rapport_Depenses_{datetime.now().strftime("%Y%m%d")}.xlsx"'
+        response['Content-Disposition'] = f'attachment; filename="Depenses_{agence.nom_agence}.xlsx"'
 
         wb = openpyxl.Workbook()
         ws = wb.active
@@ -20997,54 +21006,47 @@ def consulter_depenses(request):
         # Styles
         header_font = Font(bold=True, color="FFFFFF")
         header_fill = PatternFill(start_color="06beb6", end_color="06beb6", fill_type="solid")
-        center_align = Alignment(horizontal="center")
-
-        # En-tête : Titre et Agence
-        ws.merge_cells('A1:C1')
-        ws['A1'] = f"Dépenses : {agence.nom_agence} - {periode_info}"
-        ws['A1'].font = Font(bold=True, size=12)
-        ws['A1'].alignment = center_align
-
-        headers = ['Date', 'Libellé', 'Montant (FCFA)']
-        ws.append([]) 
+        
+        # En-têtes
+        headers = ['Date', 'Bénéficiaire', 'Libellé', 'Montant']
         ws.append(headers)
-
-        for col in range(1, 4):
-            cell = ws.cell(row=3, column=col)
+        
+        for col, h in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col)
+            cell.value = h
             cell.fill = header_fill
             cell.font = header_font
-            cell.alignment = center_align
 
-        row_num = 4
-        for depense in depenses:
-            date_naive = depense.date.replace(tzinfo=None) if depense.date else ""
-            ws.cell(row=row_num, column=1, value=date_naive).number_format = 'DD/MM/YYYY HH:MM'
-            ws.cell(row=row_num, column=2, value=depense.libelle)
-            ws.cell(row=row_num, column=3, value=depense.montant)
-            row_num += 1
-
-        ws.append([])
-        total_row = row_num + 1
-        ws.cell(row=total_row, column=2, value="TOTAL").font = Font(bold=True)
-        ws.cell(row=total_row, column=3, value=total_general).font = Font(bold=True)
-        
-        ws.column_dimensions['A'].width = 20
-        ws.column_dimensions['B'].width = 40
-        ws.column_dimensions['C'].width = 20
+        row = 2
+        for d in depenses:
+            # Gestion de la date naive pour Excel
+            d_date = d.date.replace(tzinfo=None) if d.date else ""
+            
+            # --- CORRECTION 2 : Utiliser d.beneficiaire et non d.employe ---
+            nom_emp = d.beneficiaire.nom_complet if d.beneficiaire else "Non assigné"
+            
+            ws.append([d_date, nom_emp, d.libelle, d.montant])
+            row += 1
+            
+        # Total en bas
+        ws.cell(row=row, column=3, value="TOTAL").font = Font(bold=True)
+        ws.cell(row=row, column=4, value=total_general).font = Font(bold=True)
 
         wb.save(response)
         return response
 
     context = {
         'depenses': depenses,
-        'total_general': total_general,
+        'total_general': total_general or 0,
         'date_debut': date_debut_str,
         'date_fin': date_fin_str,
         'periode_info': periode_info,
+        'tous_employes': tous_beneficiaires, # On passe les bénéficiaires au template
+        'employe_id': int(beneficiaire_id) if beneficiaire_id else '',
         'agence': agence,
         'nom_utilisateur': nom_utilisateur,
     }
-    return render(request, 'supermarket/comptabiliter/consulter_depenses.html', context)
+    return render(request, 'supermarket/comptabiliter/consulter_depenses.html', context)   
     
 @login_required
 def suivi_chiffre_affaire(request):

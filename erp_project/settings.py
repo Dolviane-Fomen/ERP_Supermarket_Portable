@@ -134,3 +134,25 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 LOGIN_URL = '/caisse/login/'
 LOGIN_REDIRECT_URL = '/caisse/'
 LOGOUT_REDIRECT_URL = '/'
+
+
+
+# ==============================================================================
+# CORRECTIF DE SÉCURITÉ : FORCE SQLITE & NETTOYAGE ENVIRONNEMENT
+# À placer impérativement à la toute fin du fichier settings.py
+# ==============================================================================
+import os
+import sys
+
+# 1. On supprime la variable "DATABASE_URL" si elle existe dans votre Windows
+# C'est elle qui fait croire à Django qu'il doit utiliser PostgreSQL
+if 'DATABASE_URL' in os.environ:
+    del os.environ['DATABASE_URL']
+
+# 2. On réimpose brutalement la configuration SQLite
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db_erp.sqlite3',
+    }
+}

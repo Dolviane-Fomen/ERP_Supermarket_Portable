@@ -410,6 +410,19 @@
                 
                 <div class="form-section">
                     <div class="form-group">
+                        <label for="nom_employe">Bénéficiaire (Employé) *</label>
+                        
+                        <input type="text" id="nom_employe" name="nom_employe" list="list_employes" 
+                               required placeholder="Sélectionnez ou écrivez un nouveau nom..." autocomplete="off">
+                        
+                        <datalist id="list_employes">
+                            {% for emp in employes_existants %}
+                                <option value="{{ emp.nom_complet }}">
+                            {% endfor %}
+                        </datalist>
+                        <small style="color: #666;">Si le nom n'existe pas, écrivez-le simplement, il sera enregistré.</small>
+                    </div>
+                    <div class="form-group">
                         <label for="libelle">Libellé *</label>
                         <input type="text" id="libelle" name="libelle" required 
                                placeholder="Ex: Achat fournitures bureau">

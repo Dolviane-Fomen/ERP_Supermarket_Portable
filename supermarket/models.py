@@ -1128,25 +1128,37 @@ class Notification(models.Model):
 
 # ----------------gestion comptable-------------------------
 
-class Depense(models.Model): 
-
-    agence = models.ForeignKey('Agence', on_delete=models.CASCADE, verbose_name="Agence")
-    
-    """Modèle pour les dépenses"""
-    date = models.DateTimeField(null=True, blank=True, verbose_name="Date de dépense")
-    montant = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Montant")
- 
-    libelle = models.CharField(max_length=200, verbose_name="Libellé")
-
-    
+# --- AJOUTEZ CECI AVANT LA CLASSE DEPENSE ---
+class Beneficiaire(models.Model):
+    """Petite table pour stocker les noms des gens payés via les dépenses"""
+    agence = models.ForeignKey('Agence', on_delete=models.CASCADE)
+    nom_complet = models.CharField(max_length=150, verbose_name="Nom complet")
 
     class Meta:
-        verbose_name = "Dépense"      
+        unique_together = ('agence', 'nom_complet')
+        verbose_name = "Bénéficiaire Dépense"
+
+    def __str__(self):
+        return self.nom_complet
+
+# --- MODIFIEZ LA CLASSE DEPENSE ---
+class Depense(models.Model):
+    agence = models.ForeignKey('Agence', on_delete=models.CASCADE, verbose_name="Agence")
+    
+    # On change 'employe' par 'beneficiaire' pour éviter toute confusion
+    beneficiaire = models.ForeignKey(Beneficiaire, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Bénéficiaire")
+    
+    date = models.DateTimeField(null=True, blank=True, verbose_name="Date de dépense")
+    montant = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Montant")
+    libelle = models.CharField(max_length=200, verbose_name="Libellé")
+
+    class Meta:
+        verbose_name = "Dépense"       
         verbose_name_plural = "Dépenses"
         ordering = ['-date']         
 
     def __str__(self):
-        return self.libelle
+        return f"{self.libelle} ({self.montant})"
 
 
 from django.db import models

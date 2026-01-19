@@ -46,6 +46,7 @@
 
     <div class="filter-card">
         <form method="GET" class="filter-form" id="filterForm">
+            
             <div class="filter-group">
                 <label><i class="fas fa-calendar-alt"></i> Date début</label>
                 <input type="date" name="date_debut" value="{{ date_debut }}">
@@ -55,14 +56,26 @@
                 <label><i class="fas fa-calendar-alt"></i> Date fin</label>
                 <input type="date" name="date_fin" value="{{ date_fin }}">
             </div>
+
+            <div class="filter-group">
+                <label><i class="fas fa-user-friends"></i> Employé / Bénéficiaire</label>
+                <select name="employe_id" class="custom-select">
+                    <option value="">-- Tous les employés --</option>
+                    {% for emp in tous_employes %}
+                        <option value="{{ emp.id }}" {% if emp.id == employe_id %}selected{% endif %}>
+                            {{ emp.nom_complet }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
             
-            <div class="filter-group" style="flex: 0 0 auto;">
+            <div class="filter-group" style="flex: 0 0 auto; align-self: flex-end;">
                 <button type="submit" class="btn-filter">
                     <i class="fas fa-filter"></i> Filtrer
                 </button>
             </div>
             
-            <div class="filter-group" style="flex: 0 0 auto;">
+            <div class="filter-group" style="flex: 0 0 auto; align-self: flex-end;">
                 <button type="submit" name="export" value="excel" class="btn-excel">
                     <i class="fas fa-file-excel"></i> Exporter Excel
                 </button>
@@ -76,7 +89,7 @@
             <thead>
                 <tr>
                     <th>Date & Heure</th>
-                    <th>Libellé</th>
+                    <th>Bénéficiaire</th> <th>Libellé</th>
                     <th>Montant</th>
                 </tr>
             </thead>
@@ -88,7 +101,18 @@
                         <br>
                         <small style="color: #95a5a6;">{{ depense.date|time:"H:i" }}</small>
                     </td>
+
+                    <td>
+                        {% if depense.beneficiaire %}  <span class="badge-employe">
+                                <i class="fas fa-user-circle"></i> {{ depense.beneficiaire.nom_complet }}
+                            </span>
+                        {% else %}
+                            <span style="color: #bdc3c7;">Non assigné</span>
+                        {% endif %}
+                    </td>
+
                     <td>{{ depense.libelle }}</td>
+
                     <td style="font-weight: bold; color: #e74c3c;">- {{ depense.montant }} FCFA</td>
                 </tr>
                 {% endfor %}
@@ -97,7 +121,7 @@
         {% else %}
             <div style="padding: 40px; text-align: center; color: #7f8c8d;">
                 <i class="fas fa-inbox" style="font-size: 3em; margin-bottom: 15px; opacity: 0.5;"></i>
-                <p>Aucune dépense trouvée pour cette période.</p>
+                <p>Aucune dépense trouvée pour cette période ou cet employé.</p>
             </div>
         {% endif %}
     </div>
