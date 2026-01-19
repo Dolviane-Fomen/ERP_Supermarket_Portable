@@ -50,8 +50,18 @@ echo.
 :: Ouvrir le navigateur après 3 secondes
 start "" cmd /c "timeout /t 3 >nul & start http://127.0.0.1:8000"
 
-:: Démarrer la synchronisation réseau en arrière-plan
-start /B py ERP_LAUNCHER_SYNC.py
+:: Démarrer la synchronisation automatique avec le serveur OVH en arrière-plan
+if exist "SYNC_AUTOMATIQUE_EN_ARRIERE_PLAN.py" (
+    echo Demarrage de la synchronisation automatique...
+    start /B %PYTHON_CMD% SYNC_AUTOMATIQUE_EN_ARRIERE_PLAN.py
+    echo Synchronisation automatique active (toutes les 5 minutes)
+    echo.
+)
+
+:: Démarrer la synchronisation réseau en arrière-plan (optionnel, pour sync locale)
+if exist "ERP_LAUNCHER_SYNC.py" (
+    start /B %PYTHON_CMD% ERP_LAUNCHER_SYNC.py
+)
 
 :: Lancer le serveur (cette fenêtre reste ouverte)
 %PYTHON_CMD% -B -u manage.py runserver 127.0.0.1:8000 --settings=erp_project.settings_standalone --noreload

@@ -10,15 +10,32 @@ import subprocess
 from pathlib import Path
 from datetime import datetime
 
-# Configuration par défaut (à personnaliser)
+# Configuration par défaut
+# Les valeurs peuvent être surchargées par un fichier de config JSON
 CONFIG = {
-    'server_host': 'VOTRE_IP_SERVEUR',  # Ex: '123.45.67.89'
-    'server_user': 'erpuser',
-    'server_path': '/home/erpuser/ERP_Supermarket_Portable',
+    'server_host': '51.68.124.152',  # IP du serveur OVH
+    'server_user': 'ubuntu',  # Utilisateur SSH sur le serveur
+    'server_path': '/home/ubuntu/erp_project',  # Chemin du projet sur le serveur
     'local_path': str(Path(__file__).parent.resolve()),
     'export_file': 'sync_export.json',
     'backup_dir': 'backups',
 }
+
+# Essayer de charger la configuration depuis .ovh_config.json si elle existe
+ovh_config_file = Path(__file__).parent / '.ovh_config.json'
+if ovh_config_file.exists():
+    try:
+        with open(ovh_config_file, 'r') as f:
+            ovh_config = json.load(f)
+            if 'ovh_host' in ovh_config:
+                CONFIG['server_host'] = ovh_config['ovh_host']
+            if 'ovh_user' in ovh_config:
+                CONFIG['server_user'] = ovh_config['ovh_user']
+            if 'ovh_project_path' in ovh_config:
+                CONFIG['server_path'] = ovh_config['ovh_project_path']
+    except Exception as e:
+        print(f"⚠️  Impossible de charger .ovh_config.json: {e}")
+        print("   Utilisation des valeurs par défaut")
 
 
 def run_command(cmd, check=True):
@@ -61,7 +78,15 @@ def export_local_data(agence_id=None):
     """Exporter les données locales"""
     print(f"[{datetime.now()}] Export des données locales...")
     
-    cmd = f'python manage.py dumpdata'
+    # Détecter la commande Python disponible
+    python_cmd = "py"
+    try:
+        subprocess.run(["py", "--version"], capture_output=True, timeout=2, check=True)
+    except:
+        python_cmd = "python"
+    
+    # Forcer l'utilisation de settings.py (SQLite local) au lieu de settings_shared_db
+    cmd = f'{python_cmd} manage.py dumpdata --settings=erp_project.settings'
     
     # Ajouter des options selon les besoins
     exclude = ['contenttypes', 'sessions', 'admin.logentry']
@@ -98,7 +123,15 @@ def import_local_data(export_file, merge=False):
     # Faire une sauvegarde avant l'import
     backup_database()
     
-    cmd = f'python manage.py loaddata "{export_path}"'
+    # Détecter la commande Python disponible
+    python_cmd = "py"
+    try:
+        subprocess.run(["py", "--version"], capture_output=True, timeout=2, check=True)
+    except:
+        python_cmd = "python"
+    
+    # Forcer l'utilisation de settings.py (SQLite local)
+    cmd = f'{python_cmd} manage.py loaddata "{export_path}" --settings=erp_project.settings'
     if merge:
         cmd += ' --merge'
     
