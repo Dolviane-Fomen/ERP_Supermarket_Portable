@@ -1,0 +1,31 @@
+LISTE DES FICHIERS A COPIER (avec sync intégrée dans launcher)
+============================================================
+
+Si vous avez intégré la synchronisation dans ERP_Launcher.bat,
+copiez ces fichiers sur les autres PCs:
+
+FICHIERS OBLIGATOIRES:
+----------------------
+- ERP_Launcher.bat (modifié avec la sync intégrée)
+- SYNC_LOCAL_ONLINE.py
+- SYNC_LOCAL_ONLINE.bat
+- SYNC_AUTOMATIQUE_EN_ARRIERE_PLAN.py
+- DEMARRER_SYNC_AUTOMATIQUE.bat (optionnel, pour démarrer manuellement)
+
+FICHIERS DE CONFIGURATION:
+--------------------------
+- .ovh_config.json (ou .ovh_config.example.json)
+
+FICHIERS OPTIONNELS (si vous voulez):
+-------------------------------------
+- SYNC_DONNEES_BIDIRECTIONNEL.bat
+- sync_donnees_bidirectionnel.ps1
+- CONFIGURER_SYNC_AUTOMATIQUE.bat
+- CONFIGURER_SYNC_AUTOMATIQUE.ps1
+
+TOTAL MINIMUM: 5 fichiers
+- ERP_Launcher.bat
+- SYNC_LOCAL_ONLINE.py
+- SYNC_LOCAL_ONLINE.bat
+- SYNC_AUTOMATIQUE_EN_ARRIERE_PLAN.py
+- .ovh_config.json

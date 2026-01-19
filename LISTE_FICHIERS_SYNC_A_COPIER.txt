@@ -1,0 +1,31 @@
+LISTE DES FICHIERS DE SYNCHRONISATION A COPIER
+==============================================
+
+Copiez ces fichiers sur les autres PCs qui ont deja l'ERP installe:
+
+FICHIERS PRINCIPAUX:
+-------------------
+- SYNC_LOCAL_ONLINE.py
+- SYNC_LOCAL_ONLINE.bat
+- SYNC_DONNEES_BIDIRECTIONNEL.bat
+- sync_donnees_bidirectionnel.ps1
+
+FICHIERS DE CONFIGURATION:
+--------------------------
+- CONFIGURER_SYNC_AUTOMATIQUE.bat
+- CONFIGURER_SYNC_AUTOMATIQUE.ps1
+- CONFIGURER_SYNC_AUTOMATIQUE_TOUS_PC.bat
+- .ovh_config.json (ou .ovh_config.example.json)
+
+OPTIONNEL (si vous voulez):
+---------------------------
+- SYNC_OVH.bat
+- sync_ovh.ps1
+- sync_data_ovh.ps1
+- GESTIONNAIRE_SYNC.bat
+
+UTILISATION:
+-----------
+1. Copiez ces fichiers dans le dossier ERP de l'autre PC
+2. Sur l'autre PC, executez: CONFIGURER_SYNC_AUTOMATIQUE_TOUS_PC.bat
+3. C'est tout!
