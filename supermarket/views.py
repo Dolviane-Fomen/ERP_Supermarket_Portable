@@ -19843,10 +19843,14 @@ def generer_etat_depense(request):
                 else:
                     date_str = None
                     
+                # Récupérer le nom du bénéficiaire comme dans le module comptabilité
+                nom_beneficiaire = depense.beneficiaire.nom_complet if depense.beneficiaire else "Non assigné"
+                
                 liste_depenses.append({
                     'date': date_str,
                     'libelle': depense.libelle,
                     'montant': float(depense.montant),
+                    'beneficiaire': nom_beneficiaire,
                 })
                 total_agence += depense.montant
             
@@ -19912,13 +19916,13 @@ def export_etat_depense_excel(request):
         
         row = 1
         
-        # En-têtes des colonnes
-        headers = ['Date', 'Libellé', 'Montant (FCFA)']
+        # En-têtes des colonnes (avec colonne Nom ajoutée)
+        headers = ['Date', 'Nom', 'Libellé', 'Montant (FCFA)']
         
         # Par agence
         for agence_id, agence_data in etat_data['depenses_par_agence'].items():
             # En-tête Agence
-            ws.merge_cells(f'A{row}:C{row}')
+            ws.merge_cells(f'A{row}:D{row}')
             ws[f'A{row}'] = f"AGENCE: {agence_data['nom_agence']}"
             ws[f'A{row}'].font = Font(bold=True, size=11)
             ws[f'A{row}'].fill = agence_fill
@@ -19953,23 +19957,27 @@ def export_etat_depense_excel(request):
                     ws.cell(row=row, column=1, value="")
                 ws.cell(row=row, column=1).alignment = Alignment(vertical="center")
                 
-                # Libellé (colonne B)
-                ws.cell(row=row, column=2, value=depense['libelle']).alignment = Alignment(vertical="center")
+                # Nom/Bénéficiaire (colonne B) - comme dans le module comptabilité
+                nom_beneficiaire = depense.get('beneficiaire', 'Non assigné')
+                ws.cell(row=row, column=2, value=nom_beneficiaire).alignment = Alignment(vertical="center")
                 
-                # Montant (colonne C)
-                cell_montant = ws.cell(row=row, column=3, value=depense['montant'])
+                # Libellé (colonne C)
+                ws.cell(row=row, column=3, value=depense['libelle']).alignment = Alignment(vertical="center")
+                
+                # Montant (colonne D)
+                cell_montant = ws.cell(row=row, column=4, value=depense['montant'])
                 cell_montant.number_format = '#,##0.00'
                 cell_montant.alignment = Alignment(horizontal="right", vertical="center")
                 
                 row += 1
             
             # Total de l'agence
-            ws.merge_cells(f'A{row}:B{row}')
+            ws.merge_cells(f'A{row}:C{row}')
             cell_total_agence_label = ws.cell(row=row, column=1, value=f"TOTAL {agence_data['nom_agence']}")
             cell_total_agence_label.font = Font(bold=True, size=11)
             cell_total_agence_label.alignment = Alignment(horizontal="right", vertical="center")
             
-            cell_total_agence = ws.cell(row=row, column=3, value=agence_data['total'])
+            cell_total_agence = ws.cell(row=row, column=4, value=agence_data['total'])
             cell_total_agence.font = Font(bold=True, size=11)
             cell_total_agence.number_format = '#,##0.00'
             cell_total_agence.alignment = Alignment(horizontal="right", vertical="center")
@@ -19979,12 +19987,12 @@ def export_etat_depense_excel(request):
             row += 1  # Ligne vide entre les agences
         
         # Total général
-        ws.merge_cells(f'A{row}:B{row}')
+        ws.merge_cells(f'A{row}:C{row}')
         cell_total_general_label = ws.cell(row=row, column=1, value="TOTAL GÉNÉRAL")
         cell_total_general_label.font = Font(bold=True, size=12)
         cell_total_general_label.alignment = Alignment(horizontal="right", vertical="center")
         
-        cell_total_general = ws.cell(row=row, column=3, value=etat_data['total_general'])
+        cell_total_general = ws.cell(row=row, column=4, value=etat_data['total_general'])
         cell_total_general.font = Font(bold=True, size=12)
         cell_total_general.number_format = '#,##0.00'
         cell_total_general.alignment = Alignment(horizontal="right", vertical="center")
@@ -20317,10 +20325,50 @@ def generer_suivi_statistique(request):
                     facture_vente__date=current_date
                 ).select_related('article', 'facture_vente')
                 
-                # Catégories de marge
-                bonne_marge = []      # ≥ 10%
-                marge_mediocre = []   # 4% à 9%
-                marge_faible = []     # < 4%
+                # Récupérer les marges personnalisées pour cette agence
+                from supermarket.models import MargePersonnalisee, AssignationMargeArticle
+                marges_perso = MargePersonnalisee.objects.filter(agence=agence, actif=True).order_by('ordre', 'marge_min')
+                
+                # Récupérer les assignations manuelles pour cette agence
+                assignations_manuelles = {}
+                for assignation in AssignationMargeArticle.objects.filter(agence=agence):
+                    assignations_manuelles[assignation.article.id] = assignation.marge_personnalisee
+                
+                # Créer les catégories de marge (personnalisées ou par défaut)
+                categories_marge = {}
+                if marges_perso.exists():
+                    # Utiliser les marges personnalisées
+                    for marge_perso in marges_perso:
+                        categories_marge[marge_perso.id] = {
+                            'nom': marge_perso.nom_categorie,
+                            'couleur': marge_perso.couleur,
+                            'marge_min': float(marge_perso.marge_min),
+                            'marge_max': float(marge_perso.marge_max) if marge_perso.marge_max else None,
+                            'articles': []
+                        }
+                else:
+                    # Utiliser les marges par défaut
+                    categories_marge['bonne_marge'] = {
+                        'nom': 'Bonne Marge',
+                        'couleur': '#28a745',
+                        'marge_min': 10.0,
+                        'marge_max': None,
+                        'articles': []
+                    }
+                    categories_marge['marge_mediocre'] = {
+                        'nom': 'Marge Médiocre',
+                        'couleur': '#ffc107',
+                        'marge_min': 4.0,
+                        'marge_max': 10.0,
+                        'articles': []
+                    }
+                    categories_marge['marge_faible'] = {
+                        'nom': 'Marge Faible',
+                        'couleur': '#dc3545',
+                        'marge_min': 0.0,
+                        'marge_max': 4.0,
+                        'articles': []
+                    }
                 
                 # Articles déjà traités pour éviter les doublons par jour
                 articles_traites = {}
@@ -20367,19 +20415,56 @@ def generer_suivi_statistique(request):
                         'pourcentage_marge': marge_pct,
                     }
                     
-                    if marge_pct >= 10:
-                        bonne_marge.append(article_data)
-                    elif marge_pct >= 4:
-                        marge_mediocre.append(article_data)
+                    article_obj = stats['article']
+                    categorie_trouvee = None
+                    
+                    # Vérifier d'abord si l'article a une assignation manuelle (priorité)
+                    if article_obj.id in assignations_manuelles:
+                        marge_assigned = assignations_manuelles[article_obj.id]
+                        categorie_trouvee = marge_assigned.id
+                        # S'assurer que la catégorie existe dans categories_marge
+                        if categorie_trouvee not in categories_marge:
+                            categories_marge[categorie_trouvee] = {
+                                'nom': marge_assigned.nom_categorie,
+                                'couleur': marge_assigned.couleur,
+                                'marge_min': float(marge_assigned.marge_min),
+                                'marge_max': float(marge_assigned.marge_max) if marge_assigned.marge_max else None,
+                                'articles': []
+                            }
                     else:
-                        marge_faible.append(article_data)
+                        # Classification automatique basée sur les marges personnalisées ou par défaut
+                        for cat_key, cat_data in categories_marge.items():
+                            marge_min = cat_data['marge_min']
+                            marge_max = cat_data['marge_max']
+                            
+                            if marge_max is None:
+                                # Marge maximale non définie (≥ marge_min)
+                                if marge_pct >= marge_min:
+                                    categorie_trouvee = cat_key
+                                    break
+                            else:
+                                # Marge avec min et max
+                                if marge_min <= marge_pct < marge_max:
+                                    categorie_trouvee = cat_key
+                                    break
+                        
+                        # Si aucune catégorie ne correspond, mettre dans la dernière
+                        if categorie_trouvee is None and categories_marge:
+                            categorie_trouvee = list(categories_marge.keys())[-1]
+                    
+                    # Ajouter l'article à la catégorie trouvée
+                    if categorie_trouvee and categorie_trouvee in categories_marge:
+                        categories_marge[categorie_trouvee]['articles'].append(article_data)
                 
-                if bonne_marge or marge_mediocre or marge_faible:
-                    stats_journalieres[str(current_date)] = {
-                        'bonne_marge': bonne_marge,
-                        'marge_mediocre': marge_mediocre,
-                        'marge_faible': marge_faible,
-                    }
+                # Convertir en format attendu par le template
+                stats_jour = {}
+                for cat_key, cat_data in categories_marge.items():
+                    if cat_data['articles']:
+                        stats_jour[cat_key] = cat_data
+                
+                if stats_jour:
+                    stats_journalieres[str(current_date)] = stats_jour
+                
                 
                 # Jour suivant
                 from datetime import timedelta
@@ -20695,6 +20780,266 @@ def export_suivi_statistique_excel(request):
         import traceback
         traceback.print_exc()
         return JsonResponse({'success': False, 'error': f'Erreur export: {str(e)}'})
+
+@login_required
+def gerer_marges_personnalisees(request):
+    """Gérer les marges personnalisées pour l'agence de l'utilisateur"""
+    compte, redirect_response = check_comptable_access(request)
+    if redirect_response:
+        return redirect_response
+    
+    agence = get_user_agence(request)
+    if not agence:
+        messages.error(request, 'Votre compte n\'est pas lié à une agence.')
+        return redirect('dashboard_financier')
+    
+    from supermarket.models import MargePersonnalisee, AssignationMargeArticle, Article
+    
+    # Récupérer les marges personnalisées de l'agence
+    marges = MargePersonnalisee.objects.filter(agence=agence).order_by('ordre', 'marge_min')
+    
+    # Récupérer les assignations manuelles
+    assignations = AssignationMargeArticle.objects.filter(agence=agence).select_related('article', 'marge_personnalisee')
+    
+    # Récupérer tous les articles de l'agence pour la sélection
+    articles = Article.objects.filter(agence=agence).order_by('reference_article')
+    
+    context = {
+        'agence': agence,
+        'marges': marges,
+        'assignations': assignations,
+        'articles': articles,
+    }
+    
+    return render(request, 'supermarket/financier/gerer_marges_personnalisees.html', context)
+
+@login_required
+def creer_marge_personnalisee(request):
+    """Créer une nouvelle marge personnalisée"""
+    compte, redirect_response = check_comptable_access(request)
+    if redirect_response:
+        return redirect_response
+    
+    agence = get_user_agence(request)
+    if not agence:
+        return JsonResponse({'success': False, 'error': 'Agence non trouvée'})
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Méthode non autorisée'})
+    
+    try:
+        from supermarket.models import MargePersonnalisee
+        from decimal import Decimal
+        
+        nom_categorie = request.POST.get('nom_categorie')
+        marge_min = Decimal(request.POST.get('marge_min', 0))
+        marge_max = request.POST.get('marge_max')
+        couleur = request.POST.get('couleur', '#28a745')
+        ordre = int(request.POST.get('ordre', 0))
+        
+        if not nom_categorie:
+            return JsonResponse({'success': False, 'error': 'Le nom de la catégorie est obligatoire'})
+        
+        marge_max_decimal = Decimal(marge_max) if marge_max else None
+        
+        marge = MargePersonnalisee.objects.create(
+            agence=agence,
+            nom_categorie=nom_categorie,
+            marge_min=marge_min,
+            marge_max=marge_max_decimal,
+            couleur=couleur,
+            ordre=ordre,
+            actif=True
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'marge': {
+                'id': marge.id,
+                'nom_categorie': marge.nom_categorie,
+                'marge_min': float(marge.marge_min),
+                'marge_max': float(marge.marge_max) if marge.marge_max else None,
+                'couleur': marge.couleur,
+                'ordre': marge.ordre,
+            }
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+@login_required
+def modifier_marge_personnalisee(request, marge_id):
+    """Modifier une marge personnalisée"""
+    compte, redirect_response = check_comptable_access(request)
+    if redirect_response:
+        return redirect_response
+    
+    agence = get_user_agence(request)
+    if not agence:
+        return JsonResponse({'success': False, 'error': 'Agence non trouvée'})
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Méthode non autorisée'})
+    
+    try:
+        from supermarket.models import MargePersonnalisee
+        from decimal import Decimal
+        
+        marge = MargePersonnalisee.objects.get(id=marge_id, agence=agence)
+        
+        nom_categorie = request.POST.get('nom_categorie')
+        marge_min = Decimal(request.POST.get('marge_min', 0))
+        marge_max = request.POST.get('marge_max')
+        couleur = request.POST.get('couleur', '#28a745')
+        ordre = int(request.POST.get('ordre', 0))
+        actif = request.POST.get('actif') == 'true'
+        
+        if nom_categorie:
+            marge.nom_categorie = nom_categorie
+        marge.marge_min = marge_min
+        marge.marge_max = Decimal(marge_max) if marge_max else None
+        marge.couleur = couleur
+        marge.ordre = ordre
+        marge.actif = actif
+        marge.save()
+        
+        return JsonResponse({
+            'success': True,
+            'marge': {
+                'id': marge.id,
+                'nom_categorie': marge.nom_categorie,
+                'marge_min': float(marge.marge_min),
+                'marge_max': float(marge.marge_max) if marge.marge_max else None,
+                'couleur': marge.couleur,
+                'ordre': marge.ordre,
+                'actif': marge.actif,
+            }
+        })
+    except MargePersonnalisee.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Marge non trouvée'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+@login_required
+def supprimer_marge_personnalisee(request, marge_id):
+    """Supprimer une marge personnalisée"""
+    compte, redirect_response = check_comptable_access(request)
+    if redirect_response:
+        return redirect_response
+    
+    agence = get_user_agence(request)
+    if not agence:
+        return JsonResponse({'success': False, 'error': 'Agence non trouvée'})
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Méthode non autorisée'})
+    
+    try:
+        from supermarket.models import MargePersonnalisee
+        marge = MargePersonnalisee.objects.get(id=marge_id, agence=agence)
+        marge.delete()
+        return JsonResponse({'success': True})
+    except MargePersonnalisee.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Marge non trouvée'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+@login_required
+def assigner_article_marge(request):
+    """Assigner manuellement un ou plusieurs articles à une catégorie de marge"""
+    compte, redirect_response = check_comptable_access(request)
+    if redirect_response:
+        return redirect_response
+    
+    agence = get_user_agence(request)
+    if not agence:
+        return JsonResponse({'success': False, 'error': 'Agence non trouvée'})
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Méthode non autorisée'})
+    
+    try:
+        from supermarket.models import AssignationMargeArticle, Article, MargePersonnalisee
+        
+        # Récupérer les IDs des articles (peut être un seul ou plusieurs)
+        article_ids = request.POST.getlist('article_id')  # getlist pour gérer plusieurs valeurs
+        if not article_ids:
+            article_id = request.POST.get('article_id')  # Fallback pour un seul article
+            if article_id:
+                article_ids = [article_id]
+        
+        marge_id = request.POST.get('marge_id')
+        
+        if not article_ids or not marge_id:
+            return JsonResponse({'success': False, 'error': 'Article(s) et marge sont obligatoires'})
+        
+        marge = MargePersonnalisee.objects.get(id=marge_id, agence=agence)
+        
+        assignations_created = []
+        assignations_updated = []
+        errors = []
+        
+        # Assigner chaque article
+        for article_id in article_ids:
+            try:
+                article = Article.objects.get(id=article_id, agence=agence)
+                
+                # Créer ou mettre à jour l'assignation
+                assignation, created = AssignationMargeArticle.objects.update_or_create(
+                    agence=agence,
+                    article=article,
+                    defaults={'marge_personnalisee': marge}
+                )
+                
+                if created:
+                    assignations_created.append({
+                        'article_reference': article.reference_article,
+                        'article_designation': article.designation,
+                    })
+                else:
+                    assignations_updated.append({
+                        'article_reference': article.reference_article,
+                        'article_designation': article.designation,
+                    })
+            except Article.DoesNotExist:
+                errors.append(f'Article ID {article_id} non trouvé')
+            except Exception as e:
+                errors.append(f'Erreur pour article ID {article_id}: {str(e)}')
+        
+        return JsonResponse({
+            'success': True,
+            'created_count': len(assignations_created),
+            'updated_count': len(assignations_updated),
+            'errors': errors,
+            'marge_nom': marge.nom_categorie,
+        })
+    except MargePersonnalisee.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Marge non trouvée'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+@login_required
+def retirer_assignation_article(request, assignation_id):
+    """Retirer l'assignation manuelle d'un article"""
+    compte, redirect_response = check_comptable_access(request)
+    if redirect_response:
+        return redirect_response
+    
+    agence = get_user_agence(request)
+    if not agence:
+        return JsonResponse({'success': False, 'error': 'Agence non trouvée'})
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Méthode non autorisée'})
+    
+    try:
+        from supermarket.models import AssignationMargeArticle
+        assignation = AssignationMargeArticle.objects.get(id=assignation_id, agence=agence)
+        assignation.delete()
+        return JsonResponse({'success': True})
+    except AssignationMargeArticle.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Assignation non trouvée'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
 
 # ==================== MODULE COMPTABILITÉ ====================
 

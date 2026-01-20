@@ -1161,6 +1161,48 @@ class Depense(models.Model):
         return f"{self.libelle} ({self.montant})"
 
 
+class MargePersonnalisee(models.Model):
+    """Modèle pour les marges personnalisées par agence"""
+    agence = models.ForeignKey('Agence', on_delete=models.CASCADE, verbose_name="Agence")
+    nom_categorie = models.CharField(max_length=100, verbose_name="Nom de la catégorie")
+    marge_min = models.DecimalField(max_digits=5, decimal_places=2, verbose_name="Marge minimale (%)")
+    marge_max = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="Marge maximale (%)")
+    couleur = models.CharField(max_length=20, default="#28a745", verbose_name="Couleur d'affichage")
+    ordre = models.IntegerField(default=0, verbose_name="Ordre d'affichage")
+    actif = models.BooleanField(default=True, verbose_name="Actif")
+    date_creation = models.DateTimeField(auto_now_add=True, verbose_name="Date de création")
+    
+    class Meta:
+        verbose_name = "Marge Personnalisée"
+        verbose_name_plural = "Marges Personnalisées"
+        ordering = ['agence', 'ordre', 'marge_min']
+        unique_together = ['agence', 'nom_categorie']
+    
+    def __str__(self):
+        if self.marge_max:
+            return f"{self.nom_categorie} ({self.agence.nom_agence}): {self.marge_min}% - {self.marge_max}%"
+        else:
+            return f"{self.nom_categorie} ({self.agence.nom_agence}): ≥ {self.marge_min}%"
+
+
+class AssignationMargeArticle(models.Model):
+    """Modèle pour les assignations manuelles d'articles à des catégories de marge"""
+    agence = models.ForeignKey('Agence', on_delete=models.CASCADE, verbose_name="Agence")
+    article = models.ForeignKey('Article', on_delete=models.CASCADE, verbose_name="Article")
+    marge_personnalisee = models.ForeignKey(MargePersonnalisee, on_delete=models.CASCADE, verbose_name="Catégorie de marge")
+    date_creation = models.DateTimeField(auto_now_add=True, verbose_name="Date de création")
+    date_modification = models.DateTimeField(auto_now=True, verbose_name="Date de modification")
+    
+    class Meta:
+        verbose_name = "Assignation Marge Article"
+        verbose_name_plural = "Assignations Marge Article"
+        unique_together = ['agence', 'article']
+        ordering = ['-date_modification']
+    
+    def __str__(self):
+        return f"{self.article.reference_article} → {self.marge_personnalisee.nom_categorie} ({self.agence.nom_agence})"
+
+
 from django.db import models
 from decimal import Decimal
 

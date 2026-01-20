@@ -368,6 +368,11 @@
             <i class="fas fa-file-invoice-dollar icon"></i>
             <span>État Résultat</span>
         </a>
+        
+        <a href="{% url 'gerer_marges_personnalisees' %}" class="menu-item {% if request.resolver_match.url_name == 'gerer_marges_personnalisees' %}active{% endif %}">
+            <i class="fas fa-sliders-h icon"></i>
+            <span>Gérer Marges</span>
+        </a>
     </div>
     
     <div class="content">
@@ -516,10 +521,16 @@
 
 <script>
     // Graphique d'évolution
-    const evolutionCtx = document.getElementById('evolutionChart').getContext('2d');
-    const labelsDays = JSON.parse(document.getElementById('labels-days').textContent);
-    const evolutionCA = JSON.parse(document.getElementById('evolution-ca').textContent);
-    const evolutionDep = JSON.parse(document.getElementById('evolution-dep').textContent);
+    const evolutionChartEl = document.getElementById('evolutionChart');
+    if (evolutionChartEl) {
+    const labelsDaysEl = document.getElementById('labels-days');
+    const evolutionCAEl = document.getElementById('evolution-ca');
+    const evolutionDepEl = document.getElementById('evolution-dep');
+    if (labelsDaysEl && evolutionCAEl && evolutionDepEl) {
+    const evolutionCtx = evolutionChartEl.getContext('2d');
+    const labelsDays = JSON.parse(labelsDaysEl.textContent);
+    const evolutionCA = JSON.parse(evolutionCAEl.textContent);
+    const evolutionDep = JSON.parse(evolutionDepEl.textContent);
     
     new Chart(evolutionCtx, {
         type: 'line',
@@ -570,10 +581,16 @@
             }
         }
     });
+    } // Fin du if labelsDaysEl, evolutionCAEl, evolutionDepEl
+    } // Fin du if evolutionChartEl
 
     // Graphique d'évolution du résultat net
-    const resultatCtx = document.getElementById('resultatChart').getContext('2d');
-    const evolutionResultat = JSON.parse(document.getElementById('evolution-resultat').textContent);
+    const resultatChartEl = document.getElementById('resultatChart');
+    if (resultatChartEl) {
+    const evolutionResultatEl = document.getElementById('evolution-resultat');
+    if (evolutionResultatEl) {
+    const resultatCtx = resultatChartEl.getContext('2d');
+    const evolutionResultat = JSON.parse(evolutionResultatEl.textContent);
     
     new Chart(resultatCtx, {
         type: 'line',
@@ -679,9 +696,13 @@
             }
         }
     });
+    } // Fin du if evolutionResultatEl
+    } // Fin du if resultatChartEl
 
     // Graphique de répartition
-    const repartitionCtx = document.getElementById('repartitionChart').getContext('2d');
+    const repartitionChartEl = document.getElementById('repartitionChart');
+    if (repartitionChartEl) {
+    const repartitionCtx = repartitionChartEl.getContext('2d');
     const caValue = parseFloat('{{ ca_total }}') || 0;
     const depValue = parseFloat('{{ depenses_total }}') || 0;
     
@@ -720,6 +741,7 @@
             }
         }
     });
+    } // Fin du if repartitionChartEl
 </script>
 
 </body>
