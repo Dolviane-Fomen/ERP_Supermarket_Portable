@@ -21391,7 +21391,7 @@ def consulter_depenses(request):
         'agence': agence,
         'nom_utilisateur': nom_utilisateur,
     }
-    return render(request, 'supermarket/comptabiliter/consulter_depenses.html', context)   
+    return render(request, 'supermarket/comptabiliter/consulter_depenses.html', context)  
     
 @login_required
 def suivi_chiffre_affaire(request):
@@ -21810,184 +21810,197 @@ def suivi_tresorerie(request):
 @login_required
 def consulter_tresorerie(request):
     """
-    Par défaut : 30 derniers jours.
-    Si filtre : 1 seule journée (Affichage + Export).
+    Affiche l'historique détaillé et permet un export Excel IDENTIQUE au tableau HTML.
     """
     import openpyxl
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-    from django.db.models import Sum
-    from .models import Tresorerie, ChiffreAffaire
+    from openpyxl.utils import get_column_letter
+    from django.db.models import Sum, F
+    from datetime import datetime, timedelta
+    from django.utils import timezone
+    from decimal import Decimal
     
+    # Imports locaux (à adapter selon votre structure)
+    from .models import Tresorerie, LigneFactureVente, Compte
+
     # 1. Identification Agence
     try:
         agence = get_user_agence(request)
     except:
         return redirect('dashboard_comptabilite')
     
-    # --- 2. LOGIQUE HYBRIDE (30 jours OU 1 jour) ---
-    date_filter = request.GET.get('date') # On cherche une date unique
+    # 2. Logique de Filtre Date
+    date_filter = request.GET.get('date')
     now = timezone.now().date()
     
     if date_filter:
-        # CAS FILTRÉ : On force le début et la fin à la MÊME date
-        date_obj = datetime.strptime(date_filter, '%Y-%m-%d').date()
-        date_debut = date_obj
-        date_fin = date_obj
-        mode_filtre = True
+        try:
+            date_obj = datetime.strptime(date_filter, '%Y-%m-%d').date()
+            date_debut = date_obj
+            date_fin = date_obj
+            mode_filtre = True
+        except ValueError:
+            date_debut = now - timedelta(days=30)
+            date_fin = now
+            mode_filtre = False
     else:
-        # CAS PAR DÉFAUT : Période de 30 jours
         date_fin = now
         date_debut = now - timedelta(days=30)
         mode_filtre = False
 
-    # 3. Récupération des données pour l'affichage HTML
-    # Utiliser date__lte pour inclure la date de fin (aujourd'hui)
-    # IMPORTANT: Utiliser date__lte avec date_fin pour inclure aujourd'hui
-    historique = Tresorerie.objects.filter(
+    # 3. Récupération des données
+    queryset = Tresorerie.objects.filter(
         agence=agence, 
         date__gte=date_debut,
         date__lte=date_fin
     ).order_by('-date')
     
-    # Debug: vérifier si aujourd'hui est inclus
-    print(f"DEBUG HISTORIQUE - date_debut: {date_debut}, date_fin: {date_fin}, now: {now}")
-    print(f"DEBUG HISTORIQUE - Nombre d'entrées: {historique.count()}")
+    # --- OPTIMISATION : On convertit en liste pour calculer le CA une seule fois ---
+    # Cela servira pour le HTML ET pour l'Excel sans refaire de requêtes
+    historique_list = list(queryset)
 
-    # Ajout du CA temporaire pour l'affichage tableau HTML (calculé depuis les ventes)
-    for t in historique:
-        # Calculer le CA directement depuis les FactureVente du jour
+    for t in historique_list:
+        # Calcul du CA du jour pour chaque ligne
         ventes_jour = LigneFactureVente.objects.filter(
             facture_vente__agence=agence,
-            facture_vente__date=t.date
+            facture_vente__date=t.date 
         )
         ca_du_jour = ventes_jour.aggregate(total=Sum(F('quantite') * F('prix_unitaire')))['total'] or Decimal('0')
         t.ca_temp = ca_du_jour
 
-    # 4. EXPORT EXCEL (Votre code Excel reste identique, il s'adapte aux dates)
+   # =========================================================================
+    # 4. EXPORT EXCEL (STRUCTURE CORRIGÉE : SAV SIMPLE)
+    # =========================================================================
     if request.GET.get('export') == 'excel':
-        
-        # Calculs du CA depuis les ventes
-        # IMPORTANT : Utiliser exactement la même logique que le tableau HTML
-        # Si une seule journée dans l'historique, utiliser le CA de cette journée (déjà calculé)
-        # Sinon, calculer le total cumulé
-        
-        # Convertir le queryset en liste pour pouvoir vérifier la longueur
-        historique_list = list(historique)
-        
-        if len(historique_list) == 1:
-            # Une seule journée : utiliser le CA déjà calculé pour cette journée (comme dans le tableau HTML)
-            total_ca = historique_list[0].ca_temp if hasattr(historique_list[0], 'ca_temp') else Decimal('0')
-        elif mode_filtre and date_debut == date_fin:
-            # Mode filtre avec une seule date : calculer pour cette date uniquement
-            ventes_periode = LigneFactureVente.objects.filter(
-                facture_vente__agence=agence,
-                facture_vente__date=date_debut
-            )
-            total_ca = ventes_periode.aggregate(total=Sum(F('quantite') * F('prix_unitaire')))['total'] or Decimal('0')
-        else:
-            # Période de plusieurs jours : calculer le total cumulé
-            ventes_periode = LigneFactureVente.objects.filter(
-                facture_vente__agence=agence,
-                facture_vente__date__range=[date_debut, date_fin]
-            )
-            total_ca = ventes_periode.aggregate(total=Sum(F('quantite') * F('prix_unitaire')))['total'] or Decimal('0')
-
-        # Derniers Soldes
-        last_treso = Tresorerie.objects.filter(
-            agence=agence, 
-            date__lte=date_fin
-        ).order_by('-date').first()
-
-        if last_treso:
-            banque = last_treso.solde_banque_final
-            caisse = last_treso.solde_caisse_final
-            om = last_treso.solde_om_final
-            momo = last_treso.solde_momo_final
-            sav = last_treso.solde_sav_final
-            total_dispo = last_treso.total_disponible
-            date_arrete = last_treso.date
-        else:
-            banque = caisse = om = momo = sav = total_dispo = 0
-            date_arrete = date_fin
-
-        # --- CRÉATION EXCEL ---
         response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        # Nom du fichier adapté
-        if mode_filtre:
-            filename = f"Bilan_Jour_{agence.nom_agence}_{date_debut}.xlsx"
-            titre_excel = f"BILAN JOURNALIER : {date_debut}"
-        else:
-            filename = f"Bilan_Periode_{agence.nom_agence}_{date_debut}_{date_fin}.xlsx"
-            titre_excel = f"Période du {date_debut} au {date_fin}"
-            
+        filename = f"Tresorerie_{agence.nom_agence}_{date_debut}_au_{date_fin}.xlsx"
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
         wb = openpyxl.Workbook()
         ws = wb.active
-        ws.title = "Bilan"
+        ws.title = "Historique Trésorerie"
 
-        # Styles (Votre code existant)
-        title_font = Font(bold=True, size=16, color="2c3e50")
-        subtitle_font = Font(size=12, italic=True, color="7f8c8d")
-        header_fill = PatternFill(start_color="34495e", end_color="34495e", fill_type="solid")
-        header_font = Font(bold=True, color="FFFFFF", size=12)
-        ca_fill = PatternFill(start_color="d1ecf1", end_color="d1ecf1", fill_type="solid")
-        total_fill = PatternFill(start_color="d4edda", end_color="d4edda", fill_type="solid")
-        total_font = Font(bold=True, size=12)
-        center_align = Alignment(horizontal="center", vertical="center")
-        right_align = Alignment(horizontal="right", vertical="center")
+        # Styles
+        border_style = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                              top=Side(style='thin'), bottom=Side(style='thin'))
+        
+        header_font = Font(bold=True, color="FFFFFF", size=10)
+        sub_header_font = Font(bold=True, size=9)
+        data_font = Font(size=10)
+        
+        # Couleurs
+        fill_dark = PatternFill(start_color="2c3e50", end_color="2c3e50", fill_type="solid")
+        fill_ca = PatternFill(start_color="17a2b8", end_color="17a2b8", fill_type="solid")
+        fill_caisse_head = PatternFill(start_color="27ae60", end_color="27ae60", fill_type="solid")
+        fill_banque_head = PatternFill(start_color="2980b9", end_color="2980b9", fill_type="solid")
+        fill_om_head = PatternFill(start_color="e67e22", end_color="e67e22", fill_type="solid")
+        fill_momo_head = PatternFill(start_color="f1c40f", end_color="f1c40f", fill_type="solid")
+        fill_sav_head = PatternFill(start_color="8e44ad", end_color="8e44ad", fill_type="solid")
 
-        # Remplissage
-        ws.merge_cells('A1:B1')
-        ws['A1'] = f"BILAN : {agence.nom_agence.upper()}"
-        ws['A1'].font = title_font
-        ws['A1'].alignment = center_align
+        # --- LIGNE 1 : EN-TÊTES ---
+        
+        # 1. Colonnes Simples (Fusion Verticale sur 2 lignes)
+        ws.merge_cells('A1:A2'); ws['A1'] = "DATE"
+        ws.merge_cells('B1:B2'); ws['B1'] = "CHIFFRE D'AFFAIRE"
+        
+        # SAV est maintenant une colonne simple comme CA
+        ws.merge_cells('O1:O2'); ws['O1'] = "SOLDE SAV" 
+        
+        # Global est décalé en P
+        ws.merge_cells('P1:P2'); ws['P1'] = "GLOBAL DISPO."
 
-        ws.merge_cells('A2:B2')
-        ws['A2'] = titre_excel # Utilisation du titre dynamique
-        ws['A2'].font = subtitle_font
-        ws['A2'].alignment = center_align
+        # 2. Groupes (Fusion Horizontale sur 3 colonnes)
+        ws.merge_cells('C1:E1'); ws['C1'] = "CAISSE ESPÈCES"
+        ws.merge_cells('F1:H1'); ws['F1'] = "BANQUE"
+        ws.merge_cells('I1:K1'); ws['I1'] = "ORANGE MONEY"
+        ws.merge_cells('L1:N1'); ws['L1'] = "MTN MOMO"
 
-        ws.append([])
+        # --- APPLICATION STYLES ---
+        
+        # Style pour Date, Global (Gris)
+        for cell in ['A1', 'P1']:
+            ws[cell].fill = fill_dark; ws[cell].font = header_font; ws[cell].alignment = Alignment(horizontal='center', vertical='center')
+        
+        # Style CA (Bleu clair)
+        ws['B1'].fill = fill_ca; ws['B1'].font = header_font; ws['B1'].alignment = Alignment(horizontal='center', vertical='center')
+        
+        # Style SAV (Violet) - Traité comme une colonne simple maintenant
+        ws['O1'].fill = fill_sav_head; ws['O1'].font = header_font; ws['O1'].alignment = Alignment(horizontal='center', vertical='center')
 
-        ws.append(["LIBELLÉ", "MONTANT (FCFA)"])
-        ws['A4'].fill = header_fill; ws['A4'].font = header_font
-        ws['B4'].fill = header_fill; ws['B4'].font = header_font; ws['B4'].alignment = center_align
+        # Styles des Groupes (Caisse, Banque, OM, Momo)
+        groups = [
+            ('C1', fill_caisse_head), ('F1', fill_banque_head), 
+            ('I1', fill_om_head), ('L1', fill_momo_head)
+        ]
+        for cell_ref, fill_color in groups:
+            ws[cell_ref].fill = fill_color
+            ws[cell_ref].font = header_font
+            if cell_ref == 'L1': ws[cell_ref].font = Font(bold=True, color="000000", size=10)
+            ws[cell_ref].alignment = Alignment(horizontal='center', vertical='center')
 
-        # CA
-        libelle_ca = "Chiffre d'Affaire (Journée)" if mode_filtre else "Chiffre d'Affaire CUMULÉ"
-        ws.append([libelle_ca, total_ca])
-        ws['A5'].fill = ca_fill; ws['B5'].fill = ca_fill; ws['B5'].font = Font(bold=True)
+        # --- LIGNE 2 : SOUS-TITRES (Seulement pour les groupes) ---
+        sub_headers = [
+            ("Entrée", "Sortie", "Solde"), # Caisse
+            ("Dépôt", "Retrait", "Solde"), # Banque
+            ("Dépôt", "Retrait", "Solde"), # OM
+            ("Dépôt", "Retrait", "Solde"), # Momo
+            # PAS DE SAV ICI
+        ]
+        
+        col_idx = 3 # Start colonne C
+        for group in sub_headers:
+            for title in group:
+                cell = ws.cell(row=2, column=col_idx, value=title)
+                cell.font = sub_header_font
+                cell.alignment = Alignment(horizontal='center')
+                cell.border = border_style
+                cell.fill = PatternFill(start_color="ecf0f1", end_color="ecf0f1", fill_type="solid")
+                col_idx += 1
 
-        ws.append(["", ""])
+        # --- DONNÉES ---
+        row_num = 3
+        for t in historique_list:
+            date_str = t.date.strftime('%d/%m/%Y')
+            
+            row_data = [
+                date_str,                   # A
+                t.ca_temp,                  # B
+                
+                t.caisse_entree, t.caisse_sortie, t.solde_caisse_final, # C, D, E
+                t.banque_depot, t.banque_retrait, t.solde_banque_final, # F, G, H
+                t.om_depot, t.om_retrait, t.solde_om_final,             # I, J, K
+                t.momo_depot, t.momo_retrait, t.solde_momo_final,       # L, M, N
+                
+                t.solde_sav_final,          # O (SAV Unique)
+                t.total_disponible          # P (Global)
+            ]
+            
+            for col_idx, value in enumerate(row_data, 1):
+                cell = ws.cell(row=row_num, column=col_idx, value=value)
+                cell.font = data_font
+                cell.border = border_style
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+                
+                if col_idx > 1 and value is not None:
+                    cell.number_format = '#,##0'
 
-        # Trésorerie
-        ws.append([f"Solde Banque (au {date_arrete})", banque])
-        ws.append([f"Solde Caisse (au {date_arrete})", caisse])
-        ws.append([f"Solde Orange (au {date_arrete})", om])
-        ws.append([f"Solde MTN (au {date_arrete})", momo])
-        ws.append([f"Solde SAV (au {date_arrete})", sav])
+            # Couleur spéciale pour Global (Col P = 16)
+            ws.cell(row=row_num, column=16).fill = PatternFill(start_color="f8f9fa", end_color="f8f9fa", fill_type="solid")
+            ws.cell(row=row_num, column=16).font = Font(bold=True)
 
-        ws.append(["", ""])
+            row_num += 1
 
-        # Total
-        row_total = ws.max_row + 1
-        ws.append(["TOTAL DISPONIBLE", total_dispo])
-        ws.cell(row=row_total, column=1).fill = total_fill; ws.cell(row=row_total, column=1).font = total_font
-        ws.cell(row=row_total, column=2).fill = total_fill; ws.cell(row=row_total, column=2).font = total_font
-
-        ws.column_dimensions['A'].width = 40
-        ws.column_dimensions['B'].width = 25
-        for row in range(5, ws.max_row + 1):
-            ws.cell(row=row, column=2).alignment = right_align
-            ws.cell(row=row, column=2).number_format = '#,##0'
+        # Largeurs colonnes
+        ws.column_dimensions['A'].width = 12
+        ws.column_dimensions['B'].width = 15
+        for col in range(3, 17): # Jusqu'à P
+            ws.column_dimensions[get_column_letter(col)].width = 12
 
         wb.save(response)
         return response
 
     context = {
-        'historique': historique,
-        # On renvoie la date unique si on filtre, sinon None
+        'historique': historique_list,
         'date_filter': date_filter if mode_filtre else '', 
         'agence': agence
     }
