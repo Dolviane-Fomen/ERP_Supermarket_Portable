@@ -261,15 +261,15 @@
     
                 <div style="display: flex; padding: 0;">
                     <div style="flex: 1; padding: 10px; text-align: center; border-right: 1px solid #eee; background-color: #fff5f5;">
-                        <div style="color: #dc3545; font-weight: bold; font-size: 0.8em; text-transform: uppercase;">Mauvaise</div>
+                        <div style="color: #dc3545; font-weight: bold; font-size: 0.8em; text-transform: uppercase;">Très Mauvaise</div>
                         <div style="font-size: 1.1em; font-weight: bold;">{{ marge.mauvaise_min|floatformat:0 }}% - {{ marge.mauvaise_max|floatformat:0 }}%</div>
                     </div>
                     <div style="flex: 1; padding: 10px; text-align: center; border-right: 1px solid #eee; background-color: #fff9e6;">
-                        <div style="color: #ffc107; font-weight: bold; font-size: 0.8em; text-transform: uppercase;">Bonne</div>
+                        <div style="color: #ffc107; font-weight: bold; font-size: 0.8em; text-transform: uppercase;">Mauvaise</div>
                         <div style="font-size: 1.1em; font-weight: bold;">{{ marge.bonne_min|floatformat:0 }}% - {{ marge.bonne_max|floatformat:0 }}%</div>
                     </div>
                     <div style="flex: 1; padding: 10px; text-align: center; background-color: #f0fff4;">
-                        <div style="color: #28a745; font-weight: bold; font-size: 0.8em; text-transform: uppercase;">Très Bonne</div>
+                        <div style="color: #28a745; font-weight: bold; font-size: 0.8em; text-transform: uppercase;">Bonne</div>
                         <div style="font-size: 1.1em; font-weight: bold;">{{ marge.tres_bonne_min|floatformat:0 }}% - {{ marge.tres_bonne_max|floatformat:0 }}%</div>
                     </div>
                 </div>
@@ -346,7 +346,7 @@
                     
                     <div class="row align-items-center mb-2">
                         <div class="col-4" style="color: #dc3545; font-weight: bold;">
-                            <i class="fas fa-thumbs-down"></i> Mauvaise
+                            <i class="fas fa-thumbs-down"></i> Très Mauvaise
                         </div>
                         <div class="col-8 d-flex gap-2">
                             <input type="number" name="mauvaise_min" id="mauvaise_min" class="form-control" placeholder="De" step="0.01" required>
@@ -357,7 +357,7 @@
     
                     <div class="row align-items-center mb-2">
                         <div class="col-4" style="color: #ffc107; font-weight: bold;">
-                            <i class="fas fa-check"></i> Bonne
+                            <i class="fas fa-check"></i> Mauvaise
                         </div>
                         <div class="col-8 d-flex gap-2">
                             <input type="number" name="bonne_min" id="bonne_min" class="form-control" placeholder="De" step="0.01" required>
@@ -368,7 +368,7 @@
     
                     <div class="row align-items-center">
                         <div class="col-4" style="color: #28a745; font-weight: bold;">
-                            <i class="fas fa-star"></i> Très Bonne
+                            <i class="fas fa-star"></i>  Bonne
                         </div>
                         <div class="col-8 d-flex gap-2">
                             <input type="number" name="tres_bonne_min" id="tres_bonne_min" class="form-control" placeholder="De" step="0.01" required>
@@ -422,11 +422,11 @@
         document.getElementById('article_list').style.display = 'block'; // Montrer la liste au départ ou non, au choix
         
         // Valeurs par défaut logiques
-        document.getElementById('mauvaise_min').value = '0';
-        document.getElementById('mauvaise_max').value = '10';
-        document.getElementById('bonne_min').value = '11';
-        document.getElementById('bonne_max').value = '20';
-        document.getElementById('tres_bonne_min').value = '21';
+        document.getElementById('mauvaise_min').value = '-5';
+        document.getElementById('mauvaise_max').value = '4';
+        document.getElementById('bonne_min').value = '5';
+        document.getElementById('bonne_max').value = '9';
+        document.getElementById('tres_bonne_min').value = '10';
         document.getElementById('tres_bonne_max').value = '100';
     }
     

@@ -20290,7 +20290,10 @@ def export_etat_resultat_excel(request):
 
 @login_required
 def generer_suivi_statistique(request):
-    """Génère les stats en comparant chaque article à SA propre configuration de marge"""
+    """
+    Génère les stats pour le SUIVI.
+    Structure : Agence -> Date -> Catégorie -> Liste d'articles (avec CA, Marge, etc.)
+    """
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'Méthode non autorisée'})
         
@@ -20300,175 +20303,224 @@ def generer_suivi_statistique(request):
     if not date_debut or not date_fin:
         return JsonResponse({'success': False, 'error': 'Dates manquantes'})
     
+    # --- CONFIGURATION PAR DÉFAUT (Si pas de config spécifique) ---
+    DEFAULT_CONFIG = {
+        'mauvaise_min': -100, 'mauvaise_max': 4.999,
+        'bonne_min': 5, 'bonne_max': 9.999,
+        'tres_bonne_min': 10, 'tres_bonne_max': 1000
+    }
+    
     try:
         from supermarket.models import LigneFactureVente, MargePersonnalisee
         
-        # 1. Récupération des ventes
+        # 1. Récupérer les ventes (Filtre direct sur la date)
         ventes = LigneFactureVente.objects.filter(
             facture_vente__date__range=[date_debut, date_fin]
         ).select_related('article', 'facture_vente__agence')
         
-        # 2. Dictionnaire de résultats
         stats_data = {}
         
-        # 3. Pré-charger les configs de marge
+        # 2. Charger les configs spécifiques
         configs_marges = {
             m.article_id: m 
             for m in MargePersonnalisee.objects.select_related('article').all()
         }
 
         for vente in ventes:
-            # --- CORRECTION ICI : Utilisation de .pk au lieu de .id ---
-            agence_id = vente.facture_vente.agence.pk 
+            agence_pk = str(vente.facture_vente.agence.pk) # Str pour compatibilité JSON
             nom_agence = vente.facture_vente.agence.nom_agence
             
-            # Gestion Date
+            # Gestion date
             date_obj = vente.facture_vente.date
             date_vente = date_obj.strftime('%Y-%m-%d') if hasattr(date_obj, 'strftime') else str(date_obj)
             
             article = vente.article
             
-            # Calculs
-            ca = vente.quantite * vente.prix_unitaire
-            cout = vente.quantite * (article.prix_achat or 0)
+            # --- CALCULS FINANCIERS (Comme statistique_vente) ---
+            qte = float(vente.quantite)
+            ca = qte * float(vente.prix_unitaire)
+            prix_achat = float(article.prix_achat or 0)
+            cout = qte * prix_achat
             marge_valeur = ca - cout
+            
+            # % Marge
             marge_pct = (marge_valeur / ca * 100) if ca > 0 else 0
             
-            # Classification
-            # --- CORRECTION ICI : Utilisation de .pk ---
-            config = configs_marges.get(article.pk) 
-            categorie_key = 'non_configure'
+            # --- CLASSIFICATION ---
+            config = configs_marges.get(article.pk)
             
             if config:
-                if config.mauvaise_min <= marge_pct <= config.mauvaise_max:
-                    categorie_key = 'mauvaise'
-                elif config.bonne_min <= marge_pct <= config.bonne_max:
-                    categorie_key = 'bonne'
-                elif config.tres_bonne_min <= marge_pct <= config.tres_bonne_max:
-                    categorie_key = 'tres_bonne'
-                else:
-                    if marge_pct < config.mauvaise_min: categorie_key = 'mauvaise'
-                    elif marge_pct > config.tres_bonne_max: categorie_key = 'tres_bonne'
+                limits = {
+                    'm_min': float(config.mauvaise_min), 'm_max': float(config.mauvaise_max),
+                    'b_min': float(config.bonne_min),    'b_max': float(config.bonne_max),
+                    'tb_min': float(config.tres_bonne_min), 'tb_max': float(config.tres_bonne_max)
+                }
+                is_default = False
+            else:
+                limits = {
+                    'm_min': DEFAULT_CONFIG['mauvaise_min'], 'm_max': DEFAULT_CONFIG['mauvaise_max'],
+                    'b_min': DEFAULT_CONFIG['bonne_min'],    'b_max': DEFAULT_CONFIG['bonne_max'],
+                    'tb_min': DEFAULT_CONFIG['tres_bonne_min'], 'tb_max': DEFAULT_CONFIG['tres_bonne_max']
+                }
+                is_default = True
+
+            # Choix catégorie
+            categorie_key = 'tres_mauvaise' # Repli
             
-            # Initialisation Agence
-            if agence_id not in stats_data:
-                stats_data[agence_id] = {'nom_agence': nom_agence, 'stats_journalieres': {}}
+            if limits['m_min'] <= marge_pct <= limits['m_max']:
+                categorie_key = 'tres_mauvaise'
+            elif limits['b_min'] <= marge_pct <= limits['b_max']:
+                categorie_key = 'mauvaise'
+            elif limits['tb_min'] <= marge_pct <= limits['tb_max']:
+                categorie_key = 'bonne'
+            else:
+                if marge_pct < limits['m_min']: categorie_key = 'tres_mauvaise'
+                elif marge_pct > limits['tb_max']: categorie_key = 'bonne'
+
+            # --- CONSTRUCTION STRUCTURE ---
+            if agence_pk not in stats_data:
+                stats_data[agence_pk] = {'nom_agence': nom_agence, 'stats_journalieres': {}}
             
-            # Initialisation Jour
-            if date_vente not in stats_data[agence_id]['stats_journalieres']:
-                stats_data[agence_id]['stats_journalieres'][date_vente] = {
-                    'tres_bonne': {'nom': 'Très Bonne Marge', 'couleur': '#28a745', 'articles': []},
-                    'bonne': {'nom': 'Bonne Marge', 'couleur': '#ffc107', 'articles': []},
-                    'mauvaise': {'nom': 'Mauvaise Marge', 'couleur': '#dc3545', 'articles': []},
-                    'non_configure': {'nom': 'Marge Non Configurée', 'couleur': '#6c757d', 'articles': []}
+            if date_vente not in stats_data[agence_pk]['stats_journalieres']:
+                stats_data[agence_pk]['stats_journalieres'][date_vente] = {
+                    'bonne': {'nom': 'Bonne Marge', 'couleur': '#d4edda', 'articles': []},        # Ancien 'tres_bonne' -> Vert
+                    'mauvaise': {'nom': 'Mauvaise Marge', 'couleur': '#fff3cd', 'articles': []},  # Ancien 'bonne' -> Jaune/Orange
+                    'tres_mauvaise': {'nom': 'Très Mauvaise Marge', 'couleur': '#f8d7da', 'articles': []}, # Ancien 'mauvaise' -> Rouge
+        
+                    'non_configure': {'nom': 'Marge Non Configurée', 'couleur': '#e2e3e5', 'articles': []}
                 }
             
-            # Récupération de la liste cible
-            liste_articles = stats_data[agence_id]['stats_journalieres'][date_vente][categorie_key]['articles']
+            # Ajout à la liste
+            target_list = stats_data[agence_pk]['stats_journalieres'][date_vente][categorie_key]['articles']
             
-            # Recherche si l'article existe déjà dans la liste pour cumuler
+            # Fusion si article existe déjà ce jour là dans cette catégorie
             found = False
-            for item in liste_articles:
+            for item in target_list:
                 if item['reference'] == article.reference_article:
-                    item['quantite'] += float(vente.quantite)
-                    item['chiffre_affaires'] += float(ca)
-                    item['marge'] += float(marge_valeur)
+                    item['quantite'] += qte
+                    item['chiffre_affaires'] += ca
+                    item['marge'] += marge_valeur
                     item['pourcentage_marge'] = (item['marge'] / item['chiffre_affaires'] * 100) if item['chiffre_affaires'] > 0 else 0
                     found = True
                     break
             
             if not found:
-                liste_articles.append({
-                    'id': article.pk,  # --- CORRECTION ICI : .pk ---
+                target_list.append({
+                    'id': article.pk,
                     'reference': article.reference_article,
                     'designation': article.designation,
-                    'quantite': float(vente.quantite),
-                    'chiffre_affaires': float(ca),
-                    'marge': float(marge_valeur),
-                    'pourcentage_marge': float(marge_pct)
+                    'quantite': qte,
+                    'chiffre_affaires': ca,
+                    'marge': marge_valeur,
+                    'pourcentage_marge': marge_pct,
+                    'is_default': is_default
                 })
 
         # Sauvegarde session
-        # Astuce : on convertit les clés agence_id en string pour éviter les soucis JSON si c'était des UUID
-        stats_data_str_keys = {str(k): v for k, v in stats_data.items()}
-        
         request.session['suivi_statistique'] = {
             'date_debut': date_debut,
             'date_fin': date_fin,
-            'statistiques_par_agence': stats_data_str_keys
+            'statistiques_par_agence': stats_data
         }
         
-        return JsonResponse({'success': True, 'statistiques': stats_data_str_keys, 'date_debut': date_debut, 'date_fin': date_fin})
+        return JsonResponse({'success': True, 'statistiques': stats_data, 'date_debut': date_debut, 'date_fin': date_fin})
         
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return JsonResponse({'success': False, 'error': f"Erreur serveur : {str(e)}"})
+        return JsonResponse({'success': False, 'error': str(e)})
 
-        
+
 def export_suivi_statistique_excel(request):
-    """Exporter les statistiques de suivi en Excel"""
+    """
+    Exporter les statistiques de suivi en Excel.
+    Structure identique au tableau HTML : Ref, Désignation, Qté, CA, Marge, %
+    """
     
-    # 1. Vérification des droits
-    # compte, redirect_response = check_comptable_access(request)
-    # if redirect_response: return redirect_response
-    
-    # 2. Vérification des données
+    # 1. Vérification des données
     stats_data = request.session.get('suivi_statistique')
     if not stats_data:
-        return JsonResponse({'success': False, 'error': 'Aucune donnée à exporter'})
+        return JsonResponse({'success': False, 'error': 'Aucune donnée à exporter. Veuillez générer les statistiques d\'abord.'})
 
-    # 3. Importation sécurisée
+    # 2. Importation openpyxl
     try:
         import openpyxl
         from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     except ImportError:
-        return JsonResponse({'success': False, 'error': 'Module openpyxl manquant'})
+        return JsonResponse({'success': False, 'error': 'Module openpyxl manquant sur le serveur'})
         
     from django.http import HttpResponse
     
-    # 4. Création du fichier Excel
+    # 3. Création du classeur
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Suivi Marges"
 
-    # Styles
+    # --- STYLES ---
+    # Couleurs correspondant (à peu près) à votre HTML
     fill_tres_bonne = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid") # Vert
     fill_bonne = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")      # Jaune
     fill_mauvaise = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")   # Rouge
-    fill_non_config = PatternFill(start_color="E7E6E6", end_color="E7E6E6", fill_type="solid") # Gris
+    fill_header_col = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid") # Gris clair pour les entêtes de colonnes
     
-    header_font = Font(bold=True)
-    row = 1
-    headers = ['Référence', 'Désignation', 'Quantité', 'CA (FCFA)', 'Marge (FCFA)', '% Réalisé']
+    font_bold = Font(bold=True)
+    font_header_cat = Font(bold=True, size=11)
+    
+    border_thin = Border(bottom=Side(style='thin', color="CCCCCC"))
 
-    # 5. Boucle sur les agences
+    row = 1
+    
+    # Colonnes exactes demandées
+    headers = ['Référence', 'Désignation', 'Quantité', 'C.A. (FCFA)', 'Marge (FCFA)', '% Marge']
+
+    # 4. Parcours des données
     if stats_data and 'statistiques_par_agence' in stats_data:
         for agence_id, agence_data in stats_data['statistiques_par_agence'].items():
-            # Titre Agence
+            
+            # --- En-tête Agence ---
             ws.merge_cells(f'A{row}:F{row}')
-            ws[f'A{row}'] = f"AGENCE : {agence_data['nom_agence']}"
-            ws[f'A{row}'].font = Font(bold=True, size=12)
-            row += 1
-    
-            # Boucle sur les dates
-            for date_jour, cats in sorted(agence_data['stats_journalieres'].items()):
-                # Titre Date
+            cell_agence = ws[f'A{row}']
+            cell_agence.value = f"AGENCE : {agence_data['nom_agence']}"
+            cell_agence.font = Font(bold=True, size=14, color="FFFFFF")
+            cell_agence.fill = PatternFill(start_color="4e73df", end_color="4e73df", fill_type="solid") # Bleu style dashboard
+            cell_agence.alignment = Alignment(horizontal='center', vertical='center')
+            ws.row_dimensions[row].height = 25
+            row += 2
+
+            # --- Parcours des Dates ---
+            # On trie les dates (la plus récente en haut, comme le HTML)
+            jours_tries = sorted(agence_data['stats_journalieres'].items(), reverse=True)
+
+            for date_jour, cats in jours_tries:
+                
+                # Vérifier s'il y a des données pour ce jour
+                has_data_day = False
+                for k in ['tres_bonne', 'bonne', 'mauvaise', 'non_configure']:
+                    if cats.get(k) and cats[k].get('articles'):
+                        has_data_day = True
+                        break
+                
+                if not has_data_day:
+                    continue
+
+                # --- En-tête Date ---
                 ws.merge_cells(f'A{row}:F{row}')
-                ws[f'A{row}'] = f"--- {date_jour} ---"
-                ws[f'A{row}'].alignment = Alignment(horizontal='center')
+                cell_date = ws[f'A{row}']
+                cell_date.value = f"📅 DATE : {date_jour}"
+                cell_date.font = Font(bold=True, size=11, color="4e73df")
+                cell_date.border = Border(bottom=Side(style='medium', color="4e73df"))
                 row += 1
-    
-                # On boucle sur les 4 catégories imposées
+
+                # Ordre d'affichage des catégories
                 ordre_cats = [
-                    ('tres_bonne', 'Très Bonne Marge', fill_tres_bonne),
-                    ('bonne', 'Bonne Marge', fill_bonne),
-                    ('mauvaise', 'Mauvaise Marge', fill_mauvaise),
-                    ('non_configure', '⚠️ Non Configuré (À définir)', fill_non_config)
+                    ('bonne', 'Bonne Marge', fill_tres_bonne),
+                    ('mauvaise', 'Mauvaise Marge', fill_bonne),
+                    ('tres_mauvaise', 'tres Mauvaise Marge', fill_mauvaise),
+                    # On garde non_configure au cas où, même si rare avec la nouvelle logique
+                    ('non_configure', 'Non Configuré', PatternFill(start_color="E7E6E6", end_color="E7E6E6", fill_type="solid"))
                 ]
-    
+
                 for key, label, fill_style in ordre_cats:
-                    # On récupère les articles de cette catégorie
                     cat_data = cats.get(key)
                     if not cat_data or 'articles' not in cat_data:
                         continue
@@ -20476,48 +20528,84 @@ def export_suivi_statistique_excel(request):
                     articles = cat_data['articles']
                     
                     if articles:
-                        # Titre Catégorie
+                        # --- En-tête Catégorie (ex: Très Bonne Marge) ---
                         ws.merge_cells(f'A{row}:F{row}')
-                        cell = ws.cell(row=row, column=1, value=label)
-                        cell.fill = fill_style
-                        cell.font = header_font
+                        cell_cat = ws.cell(row=row, column=1, value=f"{label} ({len(articles)} articles)")
+                        cell_cat.fill = fill_style
+                        cell_cat.font = font_header_cat
                         row += 1
                         
-                        # Headers Colonnes
-                        for col, h in enumerate(headers, 1):
-                            c = ws.cell(row=row, column=col, value=h)
-                            c.font = Font(bold=True, size=9)
-                            c.border = Border(bottom=Side(style='thin'))
+                        # --- En-têtes Colonnes du Tableau ---
+                        for col_idx, header_name in enumerate(headers, 1):
+                            c = ws.cell(row=row, column=col_idx, value=header_name)
+                            c.font = font_bold
+                            c.fill = fill_header_col
+                            c.border = border_thin
+                            c.alignment = Alignment(horizontal='center')
                         row += 1
-    
-                        # Liste des Articles
-                        for art in articles:
-                            ws.cell(row=row, column=1, value=art['reference'])
-                            ws.cell(row=row, column=2, value=art['designation'])
-                            ws.cell(row=row, column=3, value=art['quantite'])
-                            
-                            c_ca = ws.cell(row=row, column=4, value=art['chiffre_affaires'])
-                            c_ca.number_format = '#,##0'
-                            
-                            c_marge = ws.cell(row=row, column=5, value=art['marge'])
-                            c_marge.number_format = '#,##0'
-                            
-                            pct_cell = ws.cell(row=row, column=6, value=art['pourcentage_marge'] / 100)
-                            pct_cell.number_format = '0.00%'
-                            
-                            row += 1
-                        row += 1 # Espace après chaque catégorie
 
-    # Auto-size colonne B
-    ws.column_dimensions['B'].width = 40
+                        # --- Lignes Articles ---
+                        for art in articles:
+                            # Ajout d'un marqueur si config par défaut
+                            designation = art['designation']
+                            if art.get('is_default'):
+                                designation += " (*)" # Marqueur discret pour Excel
+
+                            # Col 1: Référence
+                            ws.cell(row=row, column=1, value=art['reference'])
+                            
+                            # Col 2: Désignation
+                            ws.cell(row=row, column=2, value=designation)
+                            
+                            # Col 3: Quantité
+                            c_qte = ws.cell(row=row, column=3, value=art['quantite'])
+                            c_qte.alignment = Alignment(horizontal='center')
+                            
+                            # Col 4: C.A.
+                            c_ca = ws.cell(row=row, column=4, value=art['chiffre_affaires'])
+                            c_ca.number_format = '#,##0 "FCFA"' # Format Excel monétaire
+                            
+                            # Col 5: Marge Valeur
+                            c_marge = ws.cell(row=row, column=5, value=art['marge'])
+                            c_marge.number_format = '#,##0 "FCFA"'
+                            
+                            # Col 6: % Marge
+                            # Attention: Excel attend 0.15 pour 15%.
+                            # Si vos données sont déjà en 15.0, il faut diviser par 100.
+                            valeur_pct = art['pourcentage_marge']
+                            if valeur_pct > 1: # Supposons que c'est stocké comme 15.5
+                                valeur_pct = valeur_pct / 100
+                                
+                            c_pct = ws.cell(row=row, column=6, value=valeur_pct)
+                            c_pct.number_format = '0.00%'
+                            
+                            # Coloration du texte Marge si négatif
+                            if art['marge'] < 0:
+                                c_marge.font = Font(color="FF0000")
+                                c_pct.font = Font(color="FF0000")
+
+                            row += 1
+                        
+                        row += 1 # Espace après chaque tableau de catégorie
+                
+                row += 1 # Espace entre les jours
+
+    # --- Ajustement des largeurs de colonnes ---
+    ws.column_dimensions['A'].width = 15 # Ref
+    ws.column_dimensions['B'].width = 40 # Designation
+    ws.column_dimensions['C'].width = 10 # Qté
+    ws.column_dimensions['D'].width = 18 # CA
+    ws.column_dimensions['E'].width = 18 # Marge
+    ws.column_dimensions['F'].width = 12 # %
+
+    # 5. Envoi
+    from django.utils import timezone
+    filename = f"Suivi_Marges_{timezone.now().strftime('%d-%m-%Y')}.xlsx"
     
-    # 6. Envoi du fichier
-    filename = f"Suivi_Marges_{stats_data['date_debut']}.xlsx"
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     wb.save(response)
     return response
-
 
 
 from django.shortcuts import render, redirect, get_object_or_404
@@ -21746,3 +21834,5 @@ def consulter_tresorerie(request):
         'agence': agence
     }
     return render(request, 'supermarket/comptabiliter/consulter_tresorerie.html', context)
+
+ 
