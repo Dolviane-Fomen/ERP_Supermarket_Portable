@@ -1,0 +1,247 @@
+{% extends 'supermarket/achats/dashboard.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    .bon-commande-container {
+        background: white;
+        border-radius: 16px;
+        padding: 40px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+        max-width: 900px;
+        margin: 0 auto;
+    }
+    
+    .header-bon {
+        border-bottom: 3px solid #11998e;
+        padding-bottom: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .header-bon h1 {
+        color: #2c3e50;
+        font-size: 2em;
+        margin-bottom: 10px;
+    }
+    
+    .header-bon .numero {
+        color: #11998e;
+        font-size: 1.2em;
+        font-weight: 600;
+    }
+    
+    .info-section {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+        margin-bottom: 30px;
+    }
+    
+    .info-box {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+    }
+    
+    .info-box h3 {
+        color: #11998e;
+        font-size: 1.1em;
+        margin-bottom: 15px;
+        border-bottom: 2px solid #11998e;
+        padding-bottom: 8px;
+    }
+    
+    .info-box p {
+        margin: 8px 0;
+        color: #2c3e50;
+    }
+    
+    .articles-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 30px 0;
+    }
+    
+    .articles-table thead {
+        background: linear-gradient(135deg, #2d1b69 0%, #11998e 100%);
+        color: white;
+    }
+    
+    .articles-table th {
+        padding: 15px;
+        text-align: left;
+        font-weight: 600;
+    }
+    
+    .articles-table td {
+        padding: 15px;
+        border-bottom: 1px solid #ecf0f1;
+    }
+    
+    .articles-table tbody tr:hover {
+        background: #f8f9fa;
+    }
+    
+    .total-section {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        margin-top: 30px;
+    }
+    
+    .total-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 0;
+        font-size: 1.1em;
+    }
+    
+    .total-row.final {
+        font-size: 1.5em;
+        font-weight: 700;
+        color: #2c3e50;
+        border-top: 3px solid #11998e;
+        padding-top: 15px;
+        margin-top: 10px;
+    }
+    
+    .btn-actions {
+        margin-top: 30px;
+        text-align: center;
+    }
+    
+    .btn {
+        padding: 12px 30px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        font-weight: 600;
+        margin: 0 10px;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, #2d1b69 0%, #11998e 100%);
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(45, 27, 105, 0.3);
+    }
+</style>
+
+<div class="bon-commande-container">
+    <div class="header-bon">
+        <h1>BON DE COMMANDE</h1>
+        <div class="numero">N° {{ commande.numero_commande }}</div>
+    </div>
+    
+    <div class="info-section">
+        <div class="info-box">
+            <h3><i class="fas fa-building"></i> Informations Entreprise</h3>
+            {% if agence.logo %}
+            <div style="text-align: center; margin-bottom: 15px;">
+                <img src="{{ agence.logo.url }}" alt="Logo {{ agence.nom_agence }}" style="max-width: 200px; max-height: 120px; object-fit: contain;">
+            </div>
+            {% endif %}
+            <p style="font-size: 1.2em; font-weight: 700; color: #2c3e50; margin-bottom: 8px;"><strong>SUPER MARKET</strong></p>
+            <p style="margin-bottom: 8px;">GROS - DEMI GROS - DETAIL</p>
+            <p style="margin-bottom: 8px;">BP 11190 YAOUNDE - {{ agence.nom_agence|default:"AGENCE" }}</p>
+            <p style="margin-bottom: 8px;"><i class="fas fa-phone"></i> TEL: (237) 670930091</p>
+            <p style="margin-bottom: 8px;"><i class="fas fa-id-card"></i> NUI: P029418061497G</p>
+            {% if agence.numero_entreprise %}
+            <p style="margin-bottom: 8px;"><strong>N° Entreprise:</strong> {{ agence.numero_entreprise }}</p>
+            {% endif %}
+            {% if agence.email %}
+            <p style="margin-bottom: 8px;"><i class="fas fa-envelope"></i> Email: {{ agence.email }}</p>
+            {% endif %}
+            {% if agence.site_web %}
+            <p style="margin-bottom: 8px;"><i class="fas fa-globe"></i> Site web: {{ agence.site_web }}</p>
+            {% endif %}
+        </div>
+        
+        <div class="info-box">
+            <h3><i class="fas fa-truck"></i> Informations Fournisseur</h3>
+            <p><strong>{{ commande.nom_fournisseur }}</strong></p>
+            <p>{{ commande.adresse_fournisseur }}</p>
+            {% if commande.telephone_fournisseur %}
+            <p><i class="fas fa-phone"></i> {{ commande.telephone_fournisseur }}</p>
+            {% endif %}
+            {% if commande.email_fournisseur %}
+            <p><i class="fas fa-envelope"></i> {{ commande.email_fournisseur }}</p>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="info-section">
+        <div class="info-box">
+            <h3><i class="fas fa-calendar"></i> Dates</h3>
+            <p><strong>Date de commande:</strong> {{ commande.date_commande|date:"d/m/Y" }}</p>
+            <p><strong>Date livraison prévue:</strong> {{ commande.date_livraison_prevue|date:"d/m/Y" }}</p>
+        </div>
+        
+        <div class="info-box">
+            <h3><i class="fas fa-map-marker-alt"></i> Livraison</h3>
+            <p>{{ commande.adresse_livraison }}</p>
+        </div>
+    </div>
+    
+    <table class="articles-table">
+        <thead>
+            <tr>
+                <th>Réf.</th>
+                <th>Désignation</th>
+                <th>Quantité</th>
+                <th>Prix unitaire</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ligne in commande.lignes.all %}
+            <tr>
+                <td>{{ ligne.article.reference_article }}</td>
+                <td>{{ ligne.article.designation }}</td>
+                <td>{{ ligne.quantite }}</td>
+                <td>{{ ligne.prix_unitaire|floatformat:2 }} FCFA</td>
+                <td><strong>{{ ligne.prix_total|floatformat:2 }} FCFA</strong></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <div class="total-section">
+        <div class="total-row">
+            <span>Total HT:</span>
+            <span>{{ commande.total_ht|floatformat:2 }} FCFA</span>
+        </div>
+        <div class="total-row">
+            <span>TVA (18%):</span>
+            <span>{{ commande.total_tva|floatformat:2 }} FCFA</span>
+        </div>
+        <div class="total-row final">
+            <span>Total TTC:</span>
+            <span>{{ commande.total_ttc|floatformat:2 }} FCFA</span>
+        </div>
+    </div>
+    
+    {% if commande.commentaire %}
+    <div class="info-box" style="margin-top: 20px;">
+        <h3><i class="fas fa-comment"></i> Commentaire</h3>
+        <p>{{ commande.commentaire }}</p>
+    </div>
+    {% endif %}
+    
+    <div class="btn-actions">
+        <a href="{% url 'generer_bon_commande_pdf' commande.id %}" class="btn btn-primary" style="text-decoration: none; display: inline-block;">
+            <i class="fas fa-file-pdf"></i> Télécharger PDF
+        </a>
+        <button class="btn btn-primary" onclick="window.print()">
+            <i class="fas fa-print"></i> Imprimer
+        </button>
+        <a href="{% url 'generer_bon_commande' %}" class="btn btn-primary" style="text-decoration: none; display: inline-block;">
+            <i class="fas fa-plus"></i> Nouveau Bon de Commande
+        </a>
+    </div>
+</div>
+{% endblock %}

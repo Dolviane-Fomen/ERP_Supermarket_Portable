@@ -258,6 +258,18 @@ urlpatterns = [
     path('financier/login/', views.login_financier, name='login_financier'),
     path('financier/logout/', views.logout_financier, name='logout_financier'),
     path('financier/', views.dashboard_financier, name='dashboard_financier'),
+    
+    # ===== MODULE GESTION ACHATS =====
+    path('achats/login/', views.login_achats, name='login_achats'),
+    path('achats/logout/', views.logout_achats, name='logout_achats'),
+    path('achats/', views.dashboard_achats, name='dashboard_achats'),
+    path('achats/generer-bon-commande/', views.generer_bon_commande, name='generer_bon_commande'),
+    path('achats/consulter-bons-commande/', views.consulter_bons_commande, name='consulter_bons_commande'),
+    path('achats/bon-commande/<int:commande_id>/', views.voir_bon_commande, name='voir_bon_commande'),
+    path('achats/bon-commande/<int:commande_id>/modifier/', views.modifier_bon_commande, name='modifier_bon_commande'),
+    path('achats/bon-commande/<int:commande_id>/supprimer/', views.supprimer_bon_commande, name='supprimer_bon_commande'),
+    path('achats/bon-commande/<int:commande_id>/pdf/', views.generer_bon_commande_pdf, name='generer_bon_commande_pdf'),
+    path('achats/get-fournisseur/<int:fournisseur_id>/', views.get_fournisseur_ajax, name='get_fournisseur_ajax'),
     path('financier/suivi-statistique/', views.suivi_statistique, name='suivi_statistique'),
     path('financier/generer-suivi-statistique/', views.generer_suivi_statistique, name='generer_suivi_statistique'),
     path('financier/export-suivi-statistique-excel/', views.export_suivi_statistique_excel, name='export_suivi_statistique_excel'),

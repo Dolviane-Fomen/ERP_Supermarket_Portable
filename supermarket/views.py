@@ -20,7 +20,8 @@ from .models import (
     FactureTemporaire, Famille, Fournisseur, MouvementStock, PlanComptable, PlanTiers, CodeJournaux,
     TauxTaxe, FactureAchat, LigneFactureAchat, FactureTransfert, LigneFactureTransfert,
     Commande, Livraison, FactureCommande, StatistiqueClient, DocumentCommande, LigneCommande, Notification,
-    Livreur, SuiviClientAction,Depense,ChiffreAffaire,Tresorerie,Beneficiaire
+    Livreur, SuiviClientAction,Depense,ChiffreAffaire,Tresorerie,Beneficiaire,
+    CommandeFournisseur, LigneCommandeFournisseur
 )
 from .decorators import (
     require_stock_modify_access,
@@ -19845,7 +19846,7 @@ def generer_etat_depense(request):
                     
                 # Récupérer le nom du bénéficiaire comme dans le module comptabilité
                 nom_beneficiaire = depense.beneficiaire.nom_complet if depense.beneficiaire else "Non assigné"
-                
+                    
                 liste_depenses.append({
                     'date': date_str,
                     'libelle': depense.libelle,
@@ -20293,7 +20294,7 @@ def generer_suivi_statistique(request):
     """Génère les stats en comparant chaque article à SA propre configuration de marge"""
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'Méthode non autorisée'})
-        
+    
     date_debut = request.POST.get('date_debut')
     date_fin = request.POST.get('date_fin')
     
@@ -20347,8 +20348,10 @@ def generer_suivi_statistique(request):
                 elif config.tres_bonne_min <= marge_pct <= config.tres_bonne_max:
                     categorie_key = 'tres_bonne'
                 else:
-                    if marge_pct < config.mauvaise_min: categorie_key = 'mauvaise'
-                    elif marge_pct > config.tres_bonne_max: categorie_key = 'tres_bonne'
+                    if marge_pct < config.mauvaise_min:
+                        categorie_key = 'mauvaise'
+                    elif marge_pct > config.tres_bonne_max:
+                        categorie_key = 'tres_bonne'
             
             # Initialisation Agence
             if agence_id not in stats_data:
@@ -20405,7 +20408,7 @@ def generer_suivi_statistique(request):
         traceback.print_exc()
         return JsonResponse({'success': False, 'error': f"Erreur serveur : {str(e)}"})
 
-        
+
 def export_suivi_statistique_excel(request):
     """Exporter les statistiques de suivi en Excel"""
     
@@ -20417,7 +20420,7 @@ def export_suivi_statistique_excel(request):
     stats_data = request.session.get('suivi_statistique')
     if not stats_data:
         return JsonResponse({'success': False, 'error': 'Aucune donnée à exporter'})
-
+        
     # 3. Importation sécurisée
     try:
         import openpyxl
@@ -20426,12 +20429,12 @@ def export_suivi_statistique_excel(request):
         return JsonResponse({'success': False, 'error': 'Module openpyxl manquant'})
         
     from django.http import HttpResponse
-    
+        
     # 4. Création du fichier Excel
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Suivi Marges"
-
+        
     # Styles
     fill_tres_bonne = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid") # Vert
     fill_bonne = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")      # Jaune
@@ -20450,7 +20453,7 @@ def export_suivi_statistique_excel(request):
             ws[f'A{row}'] = f"AGENCE : {agence_data['nom_agence']}"
             ws[f'A{row}'].font = Font(bold=True, size=12)
             row += 1
-    
+            
             # Boucle sur les dates
             for date_jour, cats in sorted(agence_data['stats_journalieres'].items()):
                 # Titre Date
@@ -20458,7 +20461,7 @@ def export_suivi_statistique_excel(request):
                 ws[f'A{row}'] = f"--- {date_jour} ---"
                 ws[f'A{row}'].alignment = Alignment(horizontal='center')
                 row += 1
-    
+                
                 # On boucle sur les 4 catégories imposées
                 ordre_cats = [
                     ('tres_bonne', 'Très Bonne Marge', fill_tres_bonne),
@@ -20489,7 +20492,7 @@ def export_suivi_statistique_excel(request):
                             c.font = Font(bold=True, size=9)
                             c.border = Border(bottom=Side(style='thin'))
                         row += 1
-    
+                    
                         # Liste des Articles
                         for art in articles:
                             ws.cell(row=row, column=1, value=art['reference'])
@@ -20506,7 +20509,7 @@ def export_suivi_statistique_excel(request):
                             pct_cell.number_format = '0.00%'
                             
                             row += 1
-                        row += 1 # Espace après chaque catégorie
+                        row += 1  # Espace après chaque catégorie
 
     # Auto-size colonne B
     ws.column_dimensions['B'].width = 40
@@ -21133,7 +21136,7 @@ def consulter_depenses(request):
         'agence': agence,
         'nom_utilisateur': nom_utilisateur,
     }
-    return render(request, 'supermarket/comptabiliter/consulter_depenses.html', context)  
+    return render(request, 'supermarket/comptabiliter/consulter_depenses.html', context)   
     
 @login_required
 def suivi_chiffre_affaire(request):
@@ -21564,7 +21567,7 @@ def consulter_tresorerie(request):
     
     # Imports locaux (à adapter selon votre structure)
     from .models import Tresorerie, LigneFactureVente, Compte
-
+    
     # 1. Identification Agence
     try:
         agence = get_user_agence(request)
@@ -21605,7 +21608,7 @@ def consulter_tresorerie(request):
         # Calcul du CA du jour pour chaque ligne
         ventes_jour = LigneFactureVente.objects.filter(
             facture_vente__agence=agence,
-            facture_vente__date=t.date 
+            facture_vente__date=t.date
         )
         ca_du_jour = ventes_jour.aggregate(total=Sum(F('quantite') * F('prix_unitaire')))['total'] or Decimal('0')
         t.ca_temp = ca_du_jour
@@ -21747,3 +21750,962 @@ def consulter_tresorerie(request):
         'agence': agence
     }
     return render(request, 'supermarket/comptabiliter/consulter_tresorerie.html', context)
+
+# ==================== MODULE GESTION ACHATS ====================
+
+def login_achats(request):
+    """Page de connexion pour le module Gestion Achats"""
+    # Toujours afficher la page de connexion, même si l'utilisateur est déjà connecté
+    if request.user.is_authenticated and request.method == 'GET':
+        logout(request)
+        request.session.flush()
+    
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        
+        if username and password:
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                try:
+                    compte = Compte.objects.get(user=user, actif=True)
+                    if compte.agence:
+                        # Pour l'instant, permettre l'accès à tous les utilisateurs (admin, comptable, etc.)
+                        # On peut restreindre plus tard si nécessaire
+                        login(request, user)
+                        # Stocker l'agence dans la session
+                        request.session['agence_id'] = compte.agence.id_agence
+                        request.session['agence_nom'] = compte.agence.nom_agence
+                        messages.success(request, f'Connexion réussie ! Bienvenue {compte.nom_complet}')
+                        # Rediriger vers la page demandée (next) ou vers le dashboard
+                        next_url = request.GET.get('next', 'dashboard_achats')
+                        return redirect(next_url)
+                    else:
+                        messages.error(request, 'Votre compte n\'est pas lié à une agence.')
+                except Compte.DoesNotExist:
+                    messages.error(request, 'Compte non trouvé ou inactif.')
+            else:
+                messages.error(request, 'Nom d\'utilisateur ou mot de passe incorrect.')
+        else:
+            messages.error(request, 'Veuillez remplir tous les champs.')
+    
+    return render(request, 'supermarket/achats/login.html')
+
+def logout_achats(request):
+    """Déconnexion du module Gestion Achats"""
+    logout(request)
+    request.session.flush()
+    messages.success(request, 'Vous avez été déconnecté avec succès.')
+    return redirect('index')
+
+@login_required
+def dashboard_achats(request):
+    """Dashboard principal du module Gestion Achats"""
+    try:
+        compte = Compte.objects.get(user=request.user, actif=True)
+        agence = get_user_agence(request)
+        if not agence:
+            messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+            return redirect('logout_achats')
+        
+        context = {
+            'compte': compte,
+            'agence': agence,
+        }
+        return render(request, 'supermarket/achats/dashboard.html', context)
+    except Compte.DoesNotExist:
+        messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+        return redirect('index')
+
+@login_required
+def generer_bon_commande(request):
+    """Générer un bon de commande fournisseur"""
+    try:
+        compte = Compte.objects.get(user=request.user, actif=True)
+        agence = get_user_agence(request)
+        if not agence:
+            messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+            return redirect('logout_achats')
+        
+        # Récupérer les fournisseurs depuis la table Fournisseur
+        fournisseurs_bdd = Fournisseur.objects.filter(agence=agence).order_by('intitule')
+        
+        # Récupérer les noms de fournisseurs uniques depuis les commandes existantes
+        fournisseurs_commandes = CommandeFournisseur.objects.filter(
+            agence=agence
+        ).values_list('nom_fournisseur', flat=True).distinct().order_by('nom_fournisseur')
+        
+        # Créer une liste combinée de tous les fournisseurs (BDD + commandes)
+        fournisseurs_dict = {}
+        
+        # Ajouter les fournisseurs de la BDD
+        for f in fournisseurs_bdd:
+            fournisseurs_dict[f.intitule.lower()] = {
+                'id': f.id,
+                'nom': f.intitule,
+                'adresse': f.adresse,
+                'telephone': f.telephone,
+                'email': f.email,
+                'from_bdd': True
+            }
+        
+        # Ajouter les fournisseurs des commandes (s'ils ne sont pas déjà dans la BDD)
+        for nom_fournisseur in fournisseurs_commandes:
+            if nom_fournisseur and nom_fournisseur.lower() not in fournisseurs_dict:
+                # Récupérer les infos depuis la dernière commande avec ce fournisseur
+                derniere_commande = CommandeFournisseur.objects.filter(
+                    agence=agence,
+                    nom_fournisseur=nom_fournisseur
+                ).order_by('-date_creation').first()
+                
+                if derniere_commande:
+                    fournisseurs_dict[nom_fournisseur.lower()] = {
+                        'id': None,  # Pas dans la BDD
+                        'nom': nom_fournisseur,
+                        'adresse': derniere_commande.adresse_fournisseur or '',
+                        'telephone': derniere_commande.telephone_fournisseur or '',
+                        'email': derniere_commande.email_fournisseur or '',
+                        'from_bdd': False
+                    }
+        
+        # Convertir en liste triée par nom
+        fournisseurs_list = sorted(fournisseurs_dict.values(), key=lambda x: x['nom'])
+        
+        articles = Article.objects.filter(agence=agence).order_by('designation')
+        
+        if request.method == 'POST':
+            # Traitement du formulaire
+            try:
+                # Générer un numéro de commande unique
+                from datetime import datetime
+                date_now = datetime.now()
+                numero_base = f"BC-{date_now.strftime('%Y%m%d')}"
+                dernier_numero = CommandeFournisseur.objects.filter(
+                    numero_commande__startswith=numero_base
+                ).order_by('-numero_commande').first()
+                
+                if dernier_numero:
+                    try:
+                        num_seq = int(dernier_numero.numero_commande.split('-')[-1]) + 1
+                    except:
+                        num_seq = 1
+                else:
+                    num_seq = 1
+                
+                numero_commande = f"{numero_base}-{num_seq:04d}"
+                
+                # Récupérer le taux de TVA (par défaut 18%)
+                taux_tva = request.POST.get('taux_tva', '18.00')
+                try:
+                    taux_tva = Decimal(str(taux_tva))
+                except:
+                    taux_tva = Decimal('18.00')
+                
+                # Gérer le fournisseur
+                fournisseur_id = request.POST.get('fournisseur_id')
+                nom_fournisseur = request.POST.get('nom_fournisseur')
+                adresse_fournisseur = request.POST.get('adresse_fournisseur')
+                telephone_fournisseur = request.POST.get('telephone_fournisseur', '')
+                email_fournisseur = request.POST.get('email_fournisseur', '')
+                
+                # Si un fournisseur est sélectionné, utiliser ses données
+                fournisseur = None
+                if fournisseur_id and fournisseur_id != '0':
+                    try:
+                        fournisseur = Fournisseur.objects.get(id=fournisseur_id, agence=agence)
+                        nom_fournisseur = fournisseur.intitule
+                        adresse_fournisseur = fournisseur.adresse
+                        telephone_fournisseur = fournisseur.telephone
+                        email_fournisseur = fournisseur.email or ''
+                    except Fournisseur.DoesNotExist:
+                        pass
+                else:
+                    # Créer automatiquement le fournisseur s'il n'existe pas
+                    # Vérifier si un fournisseur avec le même nom existe déjà
+                    fournisseur_existant = Fournisseur.objects.filter(
+                        intitule__iexact=nom_fournisseur.strip(),
+                        agence=agence
+                    ).first()
+                    
+                    if fournisseur_existant:
+                        # Mettre à jour le fournisseur existant avec les nouvelles informations
+                        fournisseur_existant.adresse = adresse_fournisseur
+                        fournisseur_existant.telephone = telephone_fournisseur
+                        fournisseur_existant.email = email_fournisseur
+                        fournisseur_existant.save()
+                        fournisseur = fournisseur_existant
+                        fournisseur_id = fournisseur.id
+                    else:
+                        # Créer un nouveau fournisseur et le sauvegarder dans la base de données
+                        fournisseur = Fournisseur.objects.create(
+                            intitule=nom_fournisseur.strip(),
+                            adresse=adresse_fournisseur,
+                            telephone=telephone_fournisseur,
+                            email=email_fournisseur,
+                            agence=agence
+                        )
+                        fournisseur_id = fournisseur.id
+                        print(f"[ACHATS] Nouveau fournisseur créé: {fournisseur.intitule} (ID: {fournisseur.id})")
+                
+                # Créer la commande
+                commande = CommandeFournisseur.objects.create(
+                    numero_commande=numero_commande,
+                    date_commande=request.POST.get('date_commande'),
+                    date_livraison_prevue=request.POST.get('date_livraison_prevue'),
+                    adresse_livraison=request.POST.get('adresse_livraison'),
+                    nom_fournisseur=nom_fournisseur,
+                    adresse_fournisseur=adresse_fournisseur,
+                    telephone_fournisseur=telephone_fournisseur,
+                    email_fournisseur=email_fournisseur,
+                    taux_tva=taux_tva,
+                    statut='brouillon',
+                    commentaire=request.POST.get('commentaire', ''),
+                    fournisseur_id=fournisseur_id,
+                    agence=agence,
+                    cree_par=request.user
+                )
+                
+                # Traiter les articles sélectionnés (format JSON comme facture d'achat)
+                articles_data = request.POST.get('articles_data', '')
+                
+                if articles_data:
+                    import json
+                    try:
+                        articles = json.loads(articles_data)
+                        for article_data in articles:
+                            try:
+                                article = Article.objects.get(id=article_data['id'], agence=agence)
+                                LigneCommandeFournisseur.objects.create(
+                                    commande=commande,
+                                    article=article,
+                                    quantite=Decimal(str(article_data['quantite'])),
+                                    prix_unitaire=Decimal(str(article_data['prix_unitaire'])),
+                                    description=article_data.get('description', '')
+                                )
+                            except (Article.DoesNotExist, ValueError, KeyError):
+                                continue
+                    except json.JSONDecodeError:
+                        messages.error(request, 'Erreur lors du traitement des articles.')
+                else:
+                    # Fallback: traitement ancien format (si nécessaire)
+                    article_ids = request.POST.getlist('article_id[]')
+                    quantites = request.POST.getlist('quantite[]')
+                    prix_unitaires = request.POST.getlist('prix_unitaire[]')
+                    
+                    for i, article_id in enumerate(article_ids):
+                        if article_id and i < len(quantites) and i < len(prix_unitaires) and quantites[i] and prix_unitaires[i]:
+                            try:
+                                article = Article.objects.get(id=article_id, agence=agence)
+                                LigneCommandeFournisseur.objects.create(
+                                    commande=commande,
+                                    article=article,
+                                    quantite=Decimal(quantites[i]),
+                                    prix_unitaire=Decimal(prix_unitaires[i]),
+                                    description=request.POST.getlist('description[]')[i] if i < len(request.POST.getlist('description[]')) else ''
+                                )
+                            except (Article.DoesNotExist, ValueError, IndexError):
+                                continue
+                
+                # Recalculer les totaux
+                commande.calculer_totaux()
+                
+                # Vérifier si un nouveau fournisseur a été créé
+                fournisseur_initial_id = request.POST.get('fournisseur_id')
+                if not fournisseur_initial_id and fournisseur:
+                    messages.success(request, f'Bon de commande {numero_commande} créé avec succès ! Le fournisseur "{fournisseur.intitule}" a été créé et sauvegardé dans la base de données.')
+                else:
+                    messages.success(request, f'Bon de commande {numero_commande} créé et sauvegardé avec succès !')
+                
+                # Rediriger vers la liste des bons de commande au lieu du PDF directement
+                return redirect('consulter_bons_commande')
+                
+            except Exception as e:
+                messages.error(request, f'Erreur lors de la création du bon de commande : {str(e)}')
+        
+        context = {
+            'compte': compte,
+            'agence': agence,
+            'fournisseurs': fournisseurs_list,  # Liste combinée BDD + commandes
+            'articles': articles,
+        }
+        return render(request, 'supermarket/achats/generer_bon_commande.html', context)
+    except Compte.DoesNotExist:
+        messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+        return redirect('index')
+
+@login_required
+def get_fournisseur_ajax(request, fournisseur_id):
+    """Récupérer les données d'un fournisseur via AJAX"""
+    try:
+        agence = get_user_agence(request)
+        if not agence:
+            return JsonResponse({'success': False, 'error': 'Agence non trouvée'})
+        
+        fournisseur = Fournisseur.objects.get(id=fournisseur_id, agence=agence)
+        
+        return JsonResponse({
+            'success': True,
+            'fournisseur': {
+                'intitule': fournisseur.intitule,
+                'adresse': fournisseur.adresse,
+                'telephone': fournisseur.telephone,
+                'email': fournisseur.email or '',
+            }
+        })
+    except Fournisseur.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Fournisseur non trouvé'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+@login_required
+def consulter_bons_commande(request):
+    """Consulter tous les bons de commande enregistrés"""
+    try:
+        compte = Compte.objects.get(user=request.user, actif=True)
+        agence = get_user_agence(request)
+        if not agence:
+            messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+            return redirect('logout_achats')
+        
+        # Récupérer tous les bons de commande de l'agence
+        bons_commande = CommandeFournisseur.objects.filter(agence=agence).select_related('fournisseur', 'cree_par').prefetch_related('lignes').order_by('-date_creation')
+        
+        # Filtres optionnels
+        statut_filter = request.GET.get('statut')
+        if statut_filter:
+            bons_commande = bons_commande.filter(statut=statut_filter)
+        
+        date_debut = request.GET.get('date_debut')
+        date_fin = request.GET.get('date_fin')
+        if date_debut:
+            bons_commande = bons_commande.filter(date_commande__gte=date_debut)
+        if date_fin:
+            bons_commande = bons_commande.filter(date_commande__lte=date_fin)
+        
+        context = {
+            'compte': compte,
+            'agence': agence,
+            'bons_commande': bons_commande,
+            'statut_filter': statut_filter,
+            'date_debut': date_debut,
+            'date_fin': date_fin,
+        }
+        return render(request, 'supermarket/achats/consulter_bons_commande.html', context)
+    except Compte.DoesNotExist:
+        messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+        return redirect('index')
+
+@login_required
+def modifier_bon_commande(request, commande_id):
+    """Modifier un bon de commande existant"""
+    try:
+        compte = Compte.objects.get(user=request.user, actif=True)
+        agence = get_user_agence(request)
+        if not agence:
+            messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+            return redirect('logout_achats')
+        
+        try:
+            commande = CommandeFournisseur.objects.get(id=commande_id, agence=agence)
+        except CommandeFournisseur.DoesNotExist:
+            messages.error(request, 'Bon de commande non trouvé.')
+            return redirect('consulter_bons_commande')
+        
+        # Récupérer les fournisseurs (même logique que generer_bon_commande)
+        fournisseurs_bdd = Fournisseur.objects.filter(agence=agence).order_by('intitule')
+        fournisseurs_commandes = CommandeFournisseur.objects.filter(
+            agence=agence
+        ).values_list('nom_fournisseur', flat=True).distinct().order_by('nom_fournisseur')
+        
+        fournisseurs_dict = {}
+        for f in fournisseurs_bdd:
+            fournisseurs_dict[f.intitule.lower()] = {
+                'id': f.id,
+                'nom': f.intitule,
+                'adresse': f.adresse,
+                'telephone': f.telephone,
+                'email': f.email,
+                'from_bdd': True
+            }
+        
+        for nom_fournisseur in fournisseurs_commandes:
+            if nom_fournisseur and nom_fournisseur.lower() not in fournisseurs_dict:
+                derniere_commande = CommandeFournisseur.objects.filter(
+                    agence=agence,
+                    nom_fournisseur=nom_fournisseur
+                ).order_by('-date_creation').first()
+                
+                if derniere_commande:
+                    fournisseurs_dict[nom_fournisseur.lower()] = {
+                        'id': None,
+                        'nom': nom_fournisseur,
+                        'adresse': derniere_commande.adresse_fournisseur or '',
+                        'telephone': derniere_commande.telephone_fournisseur or '',
+                        'email': derniere_commande.email_fournisseur or '',
+                        'from_bdd': False
+                    }
+        
+        fournisseurs_list = sorted(fournisseurs_dict.values(), key=lambda x: x['nom'])
+        articles = Article.objects.filter(agence=agence).order_by('designation')
+        
+        if request.method == 'POST':
+            try:
+                # Récupérer le taux de TVA
+                taux_tva = request.POST.get('taux_tva', '18.00')
+                try:
+                    taux_tva = Decimal(str(taux_tva))
+                except:
+                    taux_tva = Decimal('18.00')
+                
+                # Gérer le fournisseur
+                fournisseur_id = request.POST.get('fournisseur_id')
+                nom_fournisseur = request.POST.get('nom_fournisseur')
+                adresse_fournisseur = request.POST.get('adresse_fournisseur')
+                telephone_fournisseur = request.POST.get('telephone_fournisseur', '')
+                email_fournisseur = request.POST.get('email_fournisseur', '')
+                
+                fournisseur = None
+                if fournisseur_id and fournisseur_id != '0':
+                    try:
+                        fournisseur = Fournisseur.objects.get(id=fournisseur_id, agence=agence)
+                        nom_fournisseur = fournisseur.intitule
+                        adresse_fournisseur = fournisseur.adresse
+                        telephone_fournisseur = fournisseur.telephone
+                        email_fournisseur = fournisseur.email or ''
+                    except Fournisseur.DoesNotExist:
+                        pass
+                else:
+                    fournisseur_existant = Fournisseur.objects.filter(
+                        intitule__iexact=nom_fournisseur.strip(),
+                        agence=agence
+                    ).first()
+                    
+                    if fournisseur_existant:
+                        fournisseur_existant.adresse = adresse_fournisseur
+                        fournisseur_existant.telephone = telephone_fournisseur
+                        fournisseur_existant.email = email_fournisseur
+                        fournisseur_existant.save()
+                        fournisseur = fournisseur_existant
+                        fournisseur_id = fournisseur.id
+                    else:
+                        fournisseur = Fournisseur.objects.create(
+                            intitule=nom_fournisseur.strip(),
+                            adresse=adresse_fournisseur,
+                            telephone=telephone_fournisseur,
+                            email=email_fournisseur,
+                            agence=agence
+                        )
+                        fournisseur_id = fournisseur.id
+                
+                # Mettre à jour la commande
+                commande.date_commande = request.POST.get('date_commande')
+                commande.date_livraison_prevue = request.POST.get('date_livraison_prevue')
+                commande.adresse_livraison = request.POST.get('adresse_livraison')
+                commande.nom_fournisseur = nom_fournisseur
+                commande.adresse_fournisseur = adresse_fournisseur
+                commande.telephone_fournisseur = telephone_fournisseur
+                commande.email_fournisseur = email_fournisseur
+                commande.taux_tva = taux_tva
+                commande.commentaire = request.POST.get('commentaire', '')
+                commande.fournisseur_id = fournisseur_id
+                commande.save()
+                
+                # Supprimer les anciennes lignes
+                commande.lignes.all().delete()
+                
+                # Ajouter les nouvelles lignes
+                articles_data = request.POST.get('articles_data', '')
+                if articles_data:
+                    import json
+                    try:
+                        articles_list = json.loads(articles_data)
+                        for article_data in articles_list:
+                            try:
+                                article = Article.objects.get(id=article_data['id'], agence=agence)
+                                LigneCommandeFournisseur.objects.create(
+                                    commande=commande,
+                                    article=article,
+                                    quantite=Decimal(str(article_data['quantite'])),
+                                    prix_unitaire=Decimal(str(article_data['prix_unitaire'])),
+                                    description=article_data.get('description', '')
+                                )
+                            except (Article.DoesNotExist, ValueError, KeyError):
+                                continue
+                    except json.JSONDecodeError:
+                        messages.error(request, 'Erreur lors du traitement des articles.')
+                
+                # Recalculer les totaux
+                commande.calculer_totaux()
+                
+                messages.success(request, f'Bon de commande {commande.numero_commande} modifié avec succès !')
+                return redirect('consulter_bons_commande')
+                
+            except Exception as e:
+                messages.error(request, f'Erreur lors de la modification : {str(e)}')
+        
+        # Préparer les données pour le formulaire
+        lignes_commande = commande.lignes.all().select_related('article')
+        articles_json = []
+        for ligne in lignes_commande:
+            articles_json.append({
+                'id': ligne.article.id,
+                'designation': ligne.article.designation,
+                'quantite': str(ligne.quantite),
+                'prix_unitaire': str(ligne.prix_unitaire),
+                'description': ligne.description or ligne.article.designation,
+                'unite': ligne.article.unite_vente or 'UN',
+                'reference': ligne.article.reference_article or ''
+            })
+        
+        import json
+        context = {
+            'compte': compte,
+            'agence': agence,
+            'fournisseurs': fournisseurs_list,
+            'articles': articles,
+            'commande': commande,
+            'articles_json': json.dumps(articles_json),
+            'is_edit': True
+        }
+        return render(request, 'supermarket/achats/generer_bon_commande.html', context)
+    except Compte.DoesNotExist:
+        messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+        return redirect('index')
+
+@login_required
+def supprimer_bon_commande(request, commande_id):
+    """Supprimer un bon de commande"""
+    try:
+        compte = Compte.objects.get(user=request.user, actif=True)
+        agence = get_user_agence(request)
+        if not agence:
+            messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+            return redirect('logout_achats')
+        
+        try:
+            commande = CommandeFournisseur.objects.get(id=commande_id, agence=agence)
+            numero_commande = commande.numero_commande
+            commande.delete()
+            messages.success(request, f'Bon de commande {numero_commande} supprimé avec succès.')
+        except CommandeFournisseur.DoesNotExist:
+            messages.error(request, 'Bon de commande non trouvé.')
+        
+        return redirect('consulter_bons_commande')
+    except Compte.DoesNotExist:
+        messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+        return redirect('index')
+
+@login_required
+def voir_bon_commande(request, commande_id):
+    """Voir un bon de commande"""
+    try:
+        compte = Compte.objects.get(user=request.user, actif=True)
+        agence = get_user_agence(request)
+        if not agence:
+            messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+            return redirect('logout_achats')
+        
+        commande = CommandeFournisseur.objects.get(id=commande_id, agence=agence)
+        
+        context = {
+            'compte': compte,
+            'agence': agence,
+            'commande': commande,
+        }
+        return render(request, 'supermarket/achats/voir_bon_commande.html', context)
+    except (Compte.DoesNotExist, CommandeFournisseur.DoesNotExist):
+        messages.error(request, 'Bon de commande non trouvé.')
+        return redirect('dashboard_achats')
+
+@login_required
+def generer_bon_commande_pdf(request, commande_id):
+    """Générer un PDF professionnel du bon de commande"""
+    try:
+        agence = get_user_agence(request)
+        if not agence:
+            messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+            return redirect('logout_achats')
+        
+        commande = CommandeFournisseur.objects.get(id=commande_id, agence=agence)
+        lignes = commande.lignes.all().order_by('id')
+        
+        # Importer reportlab
+        try:
+            from reportlab.lib.pagesizes import A4
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib import colors
+            from reportlab.lib.units import cm, mm
+            from reportlab.pdfgen import canvas
+            from io import BytesIO
+        except ImportError:
+            messages.error(request, 'Module reportlab non installé. Veuillez installer reportlab pour générer les PDFs.')
+            return redirect('voir_bon_commande', commande_id=commande_id)
+        
+        from django.http import HttpResponse
+        from datetime import datetime
+        
+        # Créer la réponse HTTP
+        filename = f"Bon_Commande_{commande.numero_commande}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Créer le document PDF avec en-tête et pied de page
+        buffer = BytesIO()
+        
+        # Classe personnalisée pour ajouter en-tête et pied de page
+        class NumberedCanvas(canvas.Canvas):
+            def __init__(self, *args, **kwargs):
+                canvas.Canvas.__init__(self, *args, **kwargs)
+                self.pages = []
+                self.agence_ref = agence
+                self.commande_ref = commande
+                
+            def showPage(self):
+                self.pages.append(dict(self.__dict__))
+                self._startPage()
+                
+            def save(self):
+                page_count = len(self.pages)
+                for page_num, page in enumerate(self.pages, 1):
+                    self.__dict__.update(page)
+                    self.draw_header_footer(page_num, page_count)
+                    canvas.Canvas.showPage(self)
+                canvas.Canvas.save(self)
+                
+            def draw_header_footer(self, page_num, total_pages):
+                # En-tête
+                self.saveState()
+                
+                # Position de la ligne séparatrice (d'abord pour calculer la position du logo)
+                separator_y = A4[1] - 3.2*cm
+                
+                # Logo dans l'en-tête à gauche (positionné au-dessus de la ligne)
+                logo_x = 2*cm
+                logo_width = 4*cm
+                logo_height = 1.5*cm
+                # Positionner le logo pour qu'il ne traverse pas la ligne (avec marge de 0.3cm)
+                logo_y_bottom = separator_y + 0.3*cm
+                logo_y_top = logo_y_bottom + logo_height
+                
+                if self.agence_ref.logo:
+                    try:
+                        import os
+                        if os.path.exists(self.agence_ref.logo.path):
+                            self.drawImage(self.agence_ref.logo.path, logo_x, logo_y_bottom, 
+                                         width=logo_width, height=logo_height, preserveAspectRatio=True)
+                    except Exception as e:
+                        print(f"[PDF] Erreur logo en-tête: {e}")
+                        # Dessiner un rectangle pour indiquer l'espace du logo même s'il n'y a pas de logo
+                        self.setStrokeColor(colors.grey)
+                        self.setFillColor(colors.HexColor('#f0f0f0'))
+                        self.rect(logo_x, logo_y_bottom, logo_width, logo_height, fill=1, stroke=1)
+                else:
+                    # Dessiner un rectangle pour indiquer l'espace du logo même s'il n'y a pas de logo
+                    self.setStrokeColor(colors.grey)
+                    self.setFillColor(colors.HexColor('#f0f0f0'))
+                    self.rect(logo_x, logo_y_bottom, logo_width, logo_height, fill=1, stroke=1)
+                    # Texte "Logo" au centre
+                    self.setFont('Helvetica', 10)
+                    self.setFillColor(colors.grey)
+                    text_width = self.stringWidth("Logo", 'Helvetica', 10)
+                    self.drawString(logo_x + (logo_width - text_width) / 2, logo_y_bottom + logo_height / 2 - 0.2*cm, "Logo")
+                
+                # Titre "Bon de commande" à droite du logo
+                title_x = logo_x + logo_width + 1*cm
+                self.setFont('Helvetica-Bold', 24)
+                self.setFillColor(colors.HexColor('#11998e'))
+                title_y = A4[1] - 2.2*cm
+                self.drawString(title_x, title_y, "Bon de commande")
+                
+                # Ligne séparatrice sous l'en-tête (dessinée après le logo)
+                self.setStrokeColor(colors.HexColor('#11998e'))
+                self.setLineWidth(1)
+                self.line(2*cm, separator_y, A4[0] - 2*cm, separator_y)
+                
+                # Pied de page
+                self.setFont('Helvetica', 9)
+                self.setFillColor(colors.HexColor('#2c3e50'))
+                
+                # Ligne séparatrice pied de page (renforcée)
+                self.setStrokeColor(colors.HexColor('#11998e'))
+                self.setLineWidth(2)  # Ligne plus épaisse
+                footer_line_y = 2.5*cm
+                self.line(2*cm, footer_line_y, A4[0] - 2*cm, footer_line_y)
+                
+                # Informations siège social à gauche
+                footer_left = "Siège social : Yaounde-NKOMKANASIS face ATHAERIFINANCIAL"
+                self.drawString(2*cm, 2.2*cm, footer_left)
+                
+                # Téléphone à droite
+                tel_text = "Tél: (+237)699902994/691446956"
+                self.drawRightString(A4[0] - 2*cm, 2.2*cm, tel_text)
+                
+                self.restoreState()
+        
+        doc = SimpleDocTemplate(buffer, pagesize=A4, 
+                               rightMargin=2*cm, leftMargin=2*cm,
+                               topMargin=4.5*cm, bottomMargin=3.5*cm)
+        
+        # Contenu du document
+        story = []
+        styles = getSampleStyleSheet()
+        
+        # Style personnalisé pour le titre
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            textColor=colors.HexColor('#2d1b69'),
+            spaceAfter=30,
+            alignment=1,  # Centré
+            fontName='Helvetica-Bold'
+        )
+        
+        # Style pour les sous-titres
+        subtitle_style = ParagraphStyle(
+            'CustomSubtitle',
+            parent=styles['Heading2'],
+            fontSize=14,
+            textColor=colors.HexColor('#11998e'),
+            spaceAfter=15,
+            fontName='Helvetica-Bold'
+        )
+        
+        # Style pour le texte normal
+        normal_style = ParagraphStyle(
+            'CustomNormal',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=colors.HexColor('#2c3e50'),
+            spaceAfter=10
+        )
+        
+        # Le titre est maintenant dans l'en-tête, on commence directement avec les informations
+        story.append(Spacer(1, 0.3*cm))
+        
+        # Section gauche : Mon Entreprise
+        entreprise_section = []
+        entreprise_section.append(Paragraph("<b>Mon Entreprise</b>", ParagraphStyle('Bold', parent=normal_style, fontSize=11, fontName='Helvetica-Bold')))
+        if agence.adresse:
+            entreprise_section.append(Paragraph(agence.adresse, normal_style))
+        if agence.telephone:
+            entreprise_section.append(Paragraph(f"Tél: {agence.telephone}", normal_style))
+        if agence.email:
+            entreprise_section.append(Paragraph(f"Email: {agence.email}", normal_style))
+        
+        # Section droite : Informations commande
+        commande_info = []
+        commande_info.append(Paragraph(f"<b>Date:</b> {commande.date_commande.strftime('%d.%m.%Y')}", normal_style))
+        commande_info.append(Paragraph(f"<b>Bon de commande N°:</b> {commande.numero_commande}", normal_style))
+        commande_info.append(Paragraph(f"<b>Date livraison prévue:</b> {commande.date_livraison_prevue.strftime('%d.%m.%Y')}", normal_style))
+        commande_info.append(Paragraph(f"<b>Statut:</b> {commande.get_statut_display()}", normal_style))
+        
+        # Construire toutes les informations entreprise comme dans l'en-tête de facture de vente
+        entreprise_info_lines = []
+        
+        # Nom de l'entreprise (comme dans les factures)
+        entreprise_info_lines.append(Paragraph("SUPER MARKET", ParagraphStyle('Bold', parent=normal_style, fontSize=12, fontName='Helvetica-Bold')))
+        
+        # Type d'activité
+        entreprise_info_lines.append(Paragraph("GROS - DEMI GROS - DETAIL", normal_style))
+        
+        # Adresse complète (format comme dans les factures)
+        adresse_complete = f"BP 11190 YAOUNDE - {agence.nom_agence or 'AGENCE'}"
+        entreprise_info_lines.append(Paragraph(adresse_complete, normal_style))
+        
+        # Téléphone (comme dans les factures)
+        entreprise_info_lines.append(Paragraph("TEL: (237) 670930091", normal_style))
+        
+        # NUI (comme dans les factures)
+        entreprise_info_lines.append(Paragraph("NUI: P029418061497G", normal_style))
+        
+        # Email (si disponible)
+        if agence.email:
+            entreprise_info_lines.append(Paragraph(f"Email: {agence.email}", normal_style))
+        
+        # Site web (si disponible)
+        if agence.site_web:
+            entreprise_info_lines.append(Paragraph(f"Site web: {agence.site_web}", normal_style))
+        
+        # Tableau avec entreprise à gauche et commande à droite
+        header_rows = []
+        
+        # Calculer le nombre de lignes nécessaires (3 lignes pour les infos commande sans statut)
+        max_rows = max(len(entreprise_info_lines), 3)
+        
+        # Créer les lignes du tableau
+        for i in range(max_rows):
+            # Colonne gauche : Informations entreprise
+            if i < len(entreprise_info_lines):
+                left_cell = entreprise_info_lines[i]
+            else:
+                left_cell = Paragraph("", normal_style)
+            
+            # Colonne droite : Informations commande (sans statut)
+            if i == 0:
+                right_cell = Paragraph(f"<b>Date:</b> {commande.date_commande.strftime('%d.%m.%Y')}", normal_style)
+            elif i == 1:
+                right_cell = Paragraph(f"<b>Bon de commande N°:</b> {commande.numero_commande}", normal_style)
+            elif i == 2:
+                right_cell = Paragraph(f"<b>Date livraison prévue:</b> {commande.date_livraison_prevue.strftime('%d.%m.%Y')}", normal_style)
+            else:
+                right_cell = Paragraph("", normal_style)
+            
+            header_rows.append([left_cell, right_cell])
+        
+        header_table = Table(header_rows, colWidths=[9*cm, 9*cm])
+        header_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 5),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ]))
+        story.append(header_table)
+        story.append(Spacer(1, 0.6*cm))
+        
+        # Section Destinataire (Fournisseur)
+        destinataire_rows = []
+        destinataire_rows.append([Paragraph("<b>Destinataire</b>", ParagraphStyle('Bold', parent=normal_style, fontSize=11, fontName='Helvetica-Bold'))])
+        destinataire_rows.append([Paragraph(commande.nom_fournisseur, normal_style)])
+        if commande.adresse_fournisseur:
+            destinataire_rows.append([Paragraph(commande.adresse_fournisseur, normal_style)])
+        if commande.telephone_fournisseur:
+            destinataire_rows.append([Paragraph(f"Tél: {commande.telephone_fournisseur}", normal_style)])
+        if commande.email_fournisseur:
+            destinataire_rows.append([Paragraph(f"Email: {commande.email_fournisseur}", normal_style)])
+        
+        destinataire_table = Table(destinataire_rows, colWidths=[18*cm])
+        destinataire_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 5),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ]))
+        story.append(destinataire_table)
+        story.append(Spacer(1, 0.6*cm))
+        
+        # Tableau des articles (Réf. produit, Description, Quantité, Unité, Prix unitaire HT, Total)
+        article_data = [['Réf. produit', 'Description', 'Quantité', 'Unité', 'Prix unitaire HT', 'Total']]
+        
+        for ligne in lignes:
+            unite = ligne.article.unite_vente if hasattr(ligne.article, 'unite_vente') and ligne.article.unite_vente else 'pcs'
+            article_data.append([
+                Paragraph(ligne.article.reference_article or '', normal_style),
+                Paragraph(ligne.article.designation, normal_style),
+                Paragraph(str(ligne.quantite), normal_style),
+                Paragraph(unite, normal_style),
+                Paragraph(f"{ligne.prix_unitaire:.2f} FCFA", normal_style),
+                Paragraph(f"{ligne.prix_total:.2f} FCFA", normal_style)
+            ])
+        
+        article_table = Table(article_data, colWidths=[2.5*cm, 6.5*cm, 2*cm, 1.5*cm, 3*cm, 3*cm])
+        article_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2d1b69')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('ALIGN', (2, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        story.append(article_table)
+        story.append(Spacer(1, 0.6*cm))
+        
+        # Totaux alignés à droite
+        total_style = ParagraphStyle(
+            'TotalStyle',
+            parent=normal_style,
+            fontSize=10,
+            fontName='Helvetica-Bold',
+            alignment=2  # RIGHT
+        )
+        
+        total_ttc_style = ParagraphStyle(
+            'TotalTTCStyle',
+            parent=normal_style,
+            fontSize=14,
+            fontName='Helvetica-Bold',
+            textColor=colors.HexColor('#11998e'),
+            alignment=2  # RIGHT
+        )
+        
+        # Utiliser le taux de TVA de la commande
+        taux_tva_affichage = commande.taux_tva if hasattr(commande, 'taux_tva') else 18.00
+        
+        total_data = [
+            [Paragraph("", normal_style), Paragraph(f"Total HT: {commande.total_ht:.2f} FCFA", total_style)],
+            [Paragraph("", normal_style), Paragraph(f"Total TVA ({taux_tva_affichage}%): {commande.total_tva:.2f} FCFA", total_style)],
+            [Paragraph("", normal_style), Paragraph(f"Total TTC: {commande.total_ttc:.2f} FCFA", total_ttc_style)],
+        ]
+        
+        total_table = Table(total_data, colWidths=[12*cm, 6*cm])
+        total_table.setStyle(TableStyle([
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        story.append(total_table)
+        story.append(Spacer(1, 1.2*cm))
+        
+        # Section Responsable d'achat (aligné à droite, bien visible)
+        responsable_style = ParagraphStyle(
+            'ResponsableStyle',
+            parent=normal_style,
+            fontSize=11,
+            fontName='Helvetica-Bold',
+            alignment=2,  # RIGHT
+            spaceAfter=0
+        )
+        
+        # Créer un tableau pour bien positionner "Responsable d'achat" à droite
+        responsable_data = [
+            [Paragraph("", normal_style), Paragraph("Responsable d'achat", responsable_style)]
+        ]
+        
+        responsable_table = Table(responsable_data, colWidths=[12*cm, 6*cm])
+        responsable_table.setStyle(TableStyle([
+            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        ]))
+        story.append(responsable_table)
+        
+        # Commentaire si présent
+        if commande.commentaire:
+            story.append(Spacer(1, 0.6*cm))
+            story.append(Paragraph("<b>Informations additionnelles</b>", ParagraphStyle('Bold', parent=normal_style, fontSize=11, fontName='Helvetica-Bold')))
+            story.append(Paragraph(commande.commentaire, normal_style))
+        
+        # Construire le PDF avec en-tête et pied de page
+        doc.build(story, canvasmaker=NumberedCanvas)
+        
+        # Récupérer le PDF
+        pdf = buffer.getvalue()
+        buffer.close()
+        response.write(pdf)
+        
+        return response
+        
+    except CommandeFournisseur.DoesNotExist:
+        messages.error(request, 'Bon de commande non trouvé.')
+        return redirect('dashboard_achats')
+    except Exception as e:
+        messages.error(request, f'Erreur lors de la génération du PDF: {str(e)}')
+        return redirect('voir_bon_commande', commande_id=commande_id)

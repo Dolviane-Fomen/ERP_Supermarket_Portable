@@ -18,6 +18,13 @@ class Agence(models.Model):
     id_agence = models.AutoField(primary_key=True, verbose_name="ID Agence")
     nom_agence = models.CharField(max_length=100, verbose_name="Nom agence")
     adresse = models.TextField(verbose_name="Adresse")
+    code_postal = models.CharField(max_length=20, blank=True, null=True, verbose_name="Code postal")
+    numero_entreprise = models.CharField(max_length=50, blank=True, null=True, verbose_name="Numéro d'entreprise")
+    nui = models.CharField(max_length=50, blank=True, null=True, verbose_name="NUI (Numéro d'Identification Unique)")
+    logo = models.ImageField(upload_to='logos/', blank=True, null=True, verbose_name="Logo de l'entreprise")
+    telephone = models.CharField(max_length=20, blank=True, null=True, verbose_name="Téléphone")
+    email = models.EmailField(blank=True, null=True, verbose_name="Email")
+    site_web = models.URLField(blank=True, null=True, verbose_name="Site web")
     
     class Meta:
         verbose_name = "Agence"
@@ -1165,6 +1172,91 @@ class Depense(models.Model):
 
 from django.db import models
 from django.core.exceptions import ValidationError
+
+class CommandeFournisseur(models.Model):
+    """Modèle pour les bons de commande fournisseur"""
+    STATUT_CHOICES = [
+        ('brouillon', 'Brouillon'),
+        ('envoyee', 'Envoyée'),
+        ('en_cours', 'En cours de livraison'),
+        ('livree', 'Livrée'),
+        ('annulee', 'Annulée'),
+    ]
+    
+    numero_commande = models.CharField(max_length=50, unique=True, verbose_name="Numéro de commande")
+    date_commande = models.DateField(verbose_name="Date de commande")
+    date_livraison_prevue = models.DateField(verbose_name="Date de livraison prévue")
+    adresse_livraison = models.TextField(verbose_name="Adresse de livraison")
+    
+    # Informations fournisseur
+    nom_fournisseur = models.CharField(max_length=200, verbose_name="Nom du fournisseur")
+    adresse_fournisseur = models.TextField(verbose_name="Adresse du fournisseur")
+    telephone_fournisseur = models.CharField(max_length=20, blank=True, verbose_name="Téléphone fournisseur")
+    email_fournisseur = models.EmailField(blank=True, verbose_name="Email fournisseur")
+    
+    # TVA
+    taux_tva = models.DecimalField(max_digits=5, decimal_places=2, default=18.00, verbose_name="Taux TVA (%)")
+    
+    # Totaux
+    total_ht = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Total HT")
+    total_tva = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Total TVA")
+    total_ttc = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Total TTC")
+    
+    statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='brouillon', verbose_name="Statut")
+    commentaire = models.TextField(blank=True, verbose_name="Commentaire")
+    
+    # Relations
+    fournisseur = models.ForeignKey('Fournisseur', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Fournisseur")
+    agence = models.ForeignKey('Agence', on_delete=models.CASCADE, verbose_name="Agence")
+    cree_par = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Créé par")
+    
+    date_creation = models.DateTimeField(auto_now_add=True, verbose_name="Date de création")
+    date_modification = models.DateTimeField(auto_now=True, verbose_name="Date de modification")
+    
+    class Meta:
+        verbose_name = "Commande Fournisseur"
+        verbose_name_plural = "Commandes Fournisseur"
+        ordering = ['-date_commande', '-numero_commande']
+    
+    def __str__(self):
+        return f"BC-{self.numero_commande} - {self.nom_fournisseur} ({self.date_commande})"
+    
+    def calculer_totaux(self):
+        """Calculer les totaux à partir des lignes"""
+        lignes = self.lignes.all()
+        self.total_ht = sum(ligne.prix_total for ligne in lignes)
+        # TVA selon le taux défini (par défaut 18%)
+        taux_tva_decimal = self.taux_tva / Decimal('100')
+        self.total_tva = self.total_ht * taux_tva_decimal
+        self.total_ttc = self.total_ht + self.total_tva
+        self.save(update_fields=['total_ht', 'total_tva', 'total_ttc'])
+
+
+class LigneCommandeFournisseur(models.Model):
+    """Modèle pour les lignes d'un bon de commande fournisseur"""
+    commande = models.ForeignKey(CommandeFournisseur, on_delete=models.CASCADE, related_name='lignes', verbose_name="Commande")
+    article = models.ForeignKey('Article', on_delete=models.CASCADE, verbose_name="Article")
+    quantite = models.DecimalField(max_digits=10, decimal_places=3, verbose_name="Quantité")
+    prix_unitaire = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Prix unitaire")
+    prix_total = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Prix total")
+    description = models.TextField(blank=True, verbose_name="Description")
+    
+    class Meta:
+        verbose_name = "Ligne Commande Fournisseur"
+        verbose_name_plural = "Lignes Commande Fournisseur"
+        ordering = ['commande', 'id']
+    
+    def __str__(self):
+        return f"{self.commande.numero_commande} - {self.article.designation} x{self.quantite}"
+    
+    def save(self, *args, **kwargs):
+        """Calculer automatiquement le prix total"""
+        self.prix_total = self.quantite * self.prix_unitaire
+        super().save(*args, **kwargs)
+        # Recalculer les totaux de la commande
+        if self.commande:
+            self.commande.calculer_totaux()
+
 
 class MargePersonnalisee(models.Model):
     """
