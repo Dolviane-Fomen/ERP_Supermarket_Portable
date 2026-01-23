@@ -20655,11 +20655,12 @@ def gerer_marges_personnalisees(request):
     
     # A. Récupérer les configurations existantes
     # select_related('article') optimise la requête pour avoir le nom de l'article direct
-    marges = MargePersonnalisee.objects.filter(agence=agence).select_related('article').order_by('ordre', 'article__designation')
+    # On filtre les NULL pour éviter les erreurs dans order_by
+    marges = MargePersonnalisee.objects.filter(agence=agence, article__isnull=False).select_related('article').order_by('ordre', 'article__designation')
     
     # B. Récupérer UNIQUEMENT les articles qui n'ont pas encore de configuration
-    # On récupère les IDs des articles déjà configurés
-    articles_deja_configures_ids = marges.values_list('article_id', flat=True)
+    # On récupère les IDs des articles déjà configurés (en excluant les NULL)
+    articles_deja_configures_ids = list(marges.values_list('article_id', flat=True))
     
     # On filtre : Tous les articles de l'agence MOINS ceux déjà configurés
     articles_disponibles = Article.objects.filter(agence=agence).exclude(id__in=articles_deja_configures_ids).order_by('reference_article')
