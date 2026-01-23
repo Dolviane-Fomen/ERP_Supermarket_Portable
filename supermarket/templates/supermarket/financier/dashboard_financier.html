@@ -468,6 +468,10 @@
                 <h3><i class="fas fa-chart-line" style="color: #f5576c;"></i> Évolution du Résultat Net (30 derniers jours)</h3>
                 <div class="chart-container">
                     <canvas id="resultatChart"></canvas>
+                    <div id="resultatChart-empty" style="display: none; text-align: center; padding: 40px; color: #999;">
+                        <i class="fas fa-info-circle" style="font-size: 48px; margin-bottom: 10px;"></i>
+                        <p>Aucune donnée disponible pour les 30 derniers jours</p>
+                    </div>
                 </div>
             </div>
             
@@ -475,6 +479,10 @@
                 <h3><i class="fas fa-chart-pie" style="color: #f5576c;"></i> Répartition</h3>
                 <div class="chart-container">
                     <canvas id="repartitionChart"></canvas>
+                    <div id="repartitionChart-empty" style="display: none; text-align: center; padding: 40px; color: #999;">
+                        <i class="fas fa-info-circle" style="font-size: 48px; margin-bottom: 10px;"></i>
+                        <p>Aucune donnée disponible</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -586,16 +594,28 @@
 
     // Graphique d'évolution du résultat net
     const resultatChartEl = document.getElementById('resultatChart');
+    const resultatChartEmpty = document.getElementById('resultatChart-empty');
     if (resultatChartEl) {
     const evolutionResultatEl = document.getElementById('evolution-resultat');
-    if (evolutionResultatEl) {
+    const labelsDaysEl2 = document.getElementById('labels-days');
+    if (evolutionResultatEl && labelsDaysEl2) {
     const resultatCtx = resultatChartEl.getContext('2d');
     const evolutionResultat = JSON.parse(evolutionResultatEl.textContent);
+    const labelsDays2 = JSON.parse(labelsDaysEl2.textContent);
+    
+    // Vérifier si les données sont toutes à 0
+    const hasData = evolutionResultat.some(val => val !== 0);
+    
+    if (!hasData && resultatChartEmpty) {
+        resultatChartEl.style.display = 'none';
+        resultatChartEmpty.style.display = 'block';
+    } else {
+        if (resultatChartEmpty) resultatChartEmpty.style.display = 'none';
     
     new Chart(resultatCtx, {
         type: 'line',
         data: {
-            labels: labelsDays,
+            labels: labelsDays2,
             datasets: [
                 {
                     label: 'Résultat Net (Bénéfice - Dépenses)',
@@ -696,15 +716,26 @@
             }
         }
     });
-    } // Fin du if evolutionResultatEl
+    } // Fin du if hasData
+    } // Fin du if evolutionResultatEl && labelsDaysEl2
     } // Fin du if resultatChartEl
 
     // Graphique de répartition
     const repartitionChartEl = document.getElementById('repartitionChart');
+    const repartitionChartEmpty = document.getElementById('repartitionChart-empty');
     if (repartitionChartEl) {
     const repartitionCtx = repartitionChartEl.getContext('2d');
     const caValue = parseFloat('{{ ca_total }}') || 0;
     const depValue = parseFloat('{{ depenses_total }}') || 0;
+    
+    // Vérifier si les données sont disponibles
+    if (caValue === 0 && depValue === 0) {
+        if (repartitionChartEmpty) {
+            repartitionChartEl.style.display = 'none';
+            repartitionChartEmpty.style.display = 'block';
+        }
+    } else {
+        if (repartitionChartEmpty) repartitionChartEmpty.style.display = 'none';
     
     new Chart(repartitionCtx, {
         type: 'doughnut',
@@ -741,6 +772,7 @@
             }
         }
     });
+    } // Fin du else (si données disponibles)
     } // Fin du if repartitionChartEl
 </script>
 

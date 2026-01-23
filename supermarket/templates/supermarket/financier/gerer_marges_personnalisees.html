@@ -195,597 +195,425 @@
         }
     </style>
     
+ 
     <div id="alertContainer"></div>
     
-    <!-- Section 1: Liste des marges personnalisées -->
-    <div class="section-card">
-        <h3 class="section-title">
-            <i class="fas fa-tags"></i> Marges Personnalisées
-            <button class="btn btn-primary" onclick="ouvrirModalMarge()" style="float: right;">
-                <i class="fas fa-plus"></i> Créer une Marge
-            </button>
-        </h3>
-        
-        <div style="background: #e7f3ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #2196F3;">
-            <strong><i class="fas fa-info-circle"></i> Comment ça fonctionne :</strong>
-            <ul style="margin: 10px 0 0 20px; color: #555;">
-                <li>Les marges définissent les <strong>seuils pour la classification automatique</strong></li>
-                <li>Les <strong>assignations manuelles ont toujours priorité</strong> sur le calcul automatique</li>
-                <li><strong>Exemple :</strong> Si vous créez "Bonne Marge" avec 7%, les articles NON assignés manuellement avec ≥7% iront automatiquement dans cette catégorie</li>
-                <li><strong>Mais :</strong> Si vous assignez manuellement le riz à "Bonne Marge" et l'huile à "Mauvaise Marge", ils iront dans leurs catégories respectives <strong>peu importe leur pourcentage de marge</strong></li>
-            </ul>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; width: 100%;">
+    
+        <div style="min-width: 250px;"> 
+            <h2 style="margin-bottom: 0; font-size: 1.75rem; color: #5a5c69; font-weight: 500; line-height: 1.2;">
+                Configuration des Marges
+            </h2>
+            <p style="color: #858796; margin-bottom: 0; margin-top: 0; font-size: 0.9rem;">
+                Gérez vos seuils de rentabilité.
+            </p>
         </div>
         
+        <div style="display: flex; justify-content: center; flex-grow: 1; margin-left: 1.5rem; margin-right: 1.5rem;">
+            
+            <div style="display: flex; align-items: center; width: 100%; max-width: 400px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); border-radius: 50px; overflow: hidden; border: 1px solid #e3e6f0; background-color: white;">
+                
+                <input type="text" 
+                       id="searchGlobalInput" 
+                       placeholder="Rechercher un article..." 
+                       aria-label="Search" 
+                       onkeyup="filtrerListeMarges()"
+                       style="border: none; background-color: transparent; flex-grow: 1; height: 45px; padding-left: 20px; font-size: 0.95rem; outline: none; color: #6e707e;">
+                
+                <div style="padding-right: 15px; padding-left: 10px;">
+                    <button type="button" style="border: none; background: transparent; cursor: pointer; padding: 5px;">
+                        <i class="fas fa-search" style="color: #2c3e50;"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    
+        <div style="min-width: 150px; text-align: right;">
+            <button onclick="ouvrirModalCreation()" 
+            class="btn btn-primary shadow-sm" onclick="ouvrirModalCreation()" style="border-radius: 50px; padding: 10px 20px; font-weight: 600;">
+                
+                <i class="fas fa-plus" style="margin-right: 8px; color: rgba(255,255,255,0.8); font-size: 0.875em;"></i> 
+                Nouvelle Marge
+            </button>
+        </div>
+    
+    </div>
+    
+    <div class="section-card">
         <div class="marges-list">
             {% for marge in marges %}
-            <div class="marge-item" style="border-left-color: {{ marge.couleur }};">
-                <div class="marge-info">
-                    <div class="marge-name">{{ marge.nom_categorie }}</div>
-                    <div class="marge-range">
-                        {% if marge.marge_max %}
-                            {{ marge.marge_min }}% à {{ marge.marge_max }}% (classification automatique)
+            <div class="marge-item" style="background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 15px; overflow: hidden; border-left: 5px solid #2c3e50;">
+                <div style="padding: 15px; background: #f8f9fa; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h5 style="margin: 0; font-weight: bold; color: #2c3e50;">
+                            {{ marge.article.designation }}
+                        </h5>
+                        <small class="text-muted">Ref: {{ marge.article.reference_article }} | Ordre: {{ marge.ordre }}</small>
+                    </div>
+                    <div>
+                        {% if marge.actif %}
+                            <span class="badge badge-success">Actif</span>
                         {% else %}
-                            ≥ {{ marge.marge_min }}% (classification automatique)
+                            <span class="badge badge-danger">Inactif</span>
                         {% endif %}
-                        | Ordre: {{ marge.ordre }}
-                        | {% if marge.actif %}<span style="color: #28a745;">Actif</span>{% else %}<span style="color: #dc3545;">Inactif</span>{% endif %}
                     </div>
                 </div>
-                <div class="marge-actions">
-                    <button class="btn btn-secondary" onclick="modifierMarge({{ marge.id }}, '{{ marge.nom_categorie }}', {{ marge.marge_min }}, {% if marge.marge_max %}{{ marge.marge_max }}{% else %}null{% endif %}, '{{ marge.couleur }}', {{ marge.ordre }}, {{ marge.actif|lower }})">
-                        <i class="fas fa-edit"></i> Modifier
-                    </button>
-                    <button class="btn btn-danger" onclick="supprimerMarge({{ marge.id }})">
-                        <i class="fas fa-trash"></i> Supprimer
+    
+                <div style="display: flex; padding: 0;">
+                    <div style="flex: 1; padding: 10px; text-align: center; border-right: 1px solid #eee; background-color: #fff5f5;">
+                        <div style="color: #dc3545; font-weight: bold; font-size: 0.8em; text-transform: uppercase;">Mauvaise</div>
+                        <div style="font-size: 1.1em; font-weight: bold;">{{ marge.mauvaise_min|floatformat:0 }}% - {{ marge.mauvaise_max|floatformat:0 }}%</div>
+                    </div>
+                    <div style="flex: 1; padding: 10px; text-align: center; border-right: 1px solid #eee; background-color: #fff9e6;">
+                        <div style="color: #ffc107; font-weight: bold; font-size: 0.8em; text-transform: uppercase;">Bonne</div>
+                        <div style="font-size: 1.1em; font-weight: bold;">{{ marge.bonne_min|floatformat:0 }}% - {{ marge.bonne_max|floatformat:0 }}%</div>
+                    </div>
+                    <div style="flex: 1; padding: 10px; text-align: center; background-color: #f0fff4;">
+                        <div style="color: #28a745; font-weight: bold; font-size: 0.8em; text-transform: uppercase;">Très Bonne</div>
+                        <div style="font-size: 1.1em; font-weight: bold;">{{ marge.tres_bonne_min|floatformat:0 }}% - {{ marge.tres_bonne_max|floatformat:0 }}%</div>
+                    </div>
+                </div>
+    
+                <div style="padding: 10px; text-align: right; background: white; border-top: 1px solid #eee;">
+                    <button class="btn btn-sm btn-info" onclick="modifierMarge(
+    {{ marge.id }}, 
+    '{{ marge.article.designation|escapejs }}',
+    '{{ marge.mauvaise_min|floatformat:2 }}', 
+    '{{ marge.mauvaise_max|floatformat:2 }}',
+    '{{ marge.bonne_min|floatformat:2 }}', 
+    '{{ marge.bonne_max|floatformat:2 }}',
+    '{{ marge.tres_bonne_min|floatformat:2 }}', 
+    '{{ marge.tres_bonne_max|floatformat:2 }}',
+    '{{ marge.ordre }}', 
+    '{{ marge.actif|yesno:'true,false' }}',)">
+    <i class="fas fa-edit"></i> Modifier Seuils
+</button>
+                    <button class="btn btn-sm btn-danger" onclick="supprimerMarge({{ marge.id }})">
+                        <i class="fas fa-trash"></i>
                     </button>
                 </div>
             </div>
             {% empty %}
-            <p style="color: #6c757d; text-align: center; padding: 20px;">
-                Aucune marge personnalisée. Les marges par défaut seront utilisées (Bonne ≥10%, Médiocre 4-9%, Faible <4%).
-            </p>
-            {% endfor %}
-        </div>
-    </div>
-    
-    <!-- Section 2: Assignations manuelles d'articles -->
-    <div class="section-card">
-        <h3 class="section-title">
-            <i class="fas fa-link"></i> Assignations Manuelles d'Articles
-            <button class="btn btn-primary" onclick="ouvrirModalAssignation()" style="float: right;">
-                <i class="fas fa-plus"></i> Assigner des Articles
-            </button>
-        </h3>
-        
-        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
-            <strong><i class="fas fa-exclamation-triangle"></i> Priorité absolue :</strong>
-            <p style="margin: 10px 0 0 0; color: #555;">
-                Les articles assignés manuellement iront <strong>TOUJOURS</strong> dans leur catégorie assignée, 
-                <strong>peu importe leur pourcentage de marge calculé</strong>.
-                <br><strong>Exemple :</strong> Le riz à 7% peut être assigné à "Bonne Marge" et l'huile à 7% peut être assignée à "Mauvaise Marge".
-            </p>
-        </div>
-        
-        <div class="assignations-list">
-            {% for assignation in assignations %}
-            <div class="assignation-item" style="background: #fff3cd; border-left: 4px solid #ffc107;">
-                <div>
-                    <strong>{{ assignation.article.reference_article }}</strong> - {{ assignation.article.designation }}
-                    <br>
-                    <small style="color: #856404;">
-                        <i class="fas fa-hand-point-right"></i> Assigné manuellement à <strong>{{ assignation.marge_personnalisee.nom_categorie }}</strong>
-                        <br>
-                        <i class="fas fa-info-circle"></i> Cette assignation a priorité sur le calcul automatique
-                    </small>
-                </div>
-                <button class="btn btn-danger" onclick="retirerAssignation({{ assignation.id }})">
-                    <i class="fas fa-times"></i> Retirer
-                </button>
+            <div class="text-center p-5">
+                <i class="fas fa-sliders-h fa-3x text-gray-300 mb-3"></i>
+                <p class="text-gray-500">Aucune configuration de marge définie.</p>
             </div>
-            {% empty %}
-            <p style="color: #6c757d; text-align: center; padding: 20px;">
-                Aucune assignation manuelle. Les articles seront classés automatiquement selon les marges définies.
-            </p>
             {% endfor %}
         </div>
     </div>
     
-    <!-- Modal pour créer/modifier une marge -->
-    <div id="modalMarge" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="fermerModalMarge()">&times;</span>
-            <h3 id="modalMargeTitle">Créer une Marge Personnalisée</h3>
-            <form id="formMarge" onsubmit="enregistrerMarge(event)">
+    <div id="modalMarge" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5);">
+        <div class="modal-content" style="background-color: #fefefe; margin: 5% auto; padding: 0; border: 1px solid #888; width: 600px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
+            
+            <div style="padding: 15px 20px; background: #2c3e50; color: white; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center;">
+                <h4 id="modalTitle" style="margin: 0;">Nouvelle Configuration</h4>
+                <span onclick="fermerModalMarge()" style="cursor: pointer; font-size: 28px;">&times;</span>
+            </div>
+    
+            <form id="formMarge" onsubmit="enregistrerMarge(event)" style="padding: 20px;">
                 <input type="hidden" id="marge_id_form" name="marge_id">
-                <div class="form-group">
-                    <label>Nom de la catégorie *</label>
-                    <input type="text" id="nom_categorie" name="nom_categorie" required placeholder="Ex: Marge Excellente">
+                
+                <div class="form-group mb-4">
+                    <label style="font-weight: bold; color: #333;">Article Concerné</label>
+                    
+                    <div id="select_article_container">
+                        <input type="text" id="search_article" placeholder="Tapez pour rechercher un article..." 
+                               class="form-control mb-2" onkeyup="filtrerArticles()" autocomplete="off">
+                        
+                        <div id="article_list" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; display: none;">
+                            {% for art in articles_disponibles %}
+                            <div class="article-option" onclick="selectionnerArticle('{{ art.id }}', '{{ art.designation|escapejs }}')" 
+                                 data-search="{{ art.designation|lower }} {{ art.reference_article|lower }}"
+                                 style="padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #eee;">
+                                <strong>{{ art.reference_article }}</strong> - {{ art.designation }}
+                            </div>
+                            {% endfor %}
+                            {% if not articles_disponibles %}
+                                <div style="padding: 10px; color: #999; text-align: center;">Tous les articles ont déjà une configuration.</div>
+                            {% endif %}
+                        </div>
+                        <input type="hidden" name="article_id" id="article_id_input" required>
+                    </div>
+    
+                    <div id="selected_article_display" style="display: none; background: #e8f0fe; padding: 10px; border-radius: 5px; border: 1px solid #b3d7ff; color: #1967d2; font-weight: bold;">
+                        <span id="selected_article_name">Nom de l'article</span>
+                        <button type="button" id="btn_change_article" class="btn btn-sm btn-link text-danger" onclick="resetSelectionArticle()" style="float: right; padding: 0;">Changer</button>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>Marge minimale (%) *</label>
-                    <input type="number" id="marge_min" name="marge_min" step="0.01" min="0" required placeholder="0.00">
+    
+                <label style="font-weight: bold; color: #333; margin-top: 10px;">Définition des Plages (%)</label>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #eee;">
+                    
+                    <div class="row align-items-center mb-2">
+                        <div class="col-4" style="color: #dc3545; font-weight: bold;">
+                            <i class="fas fa-thumbs-down"></i> Mauvaise
+                        </div>
+                        <div class="col-8 d-flex gap-2">
+                            <input type="number" name="mauvaise_min" id="mauvaise_min" class="form-control" placeholder="De" step="0.01" required>
+                            <span class="align-self-center mx-2">à</span>
+                            <input type="number" name="mauvaise_max" id="mauvaise_max" class="form-control" placeholder="À" step="0.01" required>
+                        </div>
+                    </div>
+    
+                    <div class="row align-items-center mb-2">
+                        <div class="col-4" style="color: #ffc107; font-weight: bold;">
+                            <i class="fas fa-check"></i> Bonne
+                        </div>
+                        <div class="col-8 d-flex gap-2">
+                            <input type="number" name="bonne_min" id="bonne_min" class="form-control" placeholder="De" step="0.01" required>
+                            <span class="align-self-center mx-2">à</span>
+                            <input type="number" name="bonne_max" id="bonne_max" class="form-control" placeholder="À" step="0.01" required>
+                        </div>
+                    </div>
+    
+                    <div class="row align-items-center">
+                        <div class="col-4" style="color: #28a745; font-weight: bold;">
+                            <i class="fas fa-star"></i> Très Bonne
+                        </div>
+                        <div class="col-8 d-flex gap-2">
+                            <input type="number" name="tres_bonne_min" id="tres_bonne_min" class="form-control" placeholder="De" step="0.01" required>
+                            <span class="align-self-center mx-2">à</span>
+                            <input type="number" name="tres_bonne_max" id="tres_bonne_max" class="form-control" placeholder="À" step="0.01" required>
+                        </div>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>Marge maximale (%) - Laisser vide pour "≥ min"</label>
-                    <input type="number" id="marge_max" name="marge_max" step="0.01" min="0" placeholder="Optionnel">
+    
+                <div class="row mt-3">
+                    <div class="col-6">
+                        <div class="form-group">
+                            <label>Ordre d'affichage</label>
+                            <input type="number" name="ordre" id="ordre" class="form-control" value="0">
+                        </div>
+                    </div>
+                    <div class="col-6 d-flex align-items-center">
+                        <div class="custom-control custom-switch mt-4">
+                            <input type="checkbox" class="custom-control-input" id="actif" checked>
+                            <label class="custom-control-label" for="actif">Configuration Active</label>
+                        </div>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>Couleur d'affichage</label>
-                    <input type="color" id="couleur" name="couleur" value="#28a745">
-                </div>
-                <div class="form-group">
-                    <label>Ordre d'affichage</label>
-                    <input type="number" id="ordre" name="ordre" value="0" min="0">
-                </div>
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="actif" name="actif" checked> Actif
-                    </label>
-                </div>
-                <div style="text-align: right; margin-top: 20px;">
+    
+                <div style="margin-top: 20px; text-align: right; border-top: 1px solid #eee; padding-top: 15px;">
                     <button type="button" class="btn btn-secondary" onclick="fermerModalMarge()">Annuler</button>
-                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                    <button type="submit" class="btn btn-primary px-4">Enregistrer</button>
                 </div>
             </form>
         </div>
     </div>
     
-    <!-- Modal pour assigner un article -->
-    <div id="modalAssignation" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="fermerModalAssignation()">&times;</span>
-            <h3>Assigner des Articles à une Catégorie</h3>
-            <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
-                <strong><i class="fas fa-exclamation-triangle"></i> Assignation manuelle = Priorité absolue</strong>
-                <p style="margin: 10px 0 0 0; color: #555;">
-                    Les articles assignés manuellement iront <strong>TOUJOURS</strong> dans la catégorie choisie, 
-                    <strong>peu importe leur pourcentage de marge calculé</strong>.
-                    <br><br>
-                    <strong>Exemple concret :</strong>
-                    <ul style="margin: 10px 0 0 20px;">
-                        <li>Le <strong>riz à 7%</strong> → assignez-le à "Bonne Marge"</li>
-                        <li>L'<strong>huile à 7%</strong> → assignez-la à "Mauvaise Marge"</li>
-                    </ul>
-                    Ils iront dans leurs catégories respectives même s'ils ont le même pourcentage !
-                </p>
-            </div>
-            <form id="formAssignation" onsubmit="enregistrerAssignation(event)">
-                <div class="form-group">
-                    <label>Rechercher et sélectionner des articles *</label>
-                    <input type="text" id="recherche_article" placeholder="Rechercher un article..." style="width: 100%; padding: 10px; border: 2px solid #e1e8ed; border-radius: 8px; margin-bottom: 10px;" onkeyup="filtrerArticles()">
-                    <select id="article_id" name="article_id" multiple required size="6" style="height: 150px; width: 100%; max-height: 150px;">
-                        {% for article in articles %}
-                        <option value="{{ article.id }}" data-ref="{{ article.reference_article }}" data-designation="{{ article.designation }}">
-                            {{ article.reference_article }} - {{ article.designation }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                    <small style="color: #6c757d; display: block; margin-top: 5px;">
-                        <i class="fas fa-info-circle"></i> <strong>Comment sélectionner :</strong> 
-                        Cliquez sur un article pour le sélectionner. 
-                        Maintenez <strong>Ctrl</strong> (Windows) ou <strong>Cmd</strong> (Mac) et cliquez pour sélectionner plusieurs articles.
-                        Les articles sélectionnés apparaîtront ci-dessous.
-                    </small>
-                </div>
-                
-                <!-- Liste des articles sélectionnés -->
-                <div class="form-group" id="articles_selectionnes_container" style="display: none; margin-top: 20px;">
-                    <label style="font-weight: 600; color: #2c3e50; margin-bottom: 10px; display: block;">
-                        <i class="fas fa-check-circle" style="color: #28a745;"></i> Articles sélectionnés (<span id="nombre_articles_selectionnes">0</span>)
-                    </label>
-                    <div id="liste_articles_selectionnes" style="background: #f8f9fa; padding: 15px; border-radius: 8px; max-height: 200px; overflow-y: auto; border: 2px solid #28a745; min-height: 50px;">
-                        <!-- Les articles sélectionnés apparaîtront ici -->
-                    </div>
-                </div>
-                
-                <div class="form-group" style="margin-top: 20px;">
-                    <label style="font-weight: 600; color: #2c3e50; margin-bottom: 10px; display: block;">
-                        <i class="fas fa-tag"></i> Catégorie de marge *
-                    </label>
-                    <select id="marge_id" name="marge_id" required style="width: 100%; padding: 12px; border: 2px solid #e1e8ed; border-radius: 8px; font-size: 1em; background: white; cursor: pointer;">
-                        <option value="">-- Sélectionner une catégorie --</option>
-                        {% for marge in marges %}
-                        <option value="{{ marge.id }}">{{ marge.nom_categorie }}</option>
-                        {% endfor %}
-                    </select>
-                    {% if not marges %}
-                    <div style="background: #fff3cd; padding: 12px; border-radius: 8px; margin-top: 10px; border-left: 4px solid #ffc107;">
-                        <small style="color: #856404;">
-                            <i class="fas fa-exclamation-triangle"></i> <strong>Aucune marge personnalisée créée.</strong> Veuillez d'abord créer une marge personnalisée avant d'assigner des articles.
-                        </small>
-                    </div>
-                    {% else %}
-                    <small style="color: #6c757d; display: block; margin-top: 5px;">
-                        <i class="fas fa-info-circle"></i> Choisissez la catégorie dans laquelle les articles sélectionnés seront classés.
-                    </small>
-                    {% endif %}
-                </div>
-                <div style="text-align: right; margin-top: 20px;">
-                    <button type="button" class="btn btn-secondary" onclick="fermerModalAssignation()">Annuler</button>
-                    <button type="submit" class="btn btn-primary" id="btnAssignerArticles" disabled>
-                        <i class="fas fa-check"></i> Assigner <span id="btn_nombre_articles">0</span> article(s)
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<script>
-// Gestion des modals
-function ouvrirModalMarge() {
-    document.getElementById('modalMarge').style.display = 'block';
-    document.getElementById('marge_id_form').value = '';
-    document.getElementById('formMarge').reset();
-    document.getElementById('modalMargeTitle').textContent = 'Créer une Marge Personnalisée';
-    document.getElementById('couleur').value = '#28a745';
-    document.getElementById('actif').checked = true;
-}
-
-function fermerModalMarge() {
-    document.getElementById('modalMarge').style.display = 'none';
-}
-
-function modifierMarge(id, nom, min, max, couleur, ordre, actif) {
-    document.getElementById('modalMarge').style.display = 'block';
-    document.getElementById('marge_id_form').value = id;
-    document.getElementById('nom_categorie').value = nom;
-    document.getElementById('marge_min').value = min;
-    document.getElementById('marge_max').value = max || '';
-    document.getElementById('couleur').value = couleur;
-    document.getElementById('ordre').value = ordre;
-    document.getElementById('actif').checked = actif;
-    document.getElementById('modalMargeTitle').textContent = 'Modifier une Marge Personnalisée';
-}
-
-function ouvrirModalAssignation() {
-    const modal = document.getElementById('modalAssignation');
-    if (!modal) {
-        console.error('Modal non trouvé');
-        return;
-    }
-    
-    modal.style.display = 'block';
-    document.getElementById('formAssignation').reset();
-    document.getElementById('articles_selectionnes_container').style.display = 'none';
-    document.getElementById('liste_articles_selectionnes').innerHTML = '';
-    document.getElementById('nombre_articles_selectionnes').textContent = '0';
-    const btnNombre = document.getElementById('btn_nombre_articles');
-    if (btnNombre) {
-        btnNombre.textContent = '0';
-    }
-    document.getElementById('btnAssignerArticles').disabled = true;
-    document.getElementById('recherche_article').value = '';
-    
-    // Réinitialiser toutes les options visibles et désélectionner
-    const select = document.getElementById('article_id');
-    if (!select) {
-        console.error('Select article_id non trouvé');
-        return;
-    }
-    
-    Array.from(select.options).forEach(option => {
-        option.style.display = '';
-        option.selected = false;
-    });
-    
-    // Attacher UNIQUEMENT l'événement change pour éviter les boucles
-    select.onchange = function() {
-        mettreAJourArticlesSelectionnes();
-    };
-    
-    // S'assurer que le select de catégorie est visible et fonctionnel
-    const selectMarge = document.getElementById('marge_id');
-    if (selectMarge) {
-        selectMarge.style.display = 'block';
-        selectMarge.style.visibility = 'visible';
-        selectMarge.disabled = false;
-        selectMarge.style.opacity = '1';
-        console.log('Select de catégorie trouvé et activé');
-    } else {
-        console.error('Select marge_id non trouvé dans le modal');
-    }
-    
-    // Forcer une mise à jour initiale
-    setTimeout(mettreAJourArticlesSelectionnes, 100);
-}
-
-function fermerModalAssignation() {
-    document.getElementById('modalAssignation').style.display = 'none';
-    const select = document.getElementById('article_id');
-    select.removeEventListener('change', mettreAJourArticlesSelectionnes);
-}
-
-// Filtrer les articles selon la recherche
-function filtrerArticles() {
-    const recherche = document.getElementById('recherche_article').value.toLowerCase();
-    const select = document.getElementById('article_id');
-    
-    Array.from(select.options).forEach(option => {
-        const texte = option.textContent.toLowerCase();
-        if (texte.includes(recherche)) {
-            option.style.display = '';
-        } else {
-            option.style.display = 'none';
+    <style>
+        .article-option:hover {
+            background-color: #f0f8ff !important;
         }
-    });
-}
-
-// Variable pour éviter les appels multiples
-let isUpdating = false;
-
-// Mettre à jour la liste des articles sélectionnés
-function mettreAJourArticlesSelectionnes() {
-    // Éviter les appels multiples simultanés
-    if (isUpdating) return;
-    isUpdating = true;
+    </style>
     
-    const select = document.getElementById('article_id');
-    if (!select) {
-        console.error('Select article_id non trouvé');
-        isUpdating = false;
-        return;
-    }
+    <script>
+    // --- LOGIQUE D'OUVERTURE/FERMETURE MODAL ---
     
-    const selectedOptions = Array.from(select.selectedOptions);
-    console.log('Articles sélectionnés:', selectedOptions.length);
-    
-    const container = document.getElementById('articles_selectionnes_container');
-    const liste = document.getElementById('liste_articles_selectionnes');
-    const nombre = document.getElementById('nombre_articles_selectionnes');
-    const btnAssigner = document.getElementById('btnAssignerArticles');
-    
-    if (!container) {
-        console.error('Container articles_selectionnes_container non trouvé');
-        isUpdating = false;
-        return;
-    }
-    if (!liste) {
-        console.error('Liste liste_articles_selectionnes non trouvée');
-        isUpdating = false;
-        return;
-    }
-    if (!nombre) {
-        console.error('Nombre nombre_articles_selectionnes non trouvé');
-        isUpdating = false;
-        return;
-    }
-    if (!btnAssigner) {
-        console.error('Bouton btnAssignerArticles non trouvé');
-        isUpdating = false;
-        return;
-    }
-    
-    const nombreArticles = selectedOptions.length;
-    nombre.textContent = nombreArticles;
-    
-    // Mettre à jour le bouton
-    const btnNombre = document.getElementById('btn_nombre_articles');
-    if (btnNombre) {
-        btnNombre.textContent = nombreArticles;
-    }
-    
-    if (nombreArticles > 0) {
-        container.style.display = 'block';
-        container.style.visibility = 'visible';
-        container.style.opacity = '1';
-        liste.innerHTML = '';
+    function ouvrirModalCreation() {
+        document.getElementById('modalMarge').style.display = 'block';
+        document.getElementById('modalTitle').textContent = 'Nouvelle Configuration';
+        document.getElementById('formMarge').reset();
+        document.getElementById('marge_id_form').value = '';
         
-        selectedOptions.forEach(option => {
-            const ref = option.getAttribute('data-ref') || option.textContent.split(' - ')[0];
-            const designation = option.getAttribute('data-designation') || option.textContent.split(' - ')[1] || '';
-            const div = document.createElement('div');
-            div.style.cssText = 'padding: 8px; margin: 5px 0; background: white; border-radius: 5px; border-left: 3px solid #f5576c; display: flex; justify-content: space-between; align-items: center;';
-            div.innerHTML = `
-                <span><strong>${ref}</strong> - ${designation}</span>
-                <button type="button" onclick="deselectionnerArticle('${option.value}')" style="background: #dc3545; color: white; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer;">
-                    <i class="fas fa-times"></i>
-                </button>
-            `;
-            liste.appendChild(div);
-        });
+        // Mode Création : On montre le sélecteur, on cache l'affichage fixe
+        document.getElementById('select_article_container').style.display = 'block';
+        document.getElementById('selected_article_display').style.display = 'none';
+        document.getElementById('article_list').style.display = 'block'; // Montrer la liste au départ ou non, au choix
         
-        btnAssigner.disabled = false;
-        console.log('Liste des articles affichée');
-    } else {
-        container.style.display = 'none';
-        btnAssigner.disabled = true;
-        if (btnNombre) {
-            btnNombre.textContent = '0';
-        }
+        // Valeurs par défaut logiques
+        document.getElementById('mauvaise_min').value = '0';
+        document.getElementById('mauvaise_max').value = '10';
+        document.getElementById('bonne_min').value = '11';
+        document.getElementById('bonne_max').value = '20';
+        document.getElementById('tres_bonne_min').value = '21';
+        document.getElementById('tres_bonne_max').value = '100';
     }
     
-    isUpdating = false;
-}
-
-// Désélectionner un article
-function deselectionnerArticle(articleId) {
-    const select = document.getElementById('article_id');
-    const option = Array.from(select.options).find(opt => opt.value === articleId);
-    if (option) {
-        option.selected = false;
-        mettreAJourArticlesSelectionnes();
-    }
-}
-
-// Enregistrer une marge
-function enregistrerMarge(event) {
-    event.preventDefault();
+    function modifierMarge(id, nomArticle, mMin, mMax, bMin, bMax, tbMin, tbMax, ordre, actif) {
+        document.getElementById('modalMarge').style.display = 'block';
+        document.getElementById('modalTitle').textContent = 'Modifier Configuration';
+        document.getElementById('marge_id_form').value = id;
+        
+        // Mode Édition : On cache le sélecteur, on montre le nom fixe
+        document.getElementById('select_article_container').style.display = 'none';
+        document.getElementById('selected_article_display').style.display = 'block';
+        document.getElementById('selected_article_name').textContent = nomArticle;
+        document.getElementById('btn_change_article').style.display = 'none';
     
-    const formData = new FormData();
-    const margeId = document.getElementById('marge_id_form').value;
-    
-    formData.append('nom_categorie', document.getElementById('nom_categorie').value);
-    formData.append('marge_min', document.getElementById('marge_min').value);
-    formData.append('marge_max', document.getElementById('marge_max').value);
-    formData.append('couleur', document.getElementById('couleur').value);
-    formData.append('ordre', document.getElementById('ordre').value);
-    formData.append('actif', document.getElementById('actif').checked);
-    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
-    
-    const url = margeId 
-        ? '{% url "modifier_marge_personnalisee" 0 %}'.replace('0', margeId)
-        : '{% url "creer_marge_personnalisee" %}';
-    
-    fetch(url, {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showAlert('Marge enregistrée avec succès', 'success');
-            setTimeout(() => location.reload(), 1000);
-        } else {
-            showAlert('Erreur: ' + data.error, 'error');
-        }
-    })
-    .catch(error => {
-        showAlert('Erreur lors de l\'enregistrement', 'error');
-        console.error(error);
-    });
-}
-
-// Supprimer une marge
-function supprimerMarge(id) {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cette marge ?')) {
-        return;
-    }
-    
-    const formData = new FormData();
-    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
-    
-    fetch('{% url "supprimer_marge_personnalisee" 0 %}'.replace('0', id), {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showAlert('Marge supprimée avec succès', 'success');
-            setTimeout(() => location.reload(), 1000);
-        } else {
-            showAlert('Erreur: ' + data.error, 'error');
-        }
-    })
-    .catch(error => {
-        showAlert('Erreur lors de la suppression', 'error');
-        console.error(error);
-    });
-}
-
-// Enregistrer une assignation (plusieurs articles à la fois)
-function enregistrerAssignation(event) {
-    event.preventDefault();
-    
-    const articleSelect = document.getElementById('article_id');
-    const selectedArticles = Array.from(articleSelect.selectedOptions).map(option => option.value);
-    const margeId = document.getElementById('marge_id').value;
-    
-    if (selectedArticles.length === 0) {
-        showAlert('Veuillez sélectionner au moins un article', 'error');
-        return;
-    }
-    
-    if (!margeId) {
-        showAlert('Veuillez sélectionner une catégorie de marge', 'error');
-        return;
-    }
-    
-    // Créer le FormData avec tous les articles en une seule requête
-    const formData = new FormData();
-    selectedArticles.forEach(articleId => {
-        formData.append('article_id', articleId);
-    });
-    formData.append('marge_id', margeId);
-    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
-    
-    fetch('{% url "assigner_article_marge" %}', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            const total = data.created_count + data.updated_count;
-            let message = `${total} article(s) assigné(s) à "${data.marge_nom}"`;
-            if (data.created_count > 0 && data.updated_count > 0) {
-                message += ` (${data.created_count} créé(s), ${data.updated_count} mis à jour)`;
-            }
-            if (data.errors && data.errors.length > 0) {
-                message += `. ${data.errors.length} erreur(s): ${data.errors.join(', ')}`;
-            }
-            showAlert(message, data.errors && data.errors.length > 0 ? 'error' : 'success');
-            setTimeout(() => location.reload(), 1500);
-        } else {
-            showAlert('Erreur: ' + data.error, 'error');
-        }
-    })
-    .catch(error => {
-        showAlert('Erreur lors de l\'assignation', 'error');
-        console.error(error);
-    });
-}
-
-// Retirer une assignation
-function retirerAssignation(id) {
-    if (!confirm('Retirer l\'assignation manuelle de cet article ?')) {
-        return;
-    }
-    
-    const formData = new FormData();
-    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
-    
-    fetch('{% url "retirer_assignation_article" 0 %}'.replace('0', id), {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showAlert('Assignation retirée avec succès', 'success');
-            setTimeout(() => location.reload(), 1000);
-        } else {
-            showAlert('Erreur: ' + data.error, 'error');
-        }
-    })
-    .catch(error => {
-        showAlert('Erreur lors de la suppression', 'error');
-        console.error(error);
-    });
-}
-
-function showAlert(message, type) {
-    const container = document.getElementById('alertContainer');
-    container.innerHTML = `<div class="alert alert-${type}">
-        <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i> ${message}
-    </div>`;
-    setTimeout(() => {
-        container.innerHTML = '';
-    }, 5000);
-}
-
-// Attacher l'événement au chargement de la page
-document.addEventListener('DOMContentLoaded', function() {
-    const select = document.getElementById('article_id');
-    if (select) {
-        // Attacher UNIQUEMENT l'événement change
-        select.onchange = function() {
-            mettreAJourArticlesSelectionnes();
+        // Fonction utilitaire pour convertir "10,00" en "10.00" pour les inputs HTML
+        const formatNum = (val) => {
+            if (!val) return '0';
+            return val.toString().replace(',', '.');
         };
+        
+        // Remplissage des valeurs (avec correction virgule -> point)
+        document.getElementById('mauvaise_min').value = formatNum(mMin);
+        document.getElementById('mauvaise_max').value = formatNum(mMax);
+        document.getElementById('bonne_min').value = formatNum(bMin);
+        document.getElementById('bonne_max').value = formatNum(bMax);
+        document.getElementById('tres_bonne_min').value = formatNum(tbMin);
+        document.getElementById('tres_bonne_max').value = formatNum(tbMax);
+        
+        document.getElementById('ordre').value = ordre;
+        
+        // Correction pour la case Actif (gestion string "true"/"false" ou boolean)
+        const isActif = (actif === true || actif === 'true');
+        document.getElementById('actif').checked = isActif;
     }
-});
+    
+    function fermerModalMarge() {
+        document.getElementById('modalMarge').style.display = 'none';
+    }
+    
+    // --- LOGIQUE DE SÉLECTION D'ARTICLE (Slide Down) ---
+    
+    function filtrerArticles() {
+        const term = document.getElementById('search_article').value.toLowerCase();
+        const list = document.getElementById('article_list');
+        const items = list.getElementsByClassName('article-option');
+        let hasResults = false;
+    
+        list.style.display = 'block'; // S'assurer que c'est visible quand on tape
+    
+        for (let item of items) {
+            const text = item.getAttribute('data-search');
+            if (text.includes(term)) {
+                item.style.display = 'block';
+                hasResults = true;
+            } else {
+                item.style.display = 'none';
+            }
+        }
+    }
+    
+    function selectionnerArticle(id, nom) {
+        // 1. Remplir l'input caché
+        document.getElementById('article_id_input').value = id;
+        
+        // 2. Mettre à jour l'affichage visuel
+        document.getElementById('selected_article_name').textContent = nom;
+        document.getElementById('select_article_container').style.display = 'none';
+        document.getElementById('selected_article_display').style.display = 'block';
+        document.getElementById('btn_change_article').style.display = 'block'; // Bouton "Changer" visible en mode création
+    }
+    
+    function resetSelectionArticle() {
+        document.getElementById('article_id_input').value = '';
+        document.getElementById('select_article_container').style.display = 'block';
+        document.getElementById('selected_article_display').style.display = 'none';
+        document.getElementById('search_article').value = '';
+        filtrerArticles(); // Reset filtre
+    }
+    
+    // --- ENREGISTREMENT AJAX ---
+    
+    function enregistrerMarge(event) {
+        event.preventDefault();
+        
+        const form = document.getElementById('formMarge');
+        const formData = new FormData(form);
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        
+        // Gestion checkbox Actif
+        formData.set('actif', document.getElementById('actif').checked ? 'true' : 'false');
+        
+        const margeId = document.getElementById('marge_id_form').value;
+        const url = margeId 
+            ? '{% url "modifier_marge_personnalisee" 0 %}'.replace('0', margeId)
+            : '{% url "creer_marge_personnalisee" %}';
+            
+        fetch(url, {
+            method: 'POST',
+            body: formData
+        })
+        .then(r => r.json())
+        .then(data => {
+            if(data.success) {
+                showAlert(data.message, 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showAlert(data.error, 'error');
+            }
+        })
+        .catch(e => showAlert('Erreur technique', 'error'));
+    }
+    
+    function supprimerMarge(id) {
+        if(!confirm("Supprimer cette configuration ? L'article retournera dans la liste des disponibles.")) return;
+        
+        const formData = new FormData();
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        
+        fetch('{% url "supprimer_marge_personnalisee" 0 %}'.replace('0', id), {
+            method: 'POST', body: formData
+        })
+        .then(r => r.json())
+        .then(data => {
+            if(data.success) {
+                showAlert('Suppression réussie', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showAlert(data.error, 'error');
+            }
+        });
+    }
+    
+    function showAlert(msg, type) {
+        const div = document.getElementById('alertContainer');
+        div.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+        setTimeout(() => div.innerHTML = '', 4000);
+    }
 
-// Fermer les modals en cliquant en dehors
-window.onclick = function(event) {
-    const modalMarge = document.getElementById('modalMarge');
-    const modalAssignation = document.getElementById('modalAssignation');
-    if (event.target == modalMarge) {
-        fermerModalMarge();
+    // --- FONCTION DE RECHERCHE DANS LA LISTE ---
+function filtrerListeMarges() {
+    // 1. Récupérer le texte saisi
+    const input = document.getElementById('searchGlobalInput');
+    const filter = input.value.toLowerCase();
+    
+    // 2. Récupérer toutes les cartes de marge
+    const list = document.getElementsByClassName('marges-list')[0];
+    const items = list.getElementsByClassName('marge-item');
+    
+    let visibleCount = 0;
+
+    // 3. Boucler sur chaque carte pour voir si elle correspond
+    for (let i = 0; i < items.length; i++) {
+        // On cherche le titre h5 qui contient le nom de l'article
+        const h5 = items[i].getElementsByTagName("h5")[0];
+        
+        // On cherche aussi la référence (dans le tag small)
+        const small = items[i].getElementsByTagName("small")[0];
+        
+        if (h5 || small) {
+            const txtValue = (h5.textContent || h5.innerText) + " " + (small.textContent || small.innerText);
+            
+            if (txtValue.toLowerCase().indexOf(filter) > -1) {
+                items[i].style.display = ""; // Afficher
+                visibleCount++;
+            } else {
+                items[i].style.display = "none"; // Cacher
+            }
+        }
     }
-    if (event.target == modalAssignation) {
-        fermerModalAssignation();
+    
+    // Optionnel : Afficher un message si aucun résultat
+    let noResultMsg = document.getElementById('no-result-msg');
+    if (visibleCount === 0) {
+        if (!noResultMsg) {
+            noResultMsg = document.createElement('div');
+            noResultMsg.id = 'no-result-msg';
+            noResultMsg.className = 'text-center p-4 text-muted';
+            noResultMsg.innerHTML = '<i class="fas fa-search mb-2"></i><br>Aucun article trouvé pour cette recherche.';
+            list.appendChild(noResultMsg);
+        }
+        noResultMsg.style.display = 'block';
+    } else if (noResultMsg) {
+        noResultMsg.style.display = 'none';
     }
-}
-</script>
+    }
+
+  
+    </script>
+   
 {% endblock %}

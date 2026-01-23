@@ -20286,758 +20286,500 @@ def export_etat_resultat_excel(request):
         import traceback
         traceback.print_exc()
         return JsonResponse({'success': False, 'error': f'Erreur export: {str(e)}'})
+# Dans views.py
 
+@login_required
 def generer_suivi_statistique(request):
-    """Générer les statistiques de toutes les agences avec regroupement par catégorie de marge"""
-    compte, redirect_response = check_comptable_access(request)
-    if redirect_response:
-        return redirect_response
-    
+    """Génère les stats en comparant chaque article à SA propre configuration de marge"""
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'Méthode non autorisée'})
+        
+    date_debut = request.POST.get('date_debut')
+    date_fin = request.POST.get('date_fin')
+    
+    if not date_debut or not date_fin:
+        return JsonResponse({'success': False, 'error': 'Dates manquantes'})
     
     try:
-        date_debut_str = request.POST.get('date_debut')
-        date_fin_str = request.POST.get('date_fin')
+        from supermarket.models import LigneFactureVente, MargePersonnalisee
         
-        if not date_debut_str or not date_fin_str:
-            return JsonResponse({'success': False, 'error': 'Les dates sont obligatoires'})
+        # 1. Récupération des ventes
+        ventes = LigneFactureVente.objects.filter(
+            facture_vente__date__range=[date_debut, date_fin]
+        ).select_related('article', 'facture_vente__agence')
         
-        from datetime import datetime
-        date_debut = datetime.strptime(date_debut_str, '%Y-%m-%d').date()
-        date_fin = datetime.strptime(date_fin_str, '%Y-%m-%d').date()
+        # 2. Dictionnaire de résultats
+        stats_data = {}
         
-        # Récupérer toutes les agences
-        agences = Agence.objects.all().order_by('nom_agence')
-        
-        # Statistiques par agence et par jour
-        statistiques_par_agence = {}
-        
-        for agence in agences:
-            # Pour chaque jour de la période
-            stats_journalieres = {}
-            current_date = date_debut
+        # 3. Pré-charger les configs de marge
+        configs_marges = {
+            m.article_id: m 
+            for m in MargePersonnalisee.objects.select_related('article').all()
+        }
+
+        for vente in ventes:
+            # --- CORRECTION ICI : Utilisation de .pk au lieu de .id ---
+            agence_id = vente.facture_vente.agence.pk 
+            nom_agence = vente.facture_vente.agence.nom_agence
             
-            while current_date <= date_fin:
-                # Récupérer les ventes de cette agence pour ce jour
-                ventes_jour = LigneFactureVente.objects.filter(
-                    facture_vente__agence=agence,
-                    facture_vente__date=current_date
-                ).select_related('article', 'facture_vente')
-                
-                # Récupérer les marges personnalisées pour cette agence
-                from supermarket.models import MargePersonnalisee, AssignationMargeArticle
-                marges_perso = MargePersonnalisee.objects.filter(agence=agence, actif=True).order_by('ordre', 'marge_min')
-                
-                # Récupérer les assignations manuelles pour cette agence
-                assignations_manuelles = {}
-                for assignation in AssignationMargeArticle.objects.filter(agence=agence):
-                    assignations_manuelles[assignation.article.id] = assignation.marge_personnalisee
-                
-                # Créer les catégories de marge (personnalisées ou par défaut)
-                categories_marge = {}
-                if marges_perso.exists():
-                    # Utiliser les marges personnalisées
-                    for marge_perso in marges_perso:
-                        categories_marge[marge_perso.id] = {
-                            'nom': marge_perso.nom_categorie,
-                            'couleur': marge_perso.couleur,
-                            'marge_min': float(marge_perso.marge_min),
-                            'marge_max': float(marge_perso.marge_max) if marge_perso.marge_max else None,
-                            'articles': []
-                        }
+            # Gestion Date
+            date_obj = vente.facture_vente.date
+            date_vente = date_obj.strftime('%Y-%m-%d') if hasattr(date_obj, 'strftime') else str(date_obj)
+            
+            article = vente.article
+            
+            # Calculs
+            ca = vente.quantite * vente.prix_unitaire
+            cout = vente.quantite * (article.prix_achat or 0)
+            marge_valeur = ca - cout
+            marge_pct = (marge_valeur / ca * 100) if ca > 0 else 0
+            
+            # Classification
+            # --- CORRECTION ICI : Utilisation de .pk ---
+            config = configs_marges.get(article.pk) 
+            categorie_key = 'non_configure'
+            
+            if config:
+                if config.mauvaise_min <= marge_pct <= config.mauvaise_max:
+                    categorie_key = 'mauvaise'
+                elif config.bonne_min <= marge_pct <= config.bonne_max:
+                    categorie_key = 'bonne'
+                elif config.tres_bonne_min <= marge_pct <= config.tres_bonne_max:
+                    categorie_key = 'tres_bonne'
                 else:
-                    # Utiliser les marges par défaut
-                    categories_marge['bonne_marge'] = {
-                        'nom': 'Bonne Marge',
-                        'couleur': '#28a745',
-                        'marge_min': 10.0,
-                        'marge_max': None,
-                        'articles': []
-                    }
-                    categories_marge['marge_mediocre'] = {
-                        'nom': 'Marge Médiocre',
-                        'couleur': '#ffc107',
-                        'marge_min': 4.0,
-                        'marge_max': 10.0,
-                        'articles': []
-                    }
-                    categories_marge['marge_faible'] = {
-                        'nom': 'Marge Faible',
-                        'couleur': '#dc3545',
-                        'marge_min': 0.0,
-                        'marge_max': 4.0,
-                        'articles': []
-                    }
-                
-                # Articles déjà traités pour éviter les doublons par jour
-                articles_traites = {}
-                
-                for vente in ventes_jour:
-                    if not vente.article:
-                        continue
-                    
-                    article_id = vente.article.id
-                    prix_vente = Decimal(str(vente.prix_unitaire))
-                    prix_achat = Decimal(str(vente.article.prix_achat))
-                    quantite = Decimal(str(vente.quantite))
-                    
-                    # Calculer la marge en pourcentage
-                    if prix_vente > 0:
-                        marge_unitaire = prix_vente - prix_achat
-                        pourcentage_marge = (marge_unitaire / prix_vente) * 100
-                    else:
-                        pourcentage_marge = Decimal('0')
-                    
-                    # Regrouper par article (sommer les quantités)
-                    if article_id not in articles_traites:
-                        articles_traites[article_id] = {
-                            'article': vente.article,
-                            'quantite_totale': Decimal('0'),
-                            'chiffre_affaires': Decimal('0'),
-                            'marge_totale': Decimal('0'),
-                            'pourcentage_marge': pourcentage_marge,
-                        }
-                    
-                    articles_traites[article_id]['quantite_totale'] += quantite
-                    articles_traites[article_id]['chiffre_affaires'] += prix_vente * quantite
-                    articles_traites[article_id]['marge_totale'] += marge_unitaire * quantite
-                
-                # Classer les articles par catégorie de marge
-                for article_id, stats in articles_traites.items():
-                    marge_pct = float(stats['pourcentage_marge'])
-                    article_data = {
-                        'reference': stats['article'].reference_article,
-                        'designation': stats['article'].designation,
-                        'quantite': float(stats['quantite_totale']),
-                        'chiffre_affaires': float(stats['chiffre_affaires']),
-                        'marge': float(stats['marge_totale']),
-                        'pourcentage_marge': marge_pct,
-                    }
-                    
-                    article_obj = stats['article']
-                    categorie_trouvee = None
-                    
-                    # Vérifier d'abord si l'article a une assignation manuelle (priorité)
-                    if article_obj.id in assignations_manuelles:
-                        marge_assigned = assignations_manuelles[article_obj.id]
-                        categorie_trouvee = marge_assigned.id
-                        # S'assurer que la catégorie existe dans categories_marge
-                        if categorie_trouvee not in categories_marge:
-                            categories_marge[categorie_trouvee] = {
-                                'nom': marge_assigned.nom_categorie,
-                                'couleur': marge_assigned.couleur,
-                                'marge_min': float(marge_assigned.marge_min),
-                                'marge_max': float(marge_assigned.marge_max) if marge_assigned.marge_max else None,
-                                'articles': []
-                            }
-                    else:
-                        # Classification automatique basée sur les marges personnalisées ou par défaut
-                        for cat_key, cat_data in categories_marge.items():
-                            marge_min = cat_data['marge_min']
-                            marge_max = cat_data['marge_max']
-                            
-                            if marge_max is None:
-                                # Marge maximale non définie (≥ marge_min)
-                                if marge_pct >= marge_min:
-                                    categorie_trouvee = cat_key
-                                    break
-                            else:
-                                # Marge avec min et max
-                                if marge_min <= marge_pct < marge_max:
-                                    categorie_trouvee = cat_key
-                                    break
-                        
-                        # Si aucune catégorie ne correspond, mettre dans la dernière
-                        if categorie_trouvee is None and categories_marge:
-                            categorie_trouvee = list(categories_marge.keys())[-1]
-                    
-                    # Ajouter l'article à la catégorie trouvée
-                    if categorie_trouvee and categorie_trouvee in categories_marge:
-                        categories_marge[categorie_trouvee]['articles'].append(article_data)
-                
-                # Convertir en format attendu par le template
-                stats_jour = {}
-                for cat_key, cat_data in categories_marge.items():
-                    if cat_data['articles']:
-                        stats_jour[cat_key] = cat_data
-                
-                if stats_jour:
-                    stats_journalieres[str(current_date)] = stats_jour
-                
-                
-                # Jour suivant
-                from datetime import timedelta
-                current_date += timedelta(days=1)
+                    if marge_pct < config.mauvaise_min: categorie_key = 'mauvaise'
+                    elif marge_pct > config.tres_bonne_max: categorie_key = 'tres_bonne'
             
-            # N'inclure l'agence que si elle a des ventes sur la période
-            if stats_journalieres:
-                statistiques_par_agence[agence.id_agence] = {
-                    'nom_agence': agence.nom_agence,
-                    'stats_journalieres': stats_journalieres,
+            # Initialisation Agence
+            if agence_id not in stats_data:
+                stats_data[agence_id] = {'nom_agence': nom_agence, 'stats_journalieres': {}}
+            
+            # Initialisation Jour
+            if date_vente not in stats_data[agence_id]['stats_journalieres']:
+                stats_data[agence_id]['stats_journalieres'][date_vente] = {
+                    'tres_bonne': {'nom': 'Très Bonne Marge', 'couleur': '#28a745', 'articles': []},
+                    'bonne': {'nom': 'Bonne Marge', 'couleur': '#ffc107', 'articles': []},
+                    'mauvaise': {'nom': 'Mauvaise Marge', 'couleur': '#dc3545', 'articles': []},
+                    'non_configure': {'nom': 'Marge Non Configurée', 'couleur': '#6c757d', 'articles': []}
                 }
+            
+            # Récupération de la liste cible
+            liste_articles = stats_data[agence_id]['stats_journalieres'][date_vente][categorie_key]['articles']
+            
+            # Recherche si l'article existe déjà dans la liste pour cumuler
+            found = False
+            for item in liste_articles:
+                if item['reference'] == article.reference_article:
+                    item['quantite'] += float(vente.quantite)
+                    item['chiffre_affaires'] += float(ca)
+                    item['marge'] += float(marge_valeur)
+                    item['pourcentage_marge'] = (item['marge'] / item['chiffre_affaires'] * 100) if item['chiffre_affaires'] > 0 else 0
+                    found = True
+                    break
+            
+            if not found:
+                liste_articles.append({
+                    'id': article.pk,  # --- CORRECTION ICI : .pk ---
+                    'reference': article.reference_article,
+                    'designation': article.designation,
+                    'quantite': float(vente.quantite),
+                    'chiffre_affaires': float(ca),
+                    'marge': float(marge_valeur),
+                    'pourcentage_marge': float(marge_pct)
+                })
+
+        # Sauvegarde session
+        # Astuce : on convertit les clés agence_id en string pour éviter les soucis JSON si c'était des UUID
+        stats_data_str_keys = {str(k): v for k, v in stats_data.items()}
         
-        # Stocker dans la session pour l'export
         request.session['suivi_statistique'] = {
-            'date_debut': str(date_debut),
-            'date_fin': str(date_fin),
-            'statistiques_par_agence': statistiques_par_agence,
+            'date_debut': date_debut,
+            'date_fin': date_fin,
+            'statistiques_par_agence': stats_data_str_keys
         }
         
-        return JsonResponse({
-            'success': True,
-            'statistiques': statistiques_par_agence,
-            'date_debut': str(date_debut),
-            'date_fin': str(date_fin),
-        })
+        return JsonResponse({'success': True, 'statistiques': stats_data_str_keys, 'date_debut': date_debut, 'date_fin': date_fin})
         
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return JsonResponse({'success': False, 'error': f'Erreur: {str(e)}'})
+        return JsonResponse({'success': False, 'error': f"Erreur serveur : {str(e)}"})
 
+        
 def export_suivi_statistique_excel(request):
     """Exporter les statistiques de suivi en Excel"""
-    compte, redirect_response = check_comptable_access(request)
-    if redirect_response:
-        return redirect_response
     
+    # 1. Vérification des droits
+    # compte, redirect_response = check_comptable_access(request)
+    # if redirect_response: return redirect_response
+    
+    # 2. Vérification des données
+    stats_data = request.session.get('suivi_statistique')
+    if not stats_data:
+        return JsonResponse({'success': False, 'error': 'Aucune donnée à exporter'})
+
+    # 3. Importation sécurisée
     try:
-        # Récupérer les statistiques depuis la session
-        stats_data = request.session.get('suivi_statistique')
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    except ImportError:
+        return JsonResponse({'success': False, 'error': 'Module openpyxl manquant'})
         
-        if not stats_data:
-            return JsonResponse({'success': False, 'error': 'Aucune statistique générée'})
-        
-        try:
-            import openpyxl
-            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        except ImportError:
-            return JsonResponse({'success': False, 'error': 'Module openpyxl non installé'})
-        
-        from django.http import HttpResponse
-        
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = f"Suivi Statistique {stats_data['date_debut']} - {stats_data['date_fin']}"
-        
-        # Styles
-        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
-        header_font = Font(bold=True, color="FFFFFF", size=11)
-        bonne_marge_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
-        mediocre_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
-        faible_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
-        agence_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
-        
-        row = 1
-        
-        # En-têtes des colonnes (sans "Catégorie Marge")
-        headers = ['Référence', 'Désignation', 'Quantité', 'Chiffre d\'Affaires (FCFA)', 'Marge (FCFA)', 'Marge (%)']
-        
-        # Par agence
+    from django.http import HttpResponse
+    
+    # 4. Création du fichier Excel
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Suivi Marges"
+
+    # Styles
+    fill_tres_bonne = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid") # Vert
+    fill_bonne = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")      # Jaune
+    fill_mauvaise = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")   # Rouge
+    fill_non_config = PatternFill(start_color="E7E6E6", end_color="E7E6E6", fill_type="solid") # Gris
+    
+    header_font = Font(bold=True)
+    row = 1
+    headers = ['Référence', 'Désignation', 'Quantité', 'CA (FCFA)', 'Marge (FCFA)', '% Réalisé']
+
+    # 5. Boucle sur les agences
+    if stats_data and 'statistiques_par_agence' in stats_data:
         for agence_id, agence_data in stats_data['statistiques_par_agence'].items():
-            # En-tête Agence
+            # Titre Agence
             ws.merge_cells(f'A{row}:F{row}')
-            ws[f'A{row}'] = f"AGENCE: {agence_data['nom_agence']}"
-            ws[f'A{row}'].font = Font(bold=True, size=11)
-            ws[f'A{row}'].fill = agence_fill
-            ws[f'A{row}'].alignment = Alignment(horizontal="left", vertical="center")
+            ws[f'A{row}'] = f"AGENCE : {agence_data['nom_agence']}"
+            ws[f'A{row}'].font = Font(bold=True, size=12)
             row += 1
-            
-            # Par jour
-            for date_jour, stats_jour in sorted(agence_data['stats_journalieres'].items()):
-                # Date
+    
+            # Boucle sur les dates
+            for date_jour, cats in sorted(agence_data['stats_journalieres'].items()):
+                # Titre Date
                 ws.merge_cells(f'A{row}:F{row}')
-                ws[f'A{row}'] = f"Date: {date_jour}"
-                ws[f'A{row}'].font = Font(bold=True, size=10)
-                ws[f'A{row}'].alignment = Alignment(horizontal="left", vertical="center")
+                ws[f'A{row}'] = f"--- {date_jour} ---"
+                ws[f'A{row}'].alignment = Alignment(horizontal='center')
                 row += 1
-                
-                # Bonne marge (≥10%)
-                bonne_marge_articles = stats_jour.get('bonne_marge', [])
-                if bonne_marge_articles:
-                    # Ligne d'en-tête de catégorie
-                    ws.merge_cells(f'A{row}:F{row}')
-                    cell_cat = ws.cell(row=row, column=1, value="Bonne Marge (≥10%)")
-                    cell_cat.fill = bonne_marge_fill
-                    cell_cat.font = Font(bold=True, size=10)
-                    cell_cat.alignment = Alignment(horizontal="left", vertical="center")
-                    row += 1
+    
+                # On boucle sur les 4 catégories imposées
+                ordre_cats = [
+                    ('tres_bonne', 'Très Bonne Marge', fill_tres_bonne),
+                    ('bonne', 'Bonne Marge', fill_bonne),
+                    ('mauvaise', 'Mauvaise Marge', fill_mauvaise),
+                    ('non_configure', '⚠️ Non Configuré (À définir)', fill_non_config)
+                ]
+    
+                for key, label, fill_style in ordre_cats:
+                    # On récupère les articles de cette catégorie
+                    cat_data = cats.get(key)
+                    if not cat_data or 'articles' not in cat_data:
+                        continue
+                        
+                    articles = cat_data['articles']
                     
-                    # En-têtes du tableau
-                    for col, header in enumerate(headers, 1):
-                        cell = ws.cell(row=row, column=col)
-                        cell.value = header
+                    if articles:
+                        # Titre Catégorie
+                        ws.merge_cells(f'A{row}:F{row}')
+                        cell = ws.cell(row=row, column=1, value=label)
+                        cell.fill = fill_style
                         cell.font = header_font
-                        cell.fill = header_fill
-                        cell.alignment = Alignment(horizontal="center", vertical="center")
-                    row += 1
-                    
-                    # Articles de bonne marge
-                    for article in bonne_marge_articles:
-                        # Référence (colonne A)
-                        ws.cell(row=row, column=1, value=article['reference']).alignment = Alignment(vertical="center")
-                        
-                        # Désignation (colonne B)
-                        ws.cell(row=row, column=2, value=article['designation']).alignment = Alignment(vertical="center")
-                        
-                        # Quantité (colonne C)
-                        cell_qte = ws.cell(row=row, column=3, value=article['quantite'])
-                        cell_qte.number_format = '#,##0.000'
-                        cell_qte.alignment = Alignment(horizontal="right", vertical="center")
-                        
-                        # Chiffre d'Affaires (colonne D)
-                        cell_ca = ws.cell(row=row, column=4, value=article['chiffre_affaires'])
-                        cell_ca.number_format = '#,##0.00'
-                        cell_ca.alignment = Alignment(horizontal="right", vertical="center")
-                        
-                        # Marge (colonne E)
-                        cell_marge = ws.cell(row=row, column=5, value=article['marge'])
-                        cell_marge.number_format = '#,##0.00'
-                        cell_marge.alignment = Alignment(horizontal="right", vertical="center")
-                        
-                        # Marge % (colonne F)
-                        ws.cell(row=row, column=6, value=f"{article['pourcentage_marge']:.2f}%").alignment = Alignment(horizontal="right", vertical="center")
-                        
                         row += 1
-                
-                # Marge médiocre (4-9%)
-                marge_mediocre_articles = stats_jour.get('marge_mediocre', [])
-                if marge_mediocre_articles:
-                    # Ligne d'en-tête de catégorie
-                    ws.merge_cells(f'A{row}:F{row}')
-                    cell_cat = ws.cell(row=row, column=1, value="Marge Médiocre (4-9%)")
-                    cell_cat.fill = mediocre_fill
-                    cell_cat.font = Font(bold=True, size=10)
-                    cell_cat.alignment = Alignment(horizontal="left", vertical="center")
-                    row += 1
-                    
-                    # En-têtes du tableau
-                    for col, header in enumerate(headers, 1):
-                        cell = ws.cell(row=row, column=col)
-                        cell.value = header
-                        cell.font = header_font
-                        cell.fill = header_fill
-                        cell.alignment = Alignment(horizontal="center", vertical="center")
-                    row += 1
-                    
-                    # Articles de marge médiocre
-                    for article in marge_mediocre_articles:
-                        # Référence (colonne A)
-                        ws.cell(row=row, column=1, value=article['reference']).alignment = Alignment(vertical="center")
                         
-                        # Désignation (colonne B)
-                        ws.cell(row=row, column=2, value=article['designation']).alignment = Alignment(vertical="center")
-                        
-                        # Quantité (colonne C)
-                        cell_qte = ws.cell(row=row, column=3, value=article['quantite'])
-                        cell_qte.number_format = '#,##0.000'
-                        cell_qte.alignment = Alignment(horizontal="right", vertical="center")
-                        
-                        # Chiffre d'Affaires (colonne D)
-                        cell_ca = ws.cell(row=row, column=4, value=article['chiffre_affaires'])
-                        cell_ca.number_format = '#,##0.00'
-                        cell_ca.alignment = Alignment(horizontal="right", vertical="center")
-                        
-                        # Marge (colonne E)
-                        cell_marge = ws.cell(row=row, column=5, value=article['marge'])
-                        cell_marge.number_format = '#,##0.00'
-                        cell_marge.alignment = Alignment(horizontal="right", vertical="center")
-                        
-                        # Marge % (colonne F)
-                        ws.cell(row=row, column=6, value=f"{article['pourcentage_marge']:.2f}%").alignment = Alignment(horizontal="right", vertical="center")
-                        
+                        # Headers Colonnes
+                        for col, h in enumerate(headers, 1):
+                            c = ws.cell(row=row, column=col, value=h)
+                            c.font = Font(bold=True, size=9)
+                            c.border = Border(bottom=Side(style='thin'))
                         row += 1
-                
-                # Marge faible (<4%)
-                marge_faible_articles = stats_jour.get('marge_faible', [])
-                if marge_faible_articles:
-                    # Ligne d'en-tête de catégorie
-                    ws.merge_cells(f'A{row}:F{row}')
-                    cell_cat = ws.cell(row=row, column=1, value="Marge Faible (<4%)")
-                    cell_cat.fill = faible_fill
-                    cell_cat.font = Font(bold=True, size=10)
-                    cell_cat.alignment = Alignment(horizontal="left", vertical="center")
-                    row += 1
-                    
-                    # En-têtes du tableau
-                    for col, header in enumerate(headers, 1):
-                        cell = ws.cell(row=row, column=col)
-                        cell.value = header
-                        cell.font = header_font
-                        cell.fill = header_fill
-                        cell.alignment = Alignment(horizontal="center", vertical="center")
-                    row += 1
-                    
-                    # Articles de marge faible
-                    for article in marge_faible_articles:
-                        # Référence (colonne A)
-                        ws.cell(row=row, column=1, value=article['reference']).alignment = Alignment(vertical="center")
-                        
-                        # Désignation (colonne B)
-                        ws.cell(row=row, column=2, value=article['designation']).alignment = Alignment(vertical="center")
-                        
-                        # Quantité (colonne C)
-                        cell_qte = ws.cell(row=row, column=3, value=article['quantite'])
-                        cell_qte.number_format = '#,##0.000'
-                        cell_qte.alignment = Alignment(horizontal="right", vertical="center")
-                        
-                        # Chiffre d'Affaires (colonne D)
-                        cell_ca = ws.cell(row=row, column=4, value=article['chiffre_affaires'])
-                        cell_ca.number_format = '#,##0.00'
-                        cell_ca.alignment = Alignment(horizontal="right", vertical="center")
-                        
-                        # Marge (colonne E)
-                        cell_marge = ws.cell(row=row, column=5, value=article['marge'])
-                        cell_marge.number_format = '#,##0.00'
-                        cell_marge.alignment = Alignment(horizontal="right", vertical="center")
-                        
-                        # Marge % (colonne F)
-                        ws.cell(row=row, column=6, value=f"{article['pourcentage_marge']:.2f}%").alignment = Alignment(horizontal="right", vertical="center")
-                        
-                        row += 1
-                
-                # Calculer les totaux pour cette date
-                total_quantite = 0
-                total_chiffre_affaires = 0
-                total_marge = 0
-                
-                # Récupérer tous les articles de toutes les catégories
-                tous_articles = bonne_marge_articles + marge_mediocre_articles + marge_faible_articles
-                
-                for article in tous_articles:
-                    total_quantite += float(article['quantite'])
-                    total_chiffre_affaires += float(article['chiffre_affaires'])
-                    total_marge += float(article['marge'])
-                
-                # Calculer le pourcentage de marge global
-                pourcentage_marge_global = 0
-                if total_chiffre_affaires > 0:
-                    pourcentage_marge_global = (total_marge / total_chiffre_affaires) * 100
-                
-                # Ajouter la ligne TOTAL GÉNÉRAL si on a des articles
-                if tous_articles:
-                    # Ligne vide avant le total
-                    row += 1
-                    
-                    # Ligne TOTAL GÉNÉRAL
-                    # Colonne A: "TOTAL GÉNÉRAL"
-                    cell_total_label = ws.cell(row=row, column=1, value="TOTAL GÉNÉRAL")
-                    cell_total_label.font = Font(bold=True, size=11)
-                    cell_total_label.alignment = Alignment(horizontal="left", vertical="center")
-                    
-                    # Colonne B: vide (Désignation)
-                    ws.cell(row=row, column=2, value="")
-                    
-                    # Colonne C: Quantité totale
-                    cell_qte_total = ws.cell(row=row, column=3, value=total_quantite)
-                    cell_qte_total.number_format = '#,##0.000'
-                    cell_qte_total.font = Font(bold=True)
-                    cell_qte_total.alignment = Alignment(horizontal="right", vertical="center")
-                    
-                    # Colonne D: Chiffre d'Affaires total
-                    cell_ca_total = ws.cell(row=row, column=4, value=total_chiffre_affaires)
-                    cell_ca_total.number_format = '#,##0.00'
-                    cell_ca_total.font = Font(bold=True)
-                    cell_ca_total.alignment = Alignment(horizontal="right", vertical="center")
-                    
-                    # Colonne E: Marge totale
-                    cell_marge_total = ws.cell(row=row, column=5, value=total_marge)
-                    cell_marge_total.number_format = '#,##0.00'
-                    cell_marge_total.font = Font(bold=True)
-                    cell_marge_total.alignment = Alignment(horizontal="right", vertical="center")
-                    
-                    # Colonne F: Pourcentage de marge global
-                    cell_pct_total = ws.cell(row=row, column=6, value=f"{pourcentage_marge_global:.2f}%")
-                    cell_pct_total.font = Font(bold=True)
-                    cell_pct_total.alignment = Alignment(horizontal="right", vertical="center")
-                    
-                    row += 1
-                
-                row += 1  # Ligne vide entre les jours
-            
-            row += 1  # Ligne vide entre les agences
-        
-        # Ajuster largeurs colonnes (6 colonnes: A=Reference, B=Designation, C=Quantite, D=CA, E=Marge, F=Marge%)
-        ws.column_dimensions['A'].width = 20
-        ws.column_dimensions['B'].width = 40
-        ws.column_dimensions['C'].width = 15
-        ws.column_dimensions['D'].width = 25
-        ws.column_dimensions['E'].width = 20
-        ws.column_dimensions['F'].width = 15
-        
-        # Réponse HTTP
-        filename = f"Suivi_Statistique_{stats_data['date_debut']}_{stats_data['date_fin']}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        response = HttpResponse(
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        
-        wb.save(response)
-        return response
-        
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return JsonResponse({'success': False, 'error': f'Erreur export: {str(e)}'})
+    
+                        # Liste des Articles
+                        for art in articles:
+                            ws.cell(row=row, column=1, value=art['reference'])
+                            ws.cell(row=row, column=2, value=art['designation'])
+                            ws.cell(row=row, column=3, value=art['quantite'])
+                            
+                            c_ca = ws.cell(row=row, column=4, value=art['chiffre_affaires'])
+                            c_ca.number_format = '#,##0'
+                            
+                            c_marge = ws.cell(row=row, column=5, value=art['marge'])
+                            c_marge.number_format = '#,##0'
+                            
+                            pct_cell = ws.cell(row=row, column=6, value=art['pourcentage_marge'] / 100)
+                            pct_cell.number_format = '0.00%'
+                            
+                            row += 1
+                        row += 1 # Espace après chaque catégorie
+
+    # Auto-size colonne B
+    ws.column_dimensions['B'].width = 40
+    
+    # 6. Envoi du fichier
+    filename = f"Suivi_Marges_{stats_data['date_debut']}.xlsx"
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    wb.save(response)
+    return response
+
+
+
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from django.contrib import messages
+from decimal import Decimal
+
+# Fonction utilitaire pour l'agence (à garder si vous l'avez ailleurs)
+# def get_user_agence(request): ...
 
 @login_required
 def gerer_marges_personnalisees(request):
-    """Gérer les marges personnalisées pour l'agence de l'utilisateur"""
-    compte, redirect_response = check_comptable_access(request)
-    if redirect_response:
-        return redirect_response
+    """
+    Afficher le tableau de bord des marges.
+    On prépare aussi la liste des articles DISPONIBLES (ceux qui n'ont pas encore de marge).
+    """
+    # 1. Vérification Comptable/Admin
+    # (Adaptez cette partie selon votre décorateur check_comptable_access existant)
+    # compte, redirect_response = check_comptable_access(request)
+    # if redirect_response: return redirect_response
     
-    agence = get_user_agence(request)
+    # 2. Gestion Agence (Compatible Admin)
+    # 1. On initialise pour éviter le crash "UnboundLocalError"
+    agence = None 
+    
+    # 2. On essaie de récupérer l'agence liée au compte employé
+    try:
+        agence = get_user_agence(request)
+    except:
+        pass # Pas grave si ça échoue, on continue
+    
+    # 3. CAS SPÉCIAL ADMIN : Si pas d'agence, on prend la 1ère disponible (Mode "Secours")
+    if not agence and request.user.is_superuser:
+        from supermarket.models import Agence
+        agence = Agence.objects.first()
+
+    # 4. SÉCURITÉ FINAL : Si après tout ça, on n'a toujours rien (Base vide ?), on bloque.
     if not agence:
-        messages.error(request, 'Votre compte n\'est pas lié à une agence.')
-        return redirect('dashboard_financier')
+        if request.method == 'POST':
+            return JsonResponse({'success': False, 'error': 'Impossible d\'enregistrer : Aucune agence n\'est définie.'})
+        else:
+            messages.error(request, 'Erreur : Aucune agence trouvée. Créez une agence dans l\'admin.')
+            return redirect('dashboard_financier')
     
-    from supermarket.models import MargePersonnalisee, AssignationMargeArticle, Article
+    from supermarket.models import MargePersonnalisee, Article
     
-    # Récupérer les marges personnalisées de l'agence
-    marges = MargePersonnalisee.objects.filter(agence=agence).order_by('ordre', 'marge_min')
+    # A. Récupérer les configurations existantes
+    # select_related('article') optimise la requête pour avoir le nom de l'article direct
+    # On filtre les NULL pour éviter les erreurs dans order_by
+    marges = MargePersonnalisee.objects.filter(agence=agence, article__isnull=False).select_related('article').order_by('ordre', 'article__designation')
     
-    # Récupérer les assignations manuelles
-    assignations = AssignationMargeArticle.objects.filter(agence=agence).select_related('article', 'marge_personnalisee')
+    # B. Récupérer UNIQUEMENT les articles qui n'ont pas encore de configuration
+    # On récupère les IDs des articles déjà configurés (en excluant les NULL)
+    articles_deja_configures_ids = list(marges.values_list('article_id', flat=True))
     
-    # Récupérer tous les articles de l'agence pour la sélection
-    articles = Article.objects.filter(agence=agence).order_by('reference_article')
+    # On filtre : Tous les articles de l'agence MOINS ceux déjà configurés
+    articles_disponibles = Article.objects.filter(agence=agence).exclude(id__in=articles_deja_configures_ids).order_by('reference_article')
     
     context = {
         'agence': agence,
         'marges': marges,
-        'assignations': assignations,
-        'articles': articles,
+        'articles_disponibles': articles_disponibles, # Pour le select du modal Création
     }
     
     return render(request, 'supermarket/financier/gerer_marges_personnalisees.html', context)
 
 @login_required
 def creer_marge_personnalisee(request):
-    """Créer une nouvelle marge personnalisée"""
-    compte, redirect_response = check_comptable_access(request)
-    if redirect_response:
-        return redirect_response
+    """Créer une configuration de marge pour UN article spécifique"""
     
-    agence = get_user_agence(request)
+    # 1. Gestion Agence
+    # 1. On initialise pour éviter le crash "UnboundLocalError"
+    agence = None 
+    
+    # 2. On essaie de récupérer l'agence liée au compte employé
+    try:
+        agence = get_user_agence(request)
+    except:
+        pass # Pas grave si ça échoue, on continue
+    
+    # 3. CAS SPÉCIAL ADMIN : Si pas d'agence, on prend la 1ère disponible (Mode "Secours")
+    if not agence and request.user.is_superuser:
+        from supermarket.models import Agence
+        agence = Agence.objects.first()
+
+    # 4. SÉCURITÉ FINAL : Si après tout ça, on n'a toujours rien (Base vide ?), on bloque.
     if not agence:
-        return JsonResponse({'success': False, 'error': 'Agence non trouvée'})
-    
-    if request.method != 'POST':
-        return JsonResponse({'success': False, 'error': 'Méthode non autorisée'})
+        if request.method == 'POST':
+            return JsonResponse({'success': False, 'error': 'Impossible d\'enregistrer : Aucune agence n\'est définie.'})
+        else:
+            messages.error(request, 'Erreur : Aucune agence trouvée. Créez une agence dans l\'admin.')
+            return redirect('dashboard_financier')
     
     try:
-        from supermarket.models import MargePersonnalisee
-        from decimal import Decimal
+        from supermarket.models import MargePersonnalisee, Article
         
-        nom_categorie = request.POST.get('nom_categorie')
-        marge_min = Decimal(request.POST.get('marge_min', 0))
-        marge_max = request.POST.get('marge_max')
-        couleur = request.POST.get('couleur', '#28a745')
+        # 2. Récupération de l'article
+        article_id = request.POST.get('article_id')
+        if not article_id:
+            return JsonResponse({'success': False, 'error': 'Veuillez sélectionner un article.'})
+            
+        # Vérification doublon (Sécurité côté serveur)
+        if MargePersonnalisee.objects.filter(agence=agence, article_id=article_id).exists():
+             return JsonResponse({'success': False, 'error': 'Cet article a déjà une configuration de marge.'})
+
+        # 3. Récupération des 6 valeurs de plages
+        # On utilise une petite fonction helper pour convertir en Decimal ou 0
+        def get_dec(key):
+            val = request.POST.get(key, '0')
+            return Decimal(val) if val else Decimal('0')
+
+        mauvaise_min = get_dec('mauvaise_min')
+        mauvaise_max = get_dec('mauvaise_max')
+        bonne_min = get_dec('bonne_min')
+        bonne_max = get_dec('bonne_max')
+        tres_bonne_min = get_dec('tres_bonne_min')
+        tres_bonne_max = get_dec('tres_bonne_max')
+        
         ordre = int(request.POST.get('ordre', 0))
-        
-        if not nom_categorie:
-            return JsonResponse({'success': False, 'error': 'Le nom de la catégorie est obligatoire'})
-        
-        marge_max_decimal = Decimal(marge_max) if marge_max else None
+        actif = request.POST.get('actif') == 'true'
+
+        # 4. Création
+        article = Article.objects.get(id=article_id, agence=agence)
         
         marge = MargePersonnalisee.objects.create(
             agence=agence,
-            nom_categorie=nom_categorie,
-            marge_min=marge_min,
-            marge_max=marge_max_decimal,
-            couleur=couleur,
+            article=article, # Le lien OneToOne
+            
+            mauvaise_min=mauvaise_min,
+            mauvaise_max=mauvaise_max,
+            bonne_min=bonne_min,
+            bonne_max=bonne_max,
+            tres_bonne_min=tres_bonne_min,
+            tres_bonne_max=tres_bonne_max,
+            
             ordre=ordre,
-            actif=True
+            actif=actif
         )
         
         return JsonResponse({
             'success': True,
+            'message': f'Configuration créée pour {article.designation}',
             'marge': {
                 'id': marge.id,
-                'nom_categorie': marge.nom_categorie,
-                'marge_min': float(marge.marge_min),
-                'marge_max': float(marge.marge_max) if marge.marge_max else None,
-                'couleur': marge.couleur,
-                'ordre': marge.ordre,
+                'article_nom': article.designation,
+                # On renvoie les données pour mise à jour AJAX éventuelle
+                'mauvaise': f"{marge.mauvaise_min}% - {marge.mauvaise_max}%",
+                'bonne': f"{marge.bonne_min}% - {marge.bonne_max}%",
+                'tres_bonne': f"{marge.tres_bonne_min}% - {marge.tres_bonne_max}%",
+                'actif': marge.actif
             }
         })
+
+    except Article.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Article introuvable.'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
 
 @login_required
 def modifier_marge_personnalisee(request, marge_id):
-    """Modifier une marge personnalisée"""
-    compte, redirect_response = check_comptable_access(request)
-    if redirect_response:
-        return redirect_response
+    """Modifier les seuils d'une configuration existante"""
     
-    agence = get_user_agence(request)
+    # 1. Gestion Agence
+    # 1. On initialise pour éviter le crash "UnboundLocalError"
+    agence = None 
+    
+    # 2. On essaie de récupérer l'agence liée au compte employé
+    try:
+        agence = get_user_agence(request)
+    except:
+        pass # Pas grave si ça échoue, on continue
+    
+    # 3. CAS SPÉCIAL ADMIN : Si pas d'agence, on prend la 1ère disponible (Mode "Secours")
+    if not agence and request.user.is_superuser:
+        from supermarket.models import Agence
+        agence = Agence.objects.first()
+
+    # 4. SÉCURITÉ FINAL : Si après tout ça, on n'a toujours rien (Base vide ?), on bloque.
     if not agence:
-        return JsonResponse({'success': False, 'error': 'Agence non trouvée'})
-    
-    if request.method != 'POST':
-        return JsonResponse({'success': False, 'error': 'Méthode non autorisée'})
+        if request.method == 'POST':
+            return JsonResponse({'success': False, 'error': 'Impossible d\'enregistrer : Aucune agence n\'est définie.'})
+        else:
+            messages.error(request, 'Erreur : Aucune agence trouvée. Créez une agence dans l\'admin.')
+            
     
     try:
         from supermarket.models import MargePersonnalisee
-        from decimal import Decimal
         
         marge = MargePersonnalisee.objects.get(id=marge_id, agence=agence)
         
-        nom_categorie = request.POST.get('nom_categorie')
-        marge_min = Decimal(request.POST.get('marge_min', 0))
-        marge_max = request.POST.get('marge_max')
-        couleur = request.POST.get('couleur', '#28a745')
-        ordre = int(request.POST.get('ordre', 0))
-        actif = request.POST.get('actif') == 'true'
+        # NOTE: On ne modifie pas l'article (article_id) en édition généralement.
+        # On modifie juste les valeurs.
         
-        if nom_categorie:
-            marge.nom_categorie = nom_categorie
-        marge.marge_min = marge_min
-        marge.marge_max = Decimal(marge_max) if marge_max else None
-        marge.couleur = couleur
-        marge.ordre = ordre
-        marge.actif = actif
+        def get_dec(key):
+            val = request.POST.get(key, '0')
+            return Decimal(val) if val else Decimal('0')
+
+        marge.mauvaise_min = get_dec('mauvaise_min')
+        marge.mauvaise_max = get_dec('mauvaise_max')
+        marge.bonne_min = get_dec('bonne_min')
+        marge.bonne_max = get_dec('bonne_max')
+        marge.tres_bonne_min = get_dec('tres_bonne_min')
+        marge.tres_bonne_max = get_dec('tres_bonne_max')
+        
+        marge.ordre = int(request.POST.get('ordre', 0))
+        marge.actif = request.POST.get('actif') == 'true'
+        
         marge.save()
         
         return JsonResponse({
             'success': True,
+            'message': 'Configuration mise à jour avec succès.',
             'marge': {
                 'id': marge.id,
-                'nom_categorie': marge.nom_categorie,
-                'marge_min': float(marge.marge_min),
-                'marge_max': float(marge.marge_max) if marge.marge_max else None,
-                'couleur': marge.couleur,
-                'ordre': marge.ordre,
-                'actif': marge.actif,
+                'article_nom': marge.article.designation,
+                'mauvaise': f"{marge.mauvaise_min}% - {marge.mauvaise_max}%",
+                'bonne': f"{marge.bonne_min}% - {marge.bonne_max}%",
+                'tres_bonne': f"{marge.tres_bonne_min}% - {marge.tres_bonne_max}%",
+                'actif': marge.actif
             }
         })
+        
     except MargePersonnalisee.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'Marge non trouvée'})
+        return JsonResponse({'success': False, 'error': 'Configuration introuvable'})
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)})
+        return JsonResponse({'success': False, 'error': f'Erreur serveur : {str(e)}'})
 
 @login_required
 def supprimer_marge_personnalisee(request, marge_id):
-    """Supprimer une marge personnalisée"""
-    compte, redirect_response = check_comptable_access(request)
-    if redirect_response:
-        return redirect_response
+    """Supprimer une configuration"""
+    # ... (Même logique d'agence) ...
+    # 1. On initialise pour éviter le crash "UnboundLocalError"
+    agence = None 
     
-    agence = get_user_agence(request)
+    # 2. On essaie de récupérer l'agence liée au compte employé
+    try:
+        agence = get_user_agence(request)
+    except:
+        pass # Pas grave si ça échoue, on continue
+    
+    # 3. CAS SPÉCIAL ADMIN : Si pas d'agence, on prend la 1ère disponible (Mode "Secours")
+    if not agence and request.user.is_superuser:
+        from supermarket.models import Agence
+        agence = Agence.objects.first()
+
+    # 4. SÉCURITÉ FINAL : Si après tout ça, on n'a toujours rien (Base vide ?), on bloque.
     if not agence:
-        return JsonResponse({'success': False, 'error': 'Agence non trouvée'})
-    
-    if request.method != 'POST':
-        return JsonResponse({'success': False, 'error': 'Méthode non autorisée'})
+        if request.method == 'POST':
+            return JsonResponse({'success': False, 'error': 'Impossible d\'enregistrer : Aucune agence n\'est définie.'})
+        else:
+            messages.error(request, 'Erreur : Aucune agence trouvée. Créez une agence dans l\'admin.')
+            
     
     try:
         from supermarket.models import MargePersonnalisee
         marge = MargePersonnalisee.objects.get(id=marge_id, agence=agence)
         marge.delete()
+        # L'article redevient "disponible" automatiquement pour une nouvelle config
         return JsonResponse({'success': True})
     except MargePersonnalisee.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Marge non trouvée'})
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)})
-
-@login_required
-def assigner_article_marge(request):
-    """Assigner manuellement un ou plusieurs articles à une catégorie de marge"""
-    compte, redirect_response = check_comptable_access(request)
-    if redirect_response:
-        return redirect_response
-    
-    agence = get_user_agence(request)
-    if not agence:
-        return JsonResponse({'success': False, 'error': 'Agence non trouvée'})
-    
-    if request.method != 'POST':
-        return JsonResponse({'success': False, 'error': 'Méthode non autorisée'})
-    
-    try:
-        from supermarket.models import AssignationMargeArticle, Article, MargePersonnalisee
-        
-        # Récupérer les IDs des articles (peut être un seul ou plusieurs)
-        article_ids = request.POST.getlist('article_id')  # getlist pour gérer plusieurs valeurs
-        if not article_ids:
-            article_id = request.POST.get('article_id')  # Fallback pour un seul article
-            if article_id:
-                article_ids = [article_id]
-        
-        marge_id = request.POST.get('marge_id')
-        
-        if not article_ids or not marge_id:
-            return JsonResponse({'success': False, 'error': 'Article(s) et marge sont obligatoires'})
-        
-        marge = MargePersonnalisee.objects.get(id=marge_id, agence=agence)
-        
-        assignations_created = []
-        assignations_updated = []
-        errors = []
-        
-        # Assigner chaque article
-        for article_id in article_ids:
-            try:
-                article = Article.objects.get(id=article_id, agence=agence)
-                
-                # Créer ou mettre à jour l'assignation
-                assignation, created = AssignationMargeArticle.objects.update_or_create(
-                    agence=agence,
-                    article=article,
-                    defaults={'marge_personnalisee': marge}
-                )
-                
-                if created:
-                    assignations_created.append({
-                        'article_reference': article.reference_article,
-                        'article_designation': article.designation,
-                    })
-                else:
-                    assignations_updated.append({
-                        'article_reference': article.reference_article,
-                        'article_designation': article.designation,
-                    })
-            except Article.DoesNotExist:
-                errors.append(f'Article ID {article_id} non trouvé')
-            except Exception as e:
-                errors.append(f'Erreur pour article ID {article_id}: {str(e)}')
-        
-        return JsonResponse({
-            'success': True,
-            'created_count': len(assignations_created),
-            'updated_count': len(assignations_updated),
-            'errors': errors,
-            'marge_nom': marge.nom_categorie,
-        })
-    except MargePersonnalisee.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'Marge non trouvée'})
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)})
-
-@login_required
-def retirer_assignation_article(request, assignation_id):
-    """Retirer l'assignation manuelle d'un article"""
-    compte, redirect_response = check_comptable_access(request)
-    if redirect_response:
-        return redirect_response
-    
-    agence = get_user_agence(request)
-    if not agence:
-        return JsonResponse({'success': False, 'error': 'Agence non trouvée'})
-    
-    if request.method != 'POST':
-        return JsonResponse({'success': False, 'error': 'Méthode non autorisée'})
-    
-    try:
-        from supermarket.models import AssignationMargeArticle
-        assignation = AssignationMargeArticle.objects.get(id=assignation_id, agence=agence)
-        assignation.delete()
-        return JsonResponse({'success': True})
-    except AssignationMargeArticle.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'Assignation non trouvée'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
 
