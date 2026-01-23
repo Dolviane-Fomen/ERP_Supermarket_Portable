@@ -11,6 +11,8 @@ from datetime import date as date_class
 
 # Create your models here.
 
+#
+
 class Agence(models.Model):
     """Modèle pour les agences"""
     id_agence = models.AutoField(primary_key=True, verbose_name="ID Agence")
@@ -1161,46 +1163,54 @@ class Depense(models.Model):
         return f"{self.libelle} ({self.montant})"
 
 
+from django.db import models
+from django.core.exceptions import ValidationError
+
 class MargePersonnalisee(models.Model):
-    """Modèle pour les marges personnalisées par agence"""
+    """
+    Configuration des seuils de marge spécifique à UN article.
+    L'article définit le nom de la marge.
+    """
     agence = models.ForeignKey('Agence', on_delete=models.CASCADE, verbose_name="Agence")
-    nom_categorie = models.CharField(max_length=100, verbose_name="Nom de la catégorie")
-    marge_min = models.DecimalField(max_digits=5, decimal_places=2, verbose_name="Marge minimale (%)")
-    marge_max = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="Marge maximale (%)")
-    couleur = models.CharField(max_length=20, default="#28a745", verbose_name="Couleur d'affichage")
+    
+    # On lie directement à l'article. OneToOne assure qu'un article n'a qu'une seule config.
+    article = models.OneToOneField('Article', on_delete=models.CASCADE, verbose_name="Article concerné")
+    
+    # --- PLAGE 1 : MAUVAISE MARGE ---
+    mauvaise_min = models.DecimalField(max_digits=5, decimal_places=2, default=0, verbose_name="Mauvaise : De (%)")
+    mauvaise_max = models.DecimalField(max_digits=5, decimal_places=2, verbose_name="Mauvaise : À (%)")
+    
+    # --- PLAGE 2 : BONNE MARGE ---
+    bonne_min = models.DecimalField(max_digits=5, decimal_places=2, verbose_name="Bonne : De (%)")
+    bonne_max = models.DecimalField(max_digits=5, decimal_places=2, verbose_name="Bonne : À (%)")
+    
+    # --- PLAGE 3 : TRÈS BONNE MARGE ---
+    tres_bonne_min = models.DecimalField(max_digits=5, decimal_places=2, verbose_name="Très Bonne : De (%)")
+    tres_bonne_max = models.DecimalField(max_digits=5, decimal_places=2, verbose_name="Très Bonne : À (%)")
+    
     ordre = models.IntegerField(default=0, verbose_name="Ordre d'affichage")
     actif = models.BooleanField(default=True, verbose_name="Actif")
-    date_creation = models.DateTimeField(auto_now_add=True, verbose_name="Date de création")
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_modification = models.DateTimeField(auto_now=True)
     
     class Meta:
-        verbose_name = "Marge Personnalisée"
-        verbose_name_plural = "Marges Personnalisées"
-        ordering = ['agence', 'ordre', 'marge_min']
-        unique_together = ['agence', 'nom_categorie']
+        verbose_name = "Configuration Marge Article"
+        verbose_name_plural = "Configurations Marges Articles"
+        ordering = ['ordre', 'article__designation']
+        # Unicité déjà gérée par OneToOneField sur 'article', 
+        # mais on garde agence+article pour être sûr
+        unique_together = ['agence', 'article'] 
     
-    def __str__(self):
-        if self.marge_max:
-            return f"{self.nom_categorie} ({self.agence.nom_agence}): {self.marge_min}% - {self.marge_max}%"
-        else:
-            return f"{self.nom_categorie} ({self.agence.nom_agence}): ≥ {self.marge_min}%"
+    def clean(self):
+        """Validation logique pour s'assurer que les plages ne se chevauchent pas absurdement"""
+        if self.mauvaise_max > self.bonne_min:
+            raise ValidationError("La fin de 'Mauvaise marge' ne peut pas être supérieure au début de 'Bonne marge'.")
+        if self.bonne_max > self.tres_bonne_min:
+            raise ValidationError("La fin de 'Bonne marge' ne peut pas être supérieure au début de 'Très bonne marge'.")
 
-
-class AssignationMargeArticle(models.Model):
-    """Modèle pour les assignations manuelles d'articles à des catégories de marge"""
-    agence = models.ForeignKey('Agence', on_delete=models.CASCADE, verbose_name="Agence")
-    article = models.ForeignKey('Article', on_delete=models.CASCADE, verbose_name="Article")
-    marge_personnalisee = models.ForeignKey(MargePersonnalisee, on_delete=models.CASCADE, verbose_name="Catégorie de marge")
-    date_creation = models.DateTimeField(auto_now_add=True, verbose_name="Date de création")
-    date_modification = models.DateTimeField(auto_now=True, verbose_name="Date de modification")
-    
-    class Meta:
-        verbose_name = "Assignation Marge Article"
-        verbose_name_plural = "Assignations Marge Article"
-        unique_together = ['agence', 'article']
-        ordering = ['-date_modification']
-    
     def __str__(self):
-        return f"{self.article.reference_article} → {self.marge_personnalisee.nom_categorie} ({self.agence.nom_agence})"
+        return f"Marges pour {self.article.designation}"
+
 
 
 from django.db import models

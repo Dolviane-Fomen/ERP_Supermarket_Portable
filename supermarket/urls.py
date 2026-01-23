@@ -274,8 +274,7 @@ urlpatterns = [
     path('financier/creer-marge-personnalisee/', views.creer_marge_personnalisee, name='creer_marge_personnalisee'),
     path('financier/modifier-marge-personnalisee/<int:marge_id>/', views.modifier_marge_personnalisee, name='modifier_marge_personnalisee'),
     path('financier/supprimer-marge-personnalisee/<int:marge_id>/', views.supprimer_marge_personnalisee, name='supprimer_marge_personnalisee'),
-    path('financier/assigner-article-marge/', views.assigner_article_marge, name='assigner_article_marge'),
-    path('financier/retirer-assignation-article/<int:assignation_id>/', views.retirer_assignation_article, name='retirer_assignation_article'),
+    
     
     # ===== MODULE COMPTABILITÉ =====
     path('comptabiliter/login/', views.login_comptabiliter, name='login_comptabiliter'),

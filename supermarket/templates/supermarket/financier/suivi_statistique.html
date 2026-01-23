@@ -275,94 +275,136 @@ document.getElementById('formStats').addEventListener('submit', function(e) {
 });
 
 function displayResults(statistiques, dateDebut, dateFin) {
+    console.log("Données reçues du serveur :", statistiques); // Pour le débogage (F12)
+
     const container = document.getElementById('resultsContainer');
-    container.innerHTML = '';
+    container.innerHTML = ''; // On vide l'ancien contenu
     
+    // 1. Vérifier si on a vraiment des données
     if (!statistiques || Object.keys(statistiques).length === 0) {
-        container.innerHTML = '<div class="alert alert-info">Aucune donnée disponible pour cette période</div>';
-        container.classList.add('active');
+        console.log("Aucune statistique trouvée (objet vide)");
+        container.innerHTML = `
+            <div class="alert alert-warning text-center p-4">
+                <i class="fas fa-search mb-2" style="font-size: 2em;"></i><br>
+                <strong>Aucune vente trouvée pour cette période.</strong><br>
+                Vérifiez que vous avez bien des factures enregistrées entre le ${dateDebut} et le ${dateFin}.
+            </div>`;
         return;
     }
     
     let html = '';
     
+    // 2. Définir l'ordre et les couleurs (Doit correspondre EXACTEMENT aux clés Python)
+    const orderKeys = [
+        { key: 'tres_bonne', label: 'Très Bonne Marge', color: '#d4edda', badge: 'badge-success' },
+        { key: 'bonne', label: 'Bonne Marge', color: '#fff3cd', badge: 'badge-warning' },
+        { key: 'mauvaise', label: 'Mauvaise Marge', color: '#f8d7da', badge: 'badge-danger' },
+        { key: 'non_configure', label: 'Non Configuré', color: '#e2e3e5', badge: 'badge-secondary' }
+    ];
+    
+    // 3. Boucle sur les Agences
     for (const [agenceId, agenceData] of Object.entries(statistiques)) {
-        html += `<div class="agence-section">
-            <div class="agence-header">
-                <h3><i class="fas fa-store"></i> ${agenceData.nom_agence}</h3>
-            </div>`;
+        console.log("Traitement agence :", agenceData.nom_agence);
         
-        const jours = Object.entries(agenceData.stats_journalieres).sort();
+        html += `<div class="card mb-4 shadow-sm" style="border: none;">
+            <div class="card-header py-3" style="background-color: #4e73df; color: white;">
+                <h5 class="m-0 font-weight-bold"><i class="fas fa-store mr-2"></i> ${agenceData.nom_agence}</h5>
+            </div>
+            <div class="card-body p-0">`;
         
-        for (const [date, stats] of jours) {
-            html += `<div class="jour-section">
-                <div class="jour-title"><i class="fas fa-calendar-day"></i> ${date}</div>`;
+        // Trier les dates (plus récent en haut)
+        const jours = Object.entries(agenceData.stats_journalieres).sort().reverse();
+        
+        if (jours.length === 0) {
+            html += '<div class="p-3 text-muted">Aucune activité pour cette agence.</div>';
+        }
+
+        // 4. Boucle sur les Jours
+        for (const [date, cats] of jours) {
+            html += `<div class="border-bottom p-3" style="background-color: #f8f9fc;">
+                <h6 class="font-weight-bold text-gray-800 mb-3" style="border-left: 4px solid #4e73df; padding-left: 10px;">
+                    <i class="far fa-calendar-alt"></i> ${date}
+                </h6>`;
             
-            // Afficher toutes les catégories (personnalisées ou par défaut)
-            // Les catégories peuvent être des clés numériques (ID) ou des strings ('bonne_marge', etc.)
-            for (const [catKey, catData] of Object.entries(stats)) {
-                // Ignorer les clés qui ne sont pas des catégories
-                if (!catData || typeof catData !== 'object' || !catData.articles) {
-                    continue;
-                }
+            let articlesTrouvesCeJour = 0;
+
+            // 5. Boucle sur les Catégories (C'est ici qu'on trie)
+            for (const config of orderKeys) {
+                const catData = cats[config.key];
                 
-                const articles = catData.articles || [];
-                if (articles.length === 0) {
-                    continue;
-                }
+                // Si la catégorie n'existe pas ou n'a pas d'articles, on passe
+                if (!catData || !catData.articles || catData.articles.length === 0) continue;
                 
-                const nomCategorie = catData.nom || catData.categorie || 'Catégorie';
-                const couleur = catData.couleur || '#28a745';
-                const margeMin = catData.marge_min !== undefined ? catData.marge_min : null;
-                const margeMax = catData.marge_max !== undefined ? catData.marge_max : null;
+                articlesTrouvesCeJour++;
                 
-                // Construire le libellé de la catégorie
-                let libelleCategorie = nomCategorie;
-                if (margeMin !== null && margeMax !== null) {
-                    libelleCategorie += ` (${margeMin}% à ${margeMax}%)`;
-                } else if (margeMin !== null) {
-                    libelleCategorie += ` (≥${margeMin}%)`;
-                }
+                // Style spécifique pour "Non configuré"
+                const isNonConfig = (config.key === 'non_configure');
+                const borderStyle = isNonConfig ? '2px dashed #858796' : '1px solid rgba(0,0,0,0.1)';
                 
-                html += `<div class="marge-category">
-                    <div class="category-header" style="background: ${couleur};">
-                        <i class="fas fa-tag"></i> ${libelleCategorie} - ${articles.length} article(s)
+                html += `<div class="mb-3 rounded overflow-hidden" style="background-color: ${config.color}; border: ${borderStyle};">
+                    <div class="px-3 py-2 d-flex justify-content-between align-items-center" style="border-bottom: 1px solid rgba(0,0,0,0.05);">
+                        <strong style="color: #5a5c69;">
+                            <span class="badge ${config.badge} mr-2">${catData.articles.length}</span> ${config.label}
+                        </strong>
+                        ${isNonConfig ? '<small class="text-danger font-weight-bold"><i class="fas fa-exclamation-triangle"></i> Configuration requise</small>' : ''}
                     </div>
-                    <table class="stats-table">
-                        <thead>
-                            <tr>
-                                <th>Référence</th>
-                                <th>Désignation</th>
-                                <th>Quantité</th>
-                                <th>Chiffre d'Affaires (FCFA)</th>
-                                <th>Marge (FCFA)</th>
-                                <th>Marge (%)</th>
-                            </tr>
-                        </thead>
-                        <tbody>`;
-                for (const art of articles) {
+                    
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0" style="background: white;">
+                            <thead class="text-uppercase text-xs font-weight-bold text-gray-600" style="background-color: rgba(255,255,255,0.5);">
+                                <tr>
+                                    <th class="pl-3">Article</th>
+                                    <th class="text-right">Qté</th>
+                                    <th class="text-right">CA (FCFA)</th>
+                                    <th class="text-right">Marge (FCFA)</th>
+                                    <th class="text-right pr-3">% Marge</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-gray-800">`;
+
+                // 6. Boucle sur les Articles (IMPORTATION DES ARTICLES)
+                for (const art of catData.articles) {
+                    // Sécurité anti-crash pour les chiffres
+                    const ca = parseFloat(art.chiffre_affaires || 0).toLocaleString('fr-FR');
+                    const marge = parseFloat(art.marge || 0).toLocaleString('fr-FR');
+                    const pct = parseFloat(art.pourcentage_marge || 0).toFixed(2);
+                    const colorMarge = art.marge < 0 ? '#e74a3b' : '#1cc88a'; // Rouge si négatif, Vert si positif
+
                     html += `<tr>
-                        <td>${art.reference}</td>
-                        <td>${art.designation}</td>
-                        <td>${art.quantite.toLocaleString('fr-FR')}</td>
-                        <td>${art.chiffre_affaires.toLocaleString('fr-FR')}</td>
-                        <td>${art.marge.toLocaleString('fr-FR')}</td>
-                        <td><strong>${art.pourcentage_marge.toFixed(2)}%</strong></td>
+                        <td class="pl-3 py-2">
+                            <div class="font-weight-bold">${art.designation}</div>
+                            <div class="small text-muted">${art.reference}</div>
+                        </td>
+                        <td class="text-right align-middle">${art.quantite}</td>
+                        <td class="text-right align-middle">${ca}</td>
+                        <td class="text-right align-middle" style="color: ${art.marge < 0 ? 'red' : ''}">${marge}</td>
+                        <td class="text-right align-middle pr-3">
+                            <div class="d-flex flex-column align-items-end">
+                                <span class="font-weight-bold" style="color: ${colorMarge}">${pct}%</span>
+                                ${isNonConfig ? `<a href="/financier/gerer-marges-personnalisees/" target="_blank" class="small text-primary text-decoration-none">
+                                    <i class="fas fa-cog"></i> Configurer
+                                </a>` : ''}
+                            </div>
+                        </td>
                     </tr>`;
                 }
-                html += `</tbody></table></div>`;
+                html += `</tbody></table></div></div>`;
             }
             
-            html += `</div>`;
+            if (articlesTrouvesCeJour === 0) {
+                html += '<div class="alert alert-light text-center small">Aucun article vendu ce jour-là ne correspond aux critères.</div>';
+            }
+            
+            html += `</div>`; // Fin Date Block
         }
-        
-        html += `</div>`;
+        html += `</div></div>`; // Fin Card Agence
     }
     
     container.innerHTML = html;
-    container.classList.add('active');
+    // On s'assure que le conteneur est visible
+    container.style.display = 'block'; 
+    container.classList.add('fade-in');
 }
-
 document.getElementById('btnExport').addEventListener('click', function() {
     window.location.href = '{% url "export_suivi_statistique_excel" %}';
 });
