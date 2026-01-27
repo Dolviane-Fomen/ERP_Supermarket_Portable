@@ -20321,11 +20321,45 @@ def generer_suivi_statistique(request):
         
         stats_data = {}
         
-        # 2. Charger les configs spécifiques
-        configs_marges = {
-            m.article_id: m 
-            for m in MargePersonnalisee.objects.select_related('article').all()
-        }
+        # 2. Charger toutes les configs personnalisées actives (globales pour toutes les agences)
+        # La personnalisation est globale : si un article a une config, toutes les agences l'utilisent
+        # On stocke par ID, par référence ET par désignation pour gérer les cas où les articles ont des IDs différents
+        configs_marges = {}  # Par ID
+        configs_marges_by_ref = {}  # Par référence d'article
+        configs_marges_by_designation = {}  # Par désignation normalisée
+        
+        marges_perso = MargePersonnalisee.objects.filter(
+            actif=True
+        ).select_related('article', 'agence')
+        
+        for m in marges_perso:
+            # Stocker par ID
+            if m.article_id not in configs_marges:
+                configs_marges[m.article_id] = m
+                print(f"[DEBUG] Config chargée: Article ID {m.article_id} - {m.article.reference_article if m.article else 'N/A'} "
+                      f"({m.article.designation if m.article else 'N/A'}) - "
+                      f"Mauvaise: {m.mauvaise_min}%-{m.mauvaise_max}%, "
+                      f"Bonne: {m.bonne_min}%-{m.bonne_max}%, "
+                      f"Très bonne: {m.tres_bonne_min}%-{m.tres_bonne_max}%")
+            
+            # Stocker aussi par référence d'article (normalisée) pour recherche alternative
+            if m.article and m.article.reference_article:
+                ref_normalisee = m.article.reference_article.strip().upper()
+                if ref_normalisee not in configs_marges_by_ref:
+                    configs_marges_by_ref[ref_normalisee] = m
+            
+            # Stocker aussi par désignation normalisée (sans espaces multiples, en majuscules)
+            # Cela permet de trouver la config même si les références sont différentes
+            if m.article and m.article.designation:
+                # Normalisation : enlever tous les espaces multiples, convertir en majuscules
+                # Remplacer "% " par "%" et " %" par "%" pour gérer les variations
+                designation_normalisee = m.article.designation.strip().upper()
+                designation_normalisee = ' '.join(designation_normalisee.split())  # Normaliser les espaces
+                designation_normalisee = designation_normalisee.replace('% ', '%').replace(' %', '%')  # Normaliser les espaces autour de %
+                if designation_normalisee not in configs_marges_by_designation:
+                    configs_marges_by_designation[designation_normalisee] = m
+        
+        print(f"[DEBUG] Total configs chargées: {len(configs_marges)} (par ID), {len(configs_marges_by_ref)} (par référence), {len(configs_marges_by_designation)} (par désignation)")
 
         for vente in ventes:
             agence_pk = str(vente.facture_vente.agence.pk) # Str pour compatibilité JSON
@@ -20348,26 +20382,76 @@ def generer_suivi_statistique(request):
             marge_pct = (marge_valeur / ca * 100) if ca > 0 else 0
             
             # --- CLASSIFICATION ---
-            config = configs_marges.get(article.pk)
+            # Vérifier si une configuration personnalisée existe pour cet article (globale pour toutes les agences)
+            # Si oui, utiliser la configuration personnalisée, sinon utiliser les valeurs par défaut
+            article_id = article.pk
             
+            # Chercher la configuration personnalisée pour cet article (peu importe l'agence)
+            # 1. D'abord par ID d'article
+            config = configs_marges.get(article_id)
+            
+            # 2. Si pas trouvé par ID, chercher par référence d'article (normalisée)
+            if not config and article.reference_article:
+                ref_normalisee = article.reference_article.strip().upper()
+                config = configs_marges_by_ref.get(ref_normalisee)
             if config:
+                    print(f"[DEBUG] Config trouvée par référence '{ref_normalisee}' pour article ID {article_id} ({article.reference_article})")
+            
+            # 3. Si toujours pas trouvé, chercher par désignation normalisée (pour gérer les variations de nom)
+            if not config and article.designation:
+                # Normalisation identique à celle utilisée lors du chargement
+                designation_normalisee = article.designation.strip().upper()
+                designation_normalisee = ' '.join(designation_normalisee.split())  # Normaliser les espaces
+                designation_normalisee = designation_normalisee.replace('% ', '%').replace(' %', '%')  # Normaliser les espaces autour de %
+                
+                config = configs_marges_by_designation.get(designation_normalisee)
+                if config:
+                    print(f"[DEBUG] Config trouvée par désignation '{designation_normalisee}' pour article ID {article_id} ({article.reference_article})")
+                else:
+                    # Debug: Afficher toutes les désignations disponibles pour comparaison
+                    print(f"[DEBUG] Recherche désignation '{designation_normalisee}' - Désignations disponibles: {list(configs_marges_by_designation.keys())}")
+                    # Essayer une recherche partielle (contient) pour gérer les petites variations
+                    for desig_key, marge_config in configs_marges_by_designation.items():
+                        # Comparer en enlevant tous les espaces pour une comparaison plus flexible
+                        desig_sans_espaces = designation_normalisee.replace(' ', '')
+                        key_sans_espaces = desig_key.replace(' ', '')
+                        if desig_sans_espaces == key_sans_espaces or \
+                           (len(desig_sans_espaces) > 10 and desig_sans_espaces in key_sans_espaces) or \
+                           (len(key_sans_espaces) > 10 and key_sans_espaces in desig_sans_espaces):
+                            config = marge_config
+                            print(f"[DEBUG] Config trouvée par recherche flexible: '{designation_normalisee}' correspond à '{desig_key}'")
+                            break
+            
+            # Utiliser la configuration personnalisée si trouvée et active, sinon utiliser les valeurs par défaut
+            if config and hasattr(config, 'actif') and config.actif:
+                # Utiliser la configuration personnalisée de l'article
                 limits = {
                     'm_min': float(config.mauvaise_min), 'm_max': float(config.mauvaise_max),
                     'b_min': float(config.bonne_min),    'b_max': float(config.bonne_max),
                     'tb_min': float(config.tres_bonne_min), 'tb_max': float(config.tres_bonne_max)
                 }
                 is_default = False
+                print(f"[DEBUG] Config personnalisée utilisée pour {article.reference_article}: "
+                      f"Mauvaise={limits['m_min']}-{limits['m_max']}%, "
+                      f"Bonne={limits['b_min']}-{limits['b_max']}%, "
+                      f"Très bonne={limits['tb_min']}-{limits['tb_max']}%")
             else:
+                # Utiliser les valeurs par défaut définies dans DEFAULT_CONFIG
                 limits = {
                     'm_min': DEFAULT_CONFIG['mauvaise_min'], 'm_max': DEFAULT_CONFIG['mauvaise_max'],
                     'b_min': DEFAULT_CONFIG['bonne_min'],    'b_max': DEFAULT_CONFIG['bonne_max'],
                     'tb_min': DEFAULT_CONFIG['tres_bonne_min'], 'tb_max': DEFAULT_CONFIG['tres_bonne_max']
                 }
                 is_default = True
+                if not config:
+                    print(f"[DEBUG] Aucune config trouvée pour {article.reference_article} (ID: {article_id}), utilisation des valeurs par défaut")
+                else:
+                    print(f"[DEBUG] Config trouvée mais inactive pour {article.reference_article}")
 
             # Choix catégorie
             categorie_key = 'tres_mauvaise' # Repli
             
+            # Classification selon les limites
             if limits['m_min'] <= marge_pct <= limits['m_max']:
                 categorie_key = 'tres_mauvaise'
             elif limits['b_min'] <= marge_pct <= limits['b_max']:
@@ -20375,8 +20459,14 @@ def generer_suivi_statistique(request):
             elif limits['tb_min'] <= marge_pct <= limits['tb_max']:
                 categorie_key = 'bonne'
             else:
-                if marge_pct < limits['m_min']: categorie_key = 'tres_mauvaise'
-                elif marge_pct > limits['tb_max']: categorie_key = 'bonne'
+                # Cas limites
+                if marge_pct < limits['m_min']: 
+                    categorie_key = 'tres_mauvaise'
+                elif marge_pct > limits['tb_max']: 
+                    categorie_key = 'bonne'
+            
+            print(f"[DEBUG] Article {article.reference_article}: Marge={marge_pct:.2f}% -> Catégorie: {categorie_key} "
+                  f"(Limites: M={limits['m_min']}-{limits['m_max']}, B={limits['b_min']}-{limits['b_max']}, TB={limits['tb_min']}-{limits['tb_max']})")
 
             # --- CONSTRUCTION STRUCTURE ---
             if agence_pk not in stats_data:
@@ -20654,17 +20744,20 @@ def gerer_marges_personnalisees(request):
     
     from supermarket.models import MargePersonnalisee, Article
     
-    # A. Récupérer les configurations existantes
-    # select_related('article') optimise la requête pour avoir le nom de l'article direct
+    # A. Récupérer les configurations existantes (globales pour toutes les agences)
+    # Les configurations personnalisées sont globales : une config pour un article s'applique à toutes les agences
     # On filtre les NULL pour éviter les erreurs dans order_by
-    marges = MargePersonnalisee.objects.filter(agence=agence, article__isnull=False).select_related('article').order_by('ordre', 'article__designation')
+    # On affiche toutes les configurations, peu importe l'agence, car elles sont globales
+    marges = MargePersonnalisee.objects.filter(article__isnull=False).select_related('article', 'agence').order_by('ordre', 'article__designation')
     
     # B. Récupérer UNIQUEMENT les articles qui n'ont pas encore de configuration
     # On récupère les IDs des articles déjà configurés (en excluant les NULL)
-    articles_deja_configures_ids = list(marges.values_list('article_id', flat=True))
+    # Comme les configs sont globales, on prend tous les articles configurés, peu importe l'agence
+    articles_deja_configures_ids = list(marges.values_list('article_id', flat=True).distinct())
     
-    # On filtre : Tous les articles de l'agence MOINS ceux déjà configurés
-    articles_disponibles = Article.objects.filter(agence=agence).exclude(id__in=articles_deja_configures_ids).order_by('reference_article')
+    # On filtre : TOUS les articles de TOUTES les agences MOINS ceux déjà configurés
+    # Les configurations étant globales, on doit pouvoir configurer n'importe quel article de n'importe quelle agence
+    articles_disponibles = Article.objects.all().exclude(id__in=articles_deja_configures_ids).order_by('reference_article')
     
     context = {
         'agence': agence,
@@ -20710,8 +20803,9 @@ def creer_marge_personnalisee(request):
             return JsonResponse({'success': False, 'error': 'Veuillez sélectionner un article.'})
             
         # Vérification doublon (Sécurité côté serveur)
-        if MargePersonnalisee.objects.filter(agence=agence, article_id=article_id).exists():
-             return JsonResponse({'success': False, 'error': 'Cet article a déjà une configuration de marge.'})
+        # Les configurations sont globales : on vérifie si une config existe pour cet article, peu importe l'agence
+        if MargePersonnalisee.objects.filter(article_id=article_id, actif=True).exists():
+             return JsonResponse({'success': False, 'error': 'Cet article a déjà une configuration de marge active.'})
 
         # 3. Récupération des 6 valeurs de plages
         # On utilise une petite fonction helper pour convertir en Decimal ou 0
@@ -20730,7 +20824,12 @@ def creer_marge_personnalisee(request):
         actif = request.POST.get('actif') == 'true'
 
         # 4. Création
-        article = Article.objects.get(id=article_id, agence=agence)
+        # Récupérer l'article sans filtrer par agence, car les configurations sont globales
+        # On peut configurer n'importe quel article de n'importe quelle agence
+        try:
+            article = Article.objects.get(id=article_id)
+        except Article.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Article introuvable.'})
         
         marge = MargePersonnalisee.objects.create(
             agence=agence,
@@ -20791,12 +20890,13 @@ def modifier_marge_personnalisee(request, marge_id):
             return JsonResponse({'success': False, 'error': 'Impossible d\'enregistrer : Aucune agence n\'est définie.'})
         else:
             messages.error(request, 'Erreur : Aucune agence trouvée. Créez une agence dans l\'admin.')
-            
+            return redirect('dashboard_financier')
     
     try:
         from supermarket.models import MargePersonnalisee
         
-        marge = MargePersonnalisee.objects.get(id=marge_id, agence=agence)
+        # Les configurations sont globales : on peut modifier n'importe quelle configuration, peu importe l'agence
+        marge = MargePersonnalisee.objects.get(id=marge_id)
         
         # NOTE: On ne modifie pas l'article (article_id) en édition généralement.
         # On modifie juste les valeurs.
@@ -20859,11 +20959,12 @@ def supprimer_marge_personnalisee(request, marge_id):
             return JsonResponse({'success': False, 'error': 'Impossible d\'enregistrer : Aucune agence n\'est définie.'})
         else:
             messages.error(request, 'Erreur : Aucune agence trouvée. Créez une agence dans l\'admin.')
-            
+            return redirect('dashboard_financier')
     
     try:
         from supermarket.models import MargePersonnalisee
-        marge = MargePersonnalisee.objects.get(id=marge_id, agence=agence)
+        # Les configurations sont globales : on peut supprimer n'importe quelle configuration, peu importe l'agence
+        marge = MargePersonnalisee.objects.get(id=marge_id)
         marge.delete()
         # L'article redevient "disponible" automatiquement pour une nouvelle config
         return JsonResponse({'success': True})
@@ -21894,9 +21995,94 @@ def dashboard_achats(request):
             messages.error(request, 'Votre compte n\'est pas configuré correctement.')
             return redirect('logout_achats')
         
+        from supermarket.models import CommandeFournisseur, LigneCommandeFournisseur, Livraison, Fournisseur
+        from django.db.models import Sum, Count, Q
+        from django.utils import timezone
+        from datetime import timedelta
+        from decimal import Decimal
+        
+        # Statistiques générales
+        total_commandes = CommandeFournisseur.objects.filter(agence=agence).count()
+        commandes_brouillon = CommandeFournisseur.objects.filter(agence=agence, statut='brouillon').count()
+        commandes_envoyees = CommandeFournisseur.objects.filter(agence=agence, statut='envoyee').count()
+        commandes_en_cours = CommandeFournisseur.objects.filter(agence=agence, statut='en_cours').count()
+        commandes_livrees = CommandeFournisseur.objects.filter(agence=agence, statut='livree').count()
+        
+        # Montants totaux
+        montant_total_commandes = CommandeFournisseur.objects.filter(agence=agence).aggregate(
+            total=Sum('total_ttc')
+        )['total'] or Decimal('0')
+        
+        montant_commandes_en_cours = CommandeFournisseur.objects.filter(
+            agence=agence, 
+            statut__in=['envoyee', 'en_cours']
+        ).aggregate(total=Sum('total_ttc'))['total'] or Decimal('0')
+        
+        # Statistiques des 30 derniers jours
+        date_limite = timezone.now().date() - timedelta(days=30)
+        commandes_30j = CommandeFournisseur.objects.filter(
+            agence=agence,
+            date_commande__gte=date_limite
+        )
+        montant_30j = commandes_30j.aggregate(total=Sum('total_ttc'))['total'] or Decimal('0')
+        
+        # Statistiques livraisons
+        total_livraisons = Livraison.objects.filter(agence=agence).count()
+        livraisons_planifiees = Livraison.objects.filter(agence=agence, etat_livraison='planifiee').count()
+        livraisons_en_cours = Livraison.objects.filter(agence=agence, etat_livraison__in=['en_preparation', 'en_cours']).count()
+        livraisons_livrees = Livraison.objects.filter(agence=agence, etat_livraison='livree').count()
+        
+        # Fournisseurs
+        total_fournisseurs = Fournisseur.objects.filter(agence=agence).count()
+        fournisseurs_actifs = CommandeFournisseur.objects.filter(agence=agence).values('nom_fournisseur').distinct().count()
+        
+        # Top 5 fournisseurs par montant
+        top_fournisseurs = CommandeFournisseur.objects.filter(agence=agence).values('nom_fournisseur').annotate(
+            total=Sum('total_ttc'),
+            nb_commandes=Count('id')
+        ).order_by('-total')[:5]
+        
+        # Évolution des commandes sur les 7 derniers jours
+        evolution_7j = []
+        for i in range(6, -1, -1):
+            date_jour = timezone.now().date() - timedelta(days=i)
+            nb_commandes = CommandeFournisseur.objects.filter(
+                agence=agence,
+                date_commande=date_jour
+            ).count()
+            montant_jour = CommandeFournisseur.objects.filter(
+                agence=agence,
+                date_commande=date_jour
+            ).aggregate(total=Sum('total_ttc'))['total'] or Decimal('0')
+            evolution_7j.append({
+                'date': date_jour.strftime('%d/%m'),
+                'nb_commandes': nb_commandes,
+                'montant': float(montant_jour)  # Montant en FCFA complet
+            })
+        
+        # Commandes récentes (5 dernières)
+        commandes_recentes = CommandeFournisseur.objects.filter(agence=agence).order_by('-date_creation')[:5]
+        
         context = {
             'compte': compte,
             'agence': agence,
+            'total_commandes': total_commandes,
+            'commandes_brouillon': commandes_brouillon,
+            'commandes_envoyees': commandes_envoyees,
+            'commandes_en_cours': commandes_en_cours,
+            'commandes_livrees': commandes_livrees,
+            'montant_total_commandes': float(montant_total_commandes),
+            'montant_commandes_en_cours': float(montant_commandes_en_cours),
+            'montant_30j': float(montant_30j),
+            'total_livraisons': total_livraisons,
+            'livraisons_planifiees': livraisons_planifiees,
+            'livraisons_en_cours': livraisons_en_cours,
+            'livraisons_livrees': livraisons_livrees,
+            'total_fournisseurs': total_fournisseurs,
+            'fournisseurs_actifs': fournisseurs_actifs,
+            'top_fournisseurs': top_fournisseurs,
+            'evolution_7j': evolution_7j,
+            'commandes_recentes': commandes_recentes,
         }
         return render(request, 'supermarket/achats/dashboard.html', context)
     except Compte.DoesNotExist:
@@ -22474,11 +22660,14 @@ def generer_bon_commande_pdf(request, commande_id):
                 logo_y_bottom = separator_y + 0.3*cm
                 logo_y_top = logo_y_bottom + logo_height
                 
-                if self.agence_ref.logo:
+                # Utiliser le logo de l'entreprise depuis le dossier image
+                import os
+                from django.conf import settings
+                logo_path = os.path.join(settings.BASE_DIR, 'image', 'Image1.png')
+                
+                if os.path.exists(logo_path):
                     try:
-                        import os
-                        if os.path.exists(self.agence_ref.logo.path):
-                            self.drawImage(self.agence_ref.logo.path, logo_x, logo_y_bottom, 
+                        self.drawImage(logo_path, logo_x, logo_y_bottom, 
                                          width=logo_width, height=logo_height, preserveAspectRatio=True)
                     except Exception as e:
                         print(f"[PDF] Erreur logo en-tête: {e}")
@@ -22500,21 +22689,21 @@ def generer_bon_commande_pdf(request, commande_id):
                 # Titre "Bon de commande" à droite du logo
                 title_x = logo_x + logo_width + 1*cm
                 self.setFont('Helvetica-Bold', 24)
-                self.setFillColor(colors.HexColor('#11998e'))
+                self.setFillColor(colors.HexColor('#28a745'))  # Vert du logo
                 title_y = A4[1] - 2.2*cm
                 self.drawString(title_x, title_y, "Bon de commande")
                 
                 # Ligne séparatrice sous l'en-tête (dessinée après le logo)
-                self.setStrokeColor(colors.HexColor('#11998e'))
+                self.setStrokeColor(colors.HexColor('#28a745'))  # Vert du logo
                 self.setLineWidth(1)
                 self.line(2*cm, separator_y, A4[0] - 2*cm, separator_y)
                 
                 # Pied de page
                 self.setFont('Helvetica', 9)
-                self.setFillColor(colors.HexColor('#2c3e50'))
+                self.setFillColor(colors.HexColor('#28a745'))  # Vert du logo
                 
                 # Ligne séparatrice pied de page (renforcée)
-                self.setStrokeColor(colors.HexColor('#11998e'))
+                self.setStrokeColor(colors.HexColor('#28a745'))  # Vert du logo
                 self.setLineWidth(2)  # Ligne plus épaisse
                 footer_line_y = 2.5*cm
                 self.line(2*cm, footer_line_y, A4[0] - 2*cm, footer_line_y)
@@ -22692,7 +22881,7 @@ def generer_bon_commande_pdf(request, commande_id):
         
         article_table = Table(article_data, colWidths=[2.5*cm, 6.5*cm, 2*cm, 1.5*cm, 3*cm, 3*cm])
         article_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2d1b69')),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#28a745')),  # Vert du logo
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (0, -1), 'LEFT'),
             ('ALIGN', (1, 0), (1, -1), 'LEFT'),
@@ -22795,3 +22984,465 @@ def generer_bon_commande_pdf(request, commande_id):
     except Exception as e:
         messages.error(request, f'Erreur lors de la génération du PDF: {str(e)}')
         return redirect('voir_bon_commande', commande_id=commande_id)
+
+@login_required
+def etat_livraison(request):
+    """Afficher l'état de toutes les livraisons planifiées"""
+    try:
+        compte = Compte.objects.get(user=request.user, actif=True)
+        agence = get_user_agence(request)
+        if not agence:
+            messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+            return redirect('logout_achats')
+        
+        from supermarket.models import Livraison, Commande, Livreur
+        from django.db.models import Sum
+        
+        # Récupérer toutes les livraisons planifiées de l'agence avec leurs détails
+        livraisons = Livraison.objects.filter(
+            agence=agence
+        ).select_related(
+            'commande',
+            'commande__client',
+            'commande__article',
+            'livreur',
+            'agence'
+        ).order_by('-date_livraison', 'ordre_livraison')
+        
+        # Filtrer par état si demandé
+        etat_filter = request.GET.get('etat', '')
+        if etat_filter:
+            livraisons = livraisons.filter(etat_livraison=etat_filter)
+        
+        # Filtrer par plage de dates (comme dans le module financier)
+        date_debut_filter = request.GET.get('date_debut', '')
+        date_fin_filter = request.GET.get('date_fin', '')
+        
+        if date_debut_filter:
+            from datetime import datetime
+            try:
+                date_debut_obj = datetime.strptime(date_debut_filter, '%Y-%m-%d').date()
+                livraisons = livraisons.filter(date_livraison__gte=date_debut_obj)
+            except ValueError:
+                pass
+        
+        if date_fin_filter:
+            from datetime import datetime
+            try:
+                date_fin_obj = datetime.strptime(date_fin_filter, '%Y-%m-%d').date()
+                livraisons = livraisons.filter(date_livraison__lte=date_fin_obj)
+            except ValueError:
+                pass
+        
+        # Préparer les données enrichies pour chaque livraison
+        livraisons_enrichies = []
+        for livraison in livraisons:
+            if livraison.commande:
+                # Récupérer toutes les commandes du même groupe (même client, date, heure)
+                commandes_groupe = Commande.objects.filter(
+                    client=livraison.commande.client,
+                    date=livraison.commande.date,
+                    heure=livraison.commande.heure,
+                    agence=agence
+                ).select_related('article').order_by('article__designation')
+                
+                # Construire la liste des articles avec quantités
+                articles_list = []
+                for cmd in commandes_groupe:
+                    articles_list.append({
+                        'designation': cmd.article.designation,
+                        'reference': cmd.article.reference_article,
+                        'quantite': cmd.quantite,
+                    })
+                
+                # Calculer le montant total de toutes les commandes du groupe
+                montant_total = commandes_groupe.aggregate(
+                    total=Sum('prix_total')
+                )['total'] or Decimal('0')
+                
+                livraisons_enrichies.append({
+                    'livraison': livraison,
+                    'articles': articles_list,
+                    'montant_total': montant_total,
+                    'nombre_articles': len(articles_list),
+                })
+            else:
+                livraisons_enrichies.append({
+                    'livraison': livraison,
+                    'articles': [],
+                    'montant_total': Decimal('0'),
+                    'nombre_articles': 0,
+                })
+        
+        # Statistiques
+        total_livraisons = Livraison.objects.filter(agence=agence).count()
+        livraisons_planifiees = Livraison.objects.filter(agence=agence, etat_livraison='planifiee').count()
+        livraisons_en_cours = Livraison.objects.filter(agence=agence, etat_livraison__in=['en_preparation', 'en_cours']).count()
+        livraisons_livrees = Livraison.objects.filter(agence=agence, etat_livraison='livree').count()
+        livraisons_annulees = Livraison.objects.filter(agence=agence, etat_livraison='annulee').count()
+        
+        context = {
+            'compte': compte,
+            'agence': agence,
+            'livraisons_enrichies': livraisons_enrichies,
+            'total_livraisons': total_livraisons,
+            'livraisons_planifiees': livraisons_planifiees,
+            'livraisons_en_cours': livraisons_en_cours,
+            'livraisons_livrees': livraisons_livrees,
+            'livraisons_annulees': livraisons_annulees,
+            'etat_filter': etat_filter,
+            'date_debut_filter': date_debut_filter,
+            'date_fin_filter': date_fin_filter,
+        }
+        return render(request, 'supermarket/achats/etat_livraison.html', context)
+    except Compte.DoesNotExist:
+        messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+        return redirect('index')
+    except Exception as e:
+        messages.error(request, f'Erreur lors de la récupération des livraisons: {str(e)}')
+        return redirect('dashboard_achats')
+
+@login_required
+def etat_inventaire(request):
+    """Vue pour l'état des inventaires - Toutes les agences"""
+    try:
+        compte = Compte.objects.get(user=request.user, actif=True)
+        agence = get_user_agence(request)
+        if not agence:
+            messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+            return redirect('logout_achats')
+        
+        # Récupérer toutes les agences
+        agences = Agence.objects.all().order_by('nom_agence')
+        
+        context = {
+            'compte': compte,
+            'agence': agence,
+            'agences': agences,
+        }
+        return render(request, 'supermarket/achats/etat_inventaire.html', context)
+    except Compte.DoesNotExist:
+        messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+        return redirect('index')
+
+@login_required
+def generer_etat_inventaire(request):
+    """Générer l'état du stock (inventaire) pour toutes les agences sur une période donnée"""
+    # Vérifier l'authentification pour les requêtes AJAX
+    if not request.user.is_authenticated:
+        return JsonResponse({'success': False, 'error': 'Non authentifié. Veuillez vous reconnecter.'}, status=401)
+    
+    try:
+        compte = Compte.objects.get(user=request.user, actif=True)
+    except Compte.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Votre compte n\'est pas configuré correctement.'}, status=403)
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Méthode non autorisée'}, status=405)
+    
+    try:
+        from supermarket.models import Article
+        from django.db.models import Sum, Q
+        from datetime import datetime, timedelta
+        
+        date_debut_str = request.POST.get('date_debut')
+        date_fin_str = request.POST.get('date_fin')
+        
+        if not date_debut_str or not date_fin_str:
+            return JsonResponse({'success': False, 'error': 'Les dates sont obligatoires'})
+        
+        date_debut = datetime.strptime(date_debut_str, '%Y-%m-%d').date()
+        date_fin = datetime.strptime(date_fin_str, '%Y-%m-%d').date()
+        
+        # Récupérer toutes les agences sauf "Super Market Principal" et "Agence Principale"
+        agences = Agence.objects.exclude(
+            nom_agence__in=['Super Market Principal', 'Agence Principale']
+        ).order_by('nom_agence')
+        
+        # Données par agence et par jour
+        inventaires_data = {}
+        
+        # Générer la liste de tous les jours de la période
+        jours_periode = []
+        current_date = date_debut
+        while current_date <= date_fin:
+            jours_periode.append(current_date)
+            current_date += timedelta(days=1)
+        
+        from supermarket.models import MouvementStock
+        from django.utils import timezone
+        
+        for agence in agences:
+            # Pour chaque jour de la période, calculer l'état du stock à cette date
+            jours_data = {}
+            
+            # Récupérer tous les articles de cette agence une seule fois
+            articles = Article.objects.filter(
+                agence=agence
+            ).select_related('categorie').order_by('reference_article', 'designation')
+            
+            for jour in jours_periode:
+                # Pour chaque jour, calculer le stock de chaque article à cette date
+                # en utilisant le dernier mouvement avant ou à cette date
+                date_jour_debut = timezone.make_aware(datetime.combine(jour, datetime.min.time()))
+                date_jour_fin = timezone.make_aware(datetime.combine(jour, datetime.max.time()))
+                
+                lignes_jour = []
+                valeur_totale_jour = 0
+                
+                for article in articles:
+                    # Trouver le dernier mouvement de stock pour cet article avant ou à cette date
+                    dernier_mouvement = MouvementStock.objects.filter(
+                        article=article,
+                        agence=agence,
+                        date_mouvement__lte=date_jour_fin
+                    ).order_by('-date_mouvement').first()
+                    
+                    # Si un mouvement existe, utiliser le stock après ce mouvement (quantite_stock ou solde)
+                    # Sinon, utiliser le stock actuel (pour les articles sans historique)
+                    if dernier_mouvement:
+                        quantite = float(dernier_mouvement.quantite_stock or dernier_mouvement.solde or 0)
+                    else:
+                        # Si pas de mouvement historique, utiliser le stock actuel
+                        quantite = float(article.stock_actuel or 0)
+                    
+                    prix_unitaire = float(article.prix_achat or 0)
+                    valeur = quantite * prix_unitaire
+                    valeur_totale_jour += valeur
+                    
+                    lignes_jour.append({
+                        'reference': article.reference_article or '-',
+                        'designation': article.designation or '-',
+                        'quantite': quantite,
+                        'prix_unitaire': prix_unitaire,
+                        'valeur': valeur,
+                        'conditionnement': article.unite_vente or '-',
+                        'categorie': article.categorie.intitule if article.categorie else '-',
+                    })
+                
+                # Stocker les données pour ce jour
+                jours_data[jour.strftime('%Y-%m-%d')] = {
+                    'date': jour.strftime('%d/%m/%Y'),
+                    'lignes': lignes_jour,
+                    'total_lignes': len(lignes_jour),
+                    'valeur_totale': valeur_totale_jour,
+                }
+            
+            # Stocker les données pour cette agence (même si pas d'articles)
+            inventaires_data[str(agence.id_agence)] = {
+                'nom_agence': agence.nom_agence,
+                'jours': jours_data,
+                'total_jours': len(jours_periode),
+            }
+        
+        # Sauvegarder les données en session pour l'export Excel
+        request.session['etat_inventaire'] = {
+            'date_debut': date_debut_str,
+            'date_fin': date_fin_str,
+            'data': inventaires_data
+        }
+        
+        return JsonResponse({
+            'success': True,
+            'data': inventaires_data,
+            'date_debut': date_debut_str,
+            'date_fin': date_fin_str,
+        })
+        
+    except Exception as e:
+        import traceback
+        return JsonResponse({
+            'success': False,
+            'error': f'Erreur lors de la génération de l\'état: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
+@login_required
+def export_etat_inventaire_excel(request):
+    """Exporter l'état des inventaires en Excel"""
+    
+    # Vérifier l'authentification
+    if not request.user.is_authenticated:
+        return JsonResponse({'success': False, 'error': 'Non authentifié'}, status=401)
+    
+    try:
+        compte = Compte.objects.get(user=request.user, actif=True)
+    except Compte.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Compte non trouvé'}, status=403)
+    
+    # Récupérer les données depuis la session
+    inventaire_data = request.session.get('etat_inventaire')
+    if not inventaire_data:
+        return JsonResponse({'success': False, 'error': 'Aucune donnée à exporter. Veuillez générer l\'état d\'abord.'})
+    
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from django.http import HttpResponse
+        from django.utils import timezone
+        from io import BytesIO
+    except ImportError:
+        return JsonResponse({'success': False, 'error': 'Module openpyxl manquant sur le serveur'})
+    
+    try:
+        data = inventaire_data['data']
+        date_debut = inventaire_data['date_debut']
+        date_fin = inventaire_data['date_fin']
+        
+        # Créer le classeur Excel
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "État Inventaire"
+        
+        # Styles
+        fill_header_agence = PatternFill(start_color="2d1b69", end_color="11998e", fill_type="solid")
+        fill_header_jour = PatternFill(start_color="E8F5E9", end_color="E8F5E9", fill_type="solid")
+        fill_header_col = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+        font_bold = Font(bold=True)
+        font_header_agence = Font(bold=True, size=14, color="FFFFFF")
+        font_header_jour = Font(bold=True, size=12, color="2c3e50")
+        border_thin = Border(bottom=Side(style='thin', color="CCCCCC"))
+        
+        row = 1
+        
+        # En-tête principal
+        ws.merge_cells(f'A{row}:G{row}')
+        cell_title = ws[f'A{row}']
+        cell_title.value = f"ÉTAT INVENTAIRE - TOUTES AGENCES"
+        cell_title.font = Font(bold=True, size=16, color="FFFFFF")
+        cell_title.fill = PatternFill(start_color="2d1b69", end_color="11998e", fill_type="solid")
+        cell_title.alignment = Alignment(horizontal='center', vertical='center')
+        ws.row_dimensions[row].height = 30
+        row += 1
+        
+        ws.merge_cells(f'A{row}:G{row}')
+        cell_period = ws[f'A{row}']
+        cell_period.value = f"Période: du {date_debut} au {date_fin}"
+        cell_period.font = Font(size=12)
+        cell_period.alignment = Alignment(horizontal='center')
+        row += 2
+        
+        # En-têtes des colonnes
+        headers = ['Référence', 'Désignation', 'Catégorie', 'Quantité', 'Prix Unitaire (FCFA)', 'Valeur (FCFA)', 'Conditionnement']
+        
+        # Parcourir les agences
+        for agence_id, agence_data in data.items():
+            # En-tête Agence
+            ws.merge_cells(f'A{row}:G{row}')
+            cell_agence = ws[f'A{row}']
+            cell_agence.value = f"AGENCE : {agence_data['nom_agence']}"
+            cell_agence.font = font_header_agence
+            cell_agence.fill = fill_header_agence
+            cell_agence.alignment = Alignment(horizontal='center', vertical='center')
+            ws.row_dimensions[row].height = 25
+            row += 1
+            
+            # Parcourir les jours (triés du plus récent au plus ancien)
+            jours_sorted = sorted(agence_data['jours'].items(), reverse=True)
+            
+            for jour_key, jour_data in jours_sorted:
+                # En-tête Jour
+                ws.merge_cells(f'A{row}:G{row}')
+                cell_jour = ws[f'A{row}']
+                cell_jour.value = f"📅 DATE : {jour_data['date']}"
+                cell_jour.font = font_header_jour
+                cell_jour.fill = fill_header_jour
+                cell_jour.border = Border(bottom=Side(style='medium', color="11998e"))
+                row += 1
+                
+                # En-têtes des colonnes
+                for col_idx, header_name in enumerate(headers, 1):
+                    c = ws.cell(row=row, column=col_idx, value=header_name)
+                    c.font = font_bold
+                    c.fill = fill_header_col
+                    c.border = border_thin
+                    c.alignment = Alignment(horizontal='center')
+                row += 1
+                
+                # Lignes d'articles
+                for ligne in jour_data['lignes']:
+                    ws.cell(row=row, column=1, value=ligne['reference'])
+                    ws.cell(row=row, column=2, value=ligne['designation'])
+                    ws.cell(row=row, column=3, value=ligne['categorie'])
+                    
+                    # Quantité
+                    c_qte = ws.cell(row=row, column=4, value=ligne['quantite'])
+                    c_qte.number_format = '#,##0.000'
+                    c_qte.alignment = Alignment(horizontal='right')
+                    
+                    # Prix unitaire
+                    c_prix = ws.cell(row=row, column=5, value=ligne['prix_unitaire'])
+                    c_prix.number_format = '#,##0 "FCFA"'
+                    c_prix.alignment = Alignment(horizontal='right')
+                    
+                    # Valeur
+                    c_valeur = ws.cell(row=row, column=6, value=ligne['valeur'])
+                    c_valeur.number_format = '#,##0 "FCFA"'
+                    c_valeur.alignment = Alignment(horizontal='right')
+                    c_valeur.font = font_bold
+                    
+                    ws.cell(row=row, column=7, value=ligne['conditionnement'])
+                    row += 1
+                
+                # Ligne total pour ce jour
+                ws.merge_cells(f'A{row}:E{row}')
+                cell_total = ws[f'A{row}']
+                cell_total.value = "TOTAL"
+                cell_total.font = font_bold
+                cell_total.fill = PatternFill(start_color="E8F5E9", end_color="E8F5E9", fill_type="solid")
+                
+                c_total_valeur = ws.cell(row=row, column=6, value=jour_data['valeur_totale'])
+                c_total_valeur.number_format = '#,##0 "FCFA"'
+                c_total_valeur.font = Font(bold=True, size=12)
+                c_total_valeur.fill = PatternFill(start_color="E8F5E9", end_color="E8F5E9", fill_type="solid")
+                c_total_valeur.alignment = Alignment(horizontal='right')
+                
+                ws.cell(row=row, column=7, value="")
+                row += 2  # Espace entre les jours
+            
+            row += 1  # Espace entre les agences
+        
+        # Ajuster les largeurs des colonnes
+        ws.column_dimensions['A'].width = 15  # Référence
+        ws.column_dimensions['B'].width = 40  # Désignation
+        ws.column_dimensions['C'].width = 20  # Catégorie
+        ws.column_dimensions['D'].width = 12  # Quantité
+        ws.column_dimensions['E'].width = 20  # Prix Unitaire
+        ws.column_dimensions['F'].width = 20  # Valeur
+        ws.column_dimensions['G'].width = 15  # Conditionnement
+        
+        # Créer la réponse HTTP
+        filename = f"Etat_Inventaire_{date_debut}_{date_fin}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Sauvegarder dans un buffer
+        buffer = BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        response.write(buffer.getvalue())
+        
+        return response
+        
+    except Exception as e:
+        import traceback
+        return JsonResponse({
+            'success': False,
+            'error': f'Erreur lors de l\'export: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
+def serve_logo(request):
+    """Servir le logo de l'entreprise"""
+    import os
+    from django.conf import settings
+    from django.http import FileResponse, Http404
+    
+    logo_path = os.path.join(settings.BASE_DIR, 'image', 'Image1.png')
+    
+    if os.path.exists(logo_path):
+        return FileResponse(open(logo_path, 'rb'), content_type='image/png')
+    else:
+        raise Http404("Logo non trouvé")

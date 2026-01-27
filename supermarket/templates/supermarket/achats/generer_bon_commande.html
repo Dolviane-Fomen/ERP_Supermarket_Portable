@@ -302,14 +302,11 @@
             </h3>
             <div class="entreprise-info-wrapper">
                 <div class="logo-container">
-                    {% if agence.logo %}
-                        <img src="{{ agence.logo.url }}" alt="Logo {{ agence.nom_agence }}">
-                    {% else %}
-                        <div class="logo-placeholder">
-                            <i class="fas fa-image"></i>
-                            <span>Logo non disponible</span>
-                        </div>
-                    {% endif %}
+                    <img src="{% url 'serve_logo' %}" alt="Logo Entreprise" style="max-width: 100%; max-height: 100%; object-fit: contain;" onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    <div class="logo-placeholder" style="display: none;">
+                        <i class="fas fa-image"></i>
+                        <span>Logo non disponible</span>
+                    </div>
                 </div>
                 <div style="flex: 1;">
                     <div class="form-row">

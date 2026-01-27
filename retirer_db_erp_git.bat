@@ -1,17 +1,19 @@
 @echo off
-REM Script pour retirer db_erp.sqlite3 du suivi Git
-
 echo ========================================
 echo Retrait de db_erp.sqlite3 du suivi Git
 echo ========================================
+echo.
+echo ATTENTION: Ce script va retirer le fichier db_erp.sqlite3 du suivi Git
+echo mais ne le supprimera PAS de votre disque dur.
 echo.
 
 REM Vérifier si Git est installé
 where git >nul 2>&1
 if errorlevel 1 (
-    echo ERREUR: Git n'est pas installe ou n'est pas dans le PATH
+    echo ERREUR: Git n'est pas installé ou n'est pas dans le PATH.
     echo.
-    echo SOLUTION: Utilisez GitHub Desktop pour faire cette operation
+    echo SOLUTION: Installez Git ou utilisez GitHub Desktop pour retirer le fichier.
+    echo Dans GitHub Desktop: Clic droit sur db_erp.sqlite3 ^> Ignore
     echo.
     pause
     exit /b 1
@@ -19,45 +21,46 @@ if errorlevel 1 (
 
 REM Vérifier si on est dans un dépôt Git
 if not exist ".git" (
-    echo ERREUR: Ce n'est pas un depot Git!
+    echo ERREUR: Ce script doit être exécuté dans le répertoire du dépôt Git.
+    echo.
     pause
     exit /b 1
 )
 
-echo Retrait de db_erp.sqlite3 du suivi Git...
+echo Vérification du fichier...
+if not exist "db_erp.sqlite3" (
+    echo ATTENTION: Le fichier db_erp.sqlite3 n'existe pas dans ce répertoire.
+    echo Le script va quand même essayer de le retirer du suivi Git.
+    echo.
+)
+
+echo.
+echo Appuyez sur une touche pour continuer...
+pause
 echo.
 
-REM Retirer le fichier du suivi Git (mais le garder localement)
+REM Retirer le fichier de l'index Git (mais le garder sur le disque)
+echo Retrait du fichier du suivi Git...
 git rm --cached db_erp.sqlite3
 
 if errorlevel 1 (
     echo.
-    echo ATTENTION: Le fichier n'etait peut-etre pas suivi par Git
-    echo Continuons quand meme...
-) else (
+    echo ERREUR lors du retrait du fichier.
+    echo Le fichier n'est peut-être pas suivi par Git.
     echo.
-    echo SUCCESS: db_erp.sqlite3 retire du suivi Git
-)
-
-echo.
-echo Verification que le fichier est bien ignore...
-git check-ignore db_erp.sqlite3
-if errorlevel 1 (
-    echo ATTENTION: Le fichier n'est pas dans .gitignore
-    echo Ajout dans .gitignore...
-    echo db_erp.sqlite3 >> .gitignore
-    echo SUCCESS: Fichier ajoute dans .gitignore
-) else (
-    echo OK: Le fichier est bien dans .gitignore
+    pause
+    exit /b 1
 )
 
 echo.
 echo ========================================
-echo OPERATION TERMINEE
+echo SUCCES!
 echo ========================================
 echo.
-echo Vous pouvez maintenant:
-echo 1. Faire un commit de ce changement
-echo 2. Faire un fetch/pull normalement
+echo Le fichier db_erp.sqlite3 a été retiré du suivi Git.
+echo Le fichier existe toujours sur votre disque dur.
+echo.
+echo Vous pouvez maintenant commiter les autres changements normalement.
+echo Dans GitHub Desktop, le fichier ne devrait plus apparaître.
 echo.
 pause
