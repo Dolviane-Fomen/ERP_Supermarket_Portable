@@ -22091,26 +22091,27 @@ def dashboard_achats(request):
 
 @login_required
 def generer_bon_commande(request):
-    """Générer un bon de commande fournisseur"""
+    """
+    Générer un bon de commande fournisseur.
+    Inclus : Gestion du délai de paiement, création auto du fournisseur, et articles via JSON.
+    """
     try:
+        # 1. Vérifications Administratives
         compte = Compte.objects.get(user=request.user, actif=True)
         agence = get_user_agence(request)
         if not agence:
             messages.error(request, 'Votre compte n\'est pas configuré correctement.')
             return redirect('logout_achats')
         
-        # Récupérer les fournisseurs depuis la table Fournisseur
+        # 2. Préparation des données Fournisseurs (BDD + Historique)
         fournisseurs_bdd = Fournisseur.objects.filter(agence=agence).order_by('intitule')
-        
-        # Récupérer les noms de fournisseurs uniques depuis les commandes existantes
         fournisseurs_commandes = CommandeFournisseur.objects.filter(
             agence=agence
         ).values_list('nom_fournisseur', flat=True).distinct().order_by('nom_fournisseur')
         
-        # Créer une liste combinée de tous les fournisseurs (BDD + commandes)
         fournisseurs_dict = {}
         
-        # Ajouter les fournisseurs de la BDD
+        # A. Fournisseurs enregistrés
         for f in fournisseurs_bdd:
             fournisseurs_dict[f.intitule.lower()] = {
                 'id': f.id,
@@ -22121,18 +22122,16 @@ def generer_bon_commande(request):
                 'from_bdd': True
             }
         
-        # Ajouter les fournisseurs des commandes (s'ils ne sont pas déjà dans la BDD)
+        # B. Fournisseurs historiques (non enregistrés)
         for nom_fournisseur in fournisseurs_commandes:
             if nom_fournisseur and nom_fournisseur.lower() not in fournisseurs_dict:
-                # Récupérer les infos depuis la dernière commande avec ce fournisseur
                 derniere_commande = CommandeFournisseur.objects.filter(
-                    agence=agence,
-                    nom_fournisseur=nom_fournisseur
+                    agence=agence, nom_fournisseur=nom_fournisseur
                 ).order_by('-date_creation').first()
                 
                 if derniere_commande:
                     fournisseurs_dict[nom_fournisseur.lower()] = {
-                        'id': None,  # Pas dans la BDD
+                        'id': 0, # Marqueur pour dire "pas dans la BDD"
                         'nom': nom_fournisseur,
                         'adresse': derniere_commande.adresse_fournisseur or '',
                         'telephone': derniere_commande.telephone_fournisseur or '',
@@ -22140,170 +22139,173 @@ def generer_bon_commande(request):
                         'from_bdd': False
                     }
         
-        # Convertir en liste triée par nom
         fournisseurs_list = sorted(fournisseurs_dict.values(), key=lambda x: x['nom'])
         
+        # 3. Liste des articles pour la recherche
         articles = Article.objects.filter(agence=agence).order_by('designation')
         
+        # 4. TRAITEMENT DU FORMULAIRE (POST)
         if request.method == 'POST':
-            # Traitement du formulaire
             try:
-                # Générer un numéro de commande unique
-                from datetime import datetime
+                # A. Génération du Numéro de Commande
                 date_now = datetime.now()
                 numero_base = f"BC-{date_now.strftime('%Y%m%d')}"
-                dernier_numero = CommandeFournisseur.objects.filter(
+                
+                # Chercher le dernier numéro du jour pour incrémenter
+                dernier_bc = CommandeFournisseur.objects.filter(
                     numero_commande__startswith=numero_base
                 ).order_by('-numero_commande').first()
                 
-                if dernier_numero:
+                if dernier_bc:
                     try:
-                        num_seq = int(dernier_numero.numero_commande.split('-')[-1]) + 1
-                    except:
-                        num_seq = 1
+                        seq = int(dernier_bc.numero_commande.split('-')[-1]) + 1
+                    except ValueError:
+                        seq = 1
                 else:
-                    num_seq = 1
+                    seq = 1
                 
-                numero_commande = f"{numero_base}-{num_seq:04d}"
+                numero_commande = f"{numero_base}-{seq:04d}"
                 
-                # Récupérer le taux de TVA (par défaut 18%)
-                taux_tva = request.POST.get('taux_tva', '18.00')
-                try:
-                    taux_tva = Decimal(str(taux_tva))
-                except:
-                    taux_tva = Decimal('18.00')
-                
-                # Gérer le fournisseur
+                # B. Récupération des données basiques
+                taux_tva = Decimal(request.POST.get('taux_tva', '18.00').replace(',', '.'))
                 fournisseur_id = request.POST.get('fournisseur_id')
                 nom_fournisseur = request.POST.get('nom_fournisseur')
                 adresse_fournisseur = request.POST.get('adresse_fournisseur')
                 telephone_fournisseur = request.POST.get('telephone_fournisseur', '')
                 email_fournisseur = request.POST.get('email_fournisseur', '')
                 
-                # Si un fournisseur est sélectionné, utiliser ses données
-                fournisseur = None
+                # --- NOUVEAU : DÉLAI DE PAIEMENT ---
+                delai_paiement = request.POST.get('delai_paiement')
+                if delai_paiement == '': 
+                    delai_paiement = None
+                
+                # C. Gestion du Fournisseur (Création ou Mise à jour)
+                fournisseur_obj = None
+                
+                # Cas 1 : ID existant
                 if fournisseur_id and fournisseur_id != '0':
                     try:
-                        fournisseur = Fournisseur.objects.get(id=fournisseur_id, agence=agence)
-                        nom_fournisseur = fournisseur.intitule
-                        adresse_fournisseur = fournisseur.adresse
-                        telephone_fournisseur = fournisseur.telephone
-                        email_fournisseur = fournisseur.email or ''
+                        fournisseur_obj = Fournisseur.objects.get(id=fournisseur_id, agence=agence)
+                        # Mise à jour optionnelle des infos
+                        fournisseur_obj.adresse = adresse_fournisseur
+                        fournisseur_obj.telephone = telephone_fournisseur
+                        fournisseur_obj.email = email_fournisseur
+                        fournisseur_obj.save()
                     except Fournisseur.DoesNotExist:
                         pass
                 else:
-                    # Créer automatiquement le fournisseur s'il n'existe pas
-                    # Vérifier si un fournisseur avec le même nom existe déjà
-                    fournisseur_existant = Fournisseur.objects.filter(
-                        intitule__iexact=nom_fournisseur.strip(),
+                    # Cas 2 : Nouveau fournisseur ou nom tapé à la main
+                    # On vérifie si le nom existe déjà pour éviter les doublons
+                    fournisseur_obj = Fournisseur.objects.filter(
+                        intitule__iexact=nom_fournisseur.strip(), 
                         agence=agence
                     ).first()
                     
-                    if fournisseur_existant:
-                        # Mettre à jour le fournisseur existant avec les nouvelles informations
-                        fournisseur_existant.adresse = adresse_fournisseur
-                        fournisseur_existant.telephone = telephone_fournisseur
-                        fournisseur_existant.email = email_fournisseur
-                        fournisseur_existant.save()
-                        fournisseur = fournisseur_existant
-                        fournisseur_id = fournisseur.id
-                    else:
-                        # Créer un nouveau fournisseur et le sauvegarder dans la base de données
-                        fournisseur = Fournisseur.objects.create(
+                    if not fournisseur_obj:
+                        # Création réelle
+                        fournisseur_obj = Fournisseur.objects.create(
                             intitule=nom_fournisseur.strip(),
                             adresse=adresse_fournisseur,
                             telephone=telephone_fournisseur,
                             email=email_fournisseur,
                             agence=agence
                         )
-                        fournisseur_id = fournisseur.id
-                        print(f"[ACHATS] Nouveau fournisseur créé: {fournisseur.intitule} (ID: {fournisseur.id})")
-                
-                # Créer la commande
+                    
+                    fournisseur_id = fournisseur_obj.id
+
+                # D. Création de la Commande
                 commande = CommandeFournisseur.objects.create(
                     numero_commande=numero_commande,
                     date_commande=request.POST.get('date_commande'),
                     date_livraison_prevue=request.POST.get('date_livraison_prevue'),
+                    
+                    # Le nouveau champ est ici :
+                    delai_paiement=delai_paiement,
+                    
                     adresse_livraison=request.POST.get('adresse_livraison'),
+                    
+                    # Infos fournisseur snapshot
                     nom_fournisseur=nom_fournisseur,
                     adresse_fournisseur=adresse_fournisseur,
                     telephone_fournisseur=telephone_fournisseur,
                     email_fournisseur=email_fournisseur,
+                    
                     taux_tva=taux_tva,
                     statut='brouillon',
                     commentaire=request.POST.get('commentaire', ''),
-                    fournisseur_id=fournisseur_id,
+                    
+                    # Lien Foreign Key
+                    fournisseur=fournisseur_obj,
                     agence=agence,
                     cree_par=request.user
                 )
                 
-                # Traiter les articles sélectionnés (format JSON comme facture d'achat)
+                # E. Traitement des Articles (JSON vs Fallback)
                 articles_data = request.POST.get('articles_data', '')
                 
                 if articles_data:
-                    import json
+                    # Méthode JSON (Recommandée)
                     try:
-                        articles = json.loads(articles_data)
-                        for article_data in articles:
+                        items = json.loads(articles_data)
+                        for item in items:
                             try:
-                                article = Article.objects.get(id=article_data['id'], agence=agence)
+                                art = Article.objects.get(id=item['id'], agence=agence)
                                 LigneCommandeFournisseur.objects.create(
                                     commande=commande,
-                                    article=article,
-                                    quantite=Decimal(str(article_data['quantite'])),
-                                    prix_unitaire=Decimal(str(article_data['prix_unitaire'])),
-                                    description=article_data.get('description', '')
+                                    article=art,
+                                    quantite=Decimal(str(item['quantite'])),
+                                    prix_unitaire=Decimal(str(item['prix_unitaire'])),
+                                    description=item.get('description', '')
                                 )
                             except (Article.DoesNotExist, ValueError, KeyError):
                                 continue
                     except json.JSONDecodeError:
-                        messages.error(request, 'Erreur lors du traitement des articles.')
+                        messages.warning(request, "Erreur de formatage des articles (JSON).")
                 else:
-                    # Fallback: traitement ancien format (si nécessaire)
+                    # Méthode Fallback (Ancienne méthode Listes)
                     article_ids = request.POST.getlist('article_id[]')
                     quantites = request.POST.getlist('quantite[]')
                     prix_unitaires = request.POST.getlist('prix_unitaire[]')
+                    descriptions = request.POST.getlist('description[]')
                     
-                    for i, article_id in enumerate(article_ids):
-                        if article_id and i < len(quantites) and i < len(prix_unitaires) and quantites[i] and prix_unitaires[i]:
+                    for i, art_id in enumerate(article_ids):
+                        if art_id and i < len(quantites) and quantites[i]:
                             try:
-                                article = Article.objects.get(id=article_id, agence=agence)
+                                art = Article.objects.get(id=art_id, agence=agence)
                                 LigneCommandeFournisseur.objects.create(
                                     commande=commande,
-                                    article=article,
-                                    quantite=Decimal(quantites[i]),
-                                    prix_unitaire=Decimal(prix_unitaires[i]),
-                                    description=request.POST.getlist('description[]')[i] if i < len(request.POST.getlist('description[]')) else ''
+                                    article=art,
+                                    quantite=Decimal(str(quantites[i])),
+                                    prix_unitaire=Decimal(str(prix_unitaires[i])),
+                                    description=descriptions[i] if i < len(descriptions) else ''
                                 )
-                            except (Article.DoesNotExist, ValueError, IndexError):
+                            except Exception:
                                 continue
-                
-                # Recalculer les totaux
+
+                # F. Finalisation
                 commande.calculer_totaux()
                 
-                # Vérifier si un nouveau fournisseur a été créé
-                fournisseur_initial_id = request.POST.get('fournisseur_id')
-                if not fournisseur_initial_id and fournisseur:
-                    messages.success(request, f'Bon de commande {numero_commande} créé avec succès ! Le fournisseur "{fournisseur.intitule}" a été créé et sauvegardé dans la base de données.')
-                else:
-                    messages.success(request, f'Bon de commande {numero_commande} créé et sauvegardé avec succès !')
-                
-                # Rediriger vers la liste des bons de commande au lieu du PDF directement
+                messages.success(request, f'Bon de commande {numero_commande} créé avec succès !')
                 return redirect('consulter_bons_commande')
                 
             except Exception as e:
-                messages.error(request, f'Erreur lors de la création du bon de commande : {str(e)}')
+                import traceback
+                traceback.print_exc()
+                messages.error(request, f'Erreur lors de la création : {str(e)}')
         
+        # 5. Rendu du Template (GET)
         context = {
             'compte': compte,
             'agence': agence,
-            'fournisseurs': fournisseurs_list,  # Liste combinée BDD + commandes
+            'fournisseurs': fournisseurs_list,
             'articles': articles,
         }
         return render(request, 'supermarket/achats/generer_bon_commande.html', context)
+        
     except Compte.DoesNotExist:
-        messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+        messages.error(request, 'Compte introuvable.')
         return redirect('index')
+
 
 @login_required
 def get_fournisseur_ajax(request, fournisseur_id):
@@ -22331,41 +22333,197 @@ def get_fournisseur_ajax(request, fournisseur_id):
 
 @login_required
 def consulter_bons_commande(request):
-    """Consulter tous les bons de commande enregistrés"""
+    """Consulter tous les bons de commande (Mise à jour filtres)"""
     try:
         compte = Compte.objects.get(user=request.user, actif=True)
         agence = get_user_agence(request)
-        if not agence:
-            messages.error(request, 'Votre compte n\'est pas configuré correctement.')
-            return redirect('logout_achats')
+        if not agence: return redirect('logout_achats')
         
-        # Récupérer tous les bons de commande de l'agence
-        bons_commande = CommandeFournisseur.objects.filter(agence=agence).select_related('fournisseur', 'cree_par').prefetch_related('lignes').order_by('-date_creation')
+        # 1. Base QuerySet
+        bons_commande = CommandeFournisseur.objects.filter(agence=agence).select_related('fournisseur').order_by('-date_creation')
         
-        # Filtres optionnels
+        # 2. Gestion des Filtres
         statut_filter = request.GET.get('statut')
-        if statut_filter:
-            bons_commande = bons_commande.filter(statut=statut_filter)
-        
         date_debut = request.GET.get('date_debut')
         date_fin = request.GET.get('date_fin')
+        
+        # --- NOUVEAU FILTRE FOURNISSEUR ---
+        fournisseur_filter = request.GET.get('fournisseur') # Récupère le NOM du fournisseur
+        
+        if statut_filter:
+            bons_commande = bons_commande.filter(statut=statut_filter)
         if date_debut:
             bons_commande = bons_commande.filter(date_commande__gte=date_debut)
         if date_fin:
             bons_commande = bons_commande.filter(date_commande__lte=date_fin)
+        if fournisseur_filter:
+            bons_commande = bons_commande.filter(nom_fournisseur=fournisseur_filter)
+            
+        # 3. Récupérer la liste des fournisseurs pour le select
+        liste_fournisseurs = CommandeFournisseur.objects.filter(agence=agence).values_list('nom_fournisseur', flat=True).distinct().order_by('nom_fournisseur')
         
         context = {
             'compte': compte,
             'agence': agence,
             'bons_commande': bons_commande,
+            # Context pour les filtres
             'statut_filter': statut_filter,
             'date_debut': date_debut,
             'date_fin': date_fin,
+            'fournisseur_filter': fournisseur_filter,
+            'liste_fournisseurs': liste_fournisseurs, 
         }
         return render(request, 'supermarket/achats/consulter_bons_commande.html', context)
-    except Compte.DoesNotExist:
-        messages.error(request, 'Votre compte n\'est pas configuré correctement.')
-        return redirect('index')
+    except Exception as e:
+        messages.error(request, f"Erreur: {str(e)}")
+        return redirect('dashboard_achats')
+@login_required
+def export_commandes_achats_excel(request):
+    """
+    Export Excel Structuré : 
+    Niveau 1 : Fournisseur
+    Niveau 2 : Numéro Commande
+    Niveau 3 : Détails (Article + Dates + Montants + Délais)
+    """
+    try:
+        from supermarket.models import CommandeFournisseur
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from django.http import HttpResponse
+
+        agence = get_user_agence(request)
+        
+        # 1. Filtres
+        statut_filter = request.GET.get('statut')
+        date_debut = request.GET.get('date_debut')
+        date_fin = request.GET.get('date_fin')
+        fournisseur_filter = request.GET.get('fournisseur')
+
+        commandes = CommandeFournisseur.objects.filter(agence=agence)
+
+        if statut_filter: commandes = commandes.filter(statut=statut_filter)
+        if date_debut: commandes = commandes.filter(date_commande__gte=date_debut)
+        if date_fin: commandes = commandes.filter(date_commande__lte=date_fin)
+        if fournisseur_filter: commandes = commandes.filter(nom_fournisseur=fournisseur_filter)
+        
+        # TRI OBLIGATOIRE : Fournisseur -> Commande
+        commandes = commandes.order_by('nom_fournisseur', 'numero_commande')
+
+        # 2. Création Excel
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Détail Achats Structuré"
+
+        # --- STYLES ---
+        # Niveau 1 : Fournisseur (Bleu Foncé)
+        style_fournisseur = PatternFill(start_color="2d1b69", end_color="2d1b69", fill_type="solid")
+        font_fournisseur = Font(bold=True, color="FFFFFF", size=14)
+        
+        # Niveau 2 : Commande (Gris)
+        style_commande = PatternFill(start_color="E6E6E6", end_color="E6E6E6", fill_type="solid")
+        font_commande = Font(bold=True, color="000000", size=12)
+        
+        # Niveau 3 : En-têtes Colonnes (Blanc/Gras)
+        font_header_col = Font(bold=True)
+        border_bottom = Border(bottom=Side(style='thin'))
+
+        row_num = 1
+        current_fournisseur = None
+
+        for cmd in commandes:
+            # ==================================================
+            # NIVEAU 1 : FOURNISSEUR (Seulement si ça change)
+            # ==================================================
+            if cmd.nom_fournisseur != current_fournisseur:
+                row_num += 1
+                ws.merge_cells(f'A{row_num}:F{row_num}')
+                cell = ws.cell(row=row_num, column=1, value=f"🏢 FOURNISSEUR : {cmd.nom_fournisseur}")
+                cell.fill = style_fournisseur
+                cell.font = font_fournisseur
+                cell.alignment = Alignment(horizontal='left', vertical='center')
+                ws.row_dimensions[row_num].height = 30
+                current_fournisseur = cmd.nom_fournisseur
+                row_num += 1
+
+            # ==================================================
+            # NIVEAU 2 : NUMÉRO DE COMMANDE (Juste le numéro)
+            # ==================================================
+            ws.merge_cells(f'A{row_num}:F{row_num}')
+            cell_cmd = ws.cell(row=row_num, column=1, value=f"▶ COMMANDE N° : {cmd.numero_commande}")
+            cell_cmd.fill = style_commande
+            cell_cmd.font = font_commande
+            cell_cmd.alignment = Alignment(horizontal='left', vertical='center')
+            ws.row_dimensions[row_num].height = 22
+            row_num += 1
+
+            # ==================================================
+            # NIVEAU 3 : LISTE DES ARTICLES AVEC DÉTAILS
+            # ==================================================
+            
+            # En-têtes des colonnes
+            headers = ['Article / Désignation', 'Date Commande', 'Date Livraison', 'Quantité', 'Montant (FCFA)', 'Délai Paiement']
+            for idx, h in enumerate(headers, 1):
+                c = ws.cell(row=row_num, column=idx, value=h)
+                c.font = font_header_col
+                c.border = border_bottom
+            row_num += 1
+
+            # Préparation des données communes à la commande
+            date_cmd = cmd.date_commande
+            date_liv = cmd.date_livraison_prevue
+            delai = cmd.delai_paiement if cmd.delai_paiement else "Non défini"
+
+            lignes = cmd.lignes.all().select_related('article')
+            
+            if lignes:
+                for ligne in lignes:
+                    # Col A: Article
+                    ws.cell(row=row_num, column=1, value=ligne.article.designation)
+                    
+                    # Col B: Date Commande
+                    c_date = ws.cell(row=row_num, column=2, value=date_cmd)
+                    c_date.number_format = 'DD/MM/YYYY'
+                    
+                    # Col C: Date Livraison
+                    c_liv = ws.cell(row=row_num, column=3, value=date_liv)
+                    c_liv.number_format = 'DD/MM/YYYY'
+                    
+                    # Col D: Quantité
+                    ws.cell(row=row_num, column=4, value=ligne.quantite)
+                    
+                    # Col E: Montant
+                    c_mnt = ws.cell(row=row_num, column=5, value=ligne.prix_total)
+                    c_mnt.number_format = '#,##0 "FCFA"'
+                    
+                    # Col F: Délai Paiement
+                    c_delai = ws.cell(row=row_num, column=6, value=delai)
+                    if delai != "Non défini":
+                        c_delai.number_format = 'DD/MM/YYYY'
+                    
+                    row_num += 1
+            else:
+                ws.cell(row=row_num, column=1, value="Aucun article").font = Font(italic=True)
+                row_num += 1
+            
+            row_num += 1 # Espace après chaque commande
+
+        # Ajustement largeurs colonnes
+        ws.column_dimensions['A'].width = 40 # Article (Large)
+        ws.column_dimensions['B'].width = 15 # Date
+        ws.column_dimensions['C'].width = 15 # Date
+        ws.column_dimensions['D'].width = 10 # Qté
+        ws.column_dimensions['E'].width = 18 # Montant
+        ws.column_dimensions['F'].width = 15 # Délai
+
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = f'attachment; filename="Achats_Par_Fournisseur.xlsx"'
+        wb.save(response)
+        return response
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return HttpResponse(f"Erreur Export: {str(e)}")
 
 @login_required
 def modifier_bon_commande(request, commande_id):
