@@ -1,0 +1,625 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>État Inventaire - Gestion Achats</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        line-height: 1.6;
+        min-height: 100vh;
+    }
+    header {
+        display: flex;
+        align-items: center;
+        background: linear-gradient(135deg, #2d1b69 0%, #11998e 100%);
+        padding: 15px 20px;
+        border-radius: 12px;
+        box-shadow: 0 8px 30px rgba(45, 27, 105, 0.3);
+        margin-bottom: 25px;
+    }
+    .super-market-title {
+        font-size: 1.8em;
+        font-weight: 600;
+        color: white;
+        margin: 0;
+        flex: 1;
+    }
+    .header-info {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+    .username {
+        color: white;
+        font-weight: 600;
+        font-size: 0.95em;
+    }
+    .logout-button {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        padding: 8px 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        font-size: 0.9em;
+    }
+    .logout-button:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: translateY(-2px);
+    }
+    .container {
+        display: flex;
+        gap: 20px;
+    }
+    .menu-bar {
+        width: 260px;
+        background: linear-gradient(to bottom, #2c3e50, #34495e);
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+        height: fit-content;
+    }
+    .menu-bar h2 {
+        color: #ecf0f1;
+        font-size: 1.3em;
+        margin: 0 0 20px;
+        font-weight: bold;
+        text-align: center;
+        padding-bottom: 15px;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+    }
+    .menu-item {
+        color: #ecf0f1;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        padding: 14px;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        transition: all 0.3s ease;
+    }
+    .menu-item:hover {
+        background: rgba(17, 153, 142, 0.2);
+        transform: translateX(5px);
+    }
+    .menu-item.active {
+        background: linear-gradient(135deg, #2d1b69 0%, #11998e 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(45, 27, 105, 0.4);
+    }
+    .icon {
+        margin-right: 12px;
+        font-size: 1.1em;
+        width: 24px;
+        text-align: center;
+    }
+    .content {
+        flex: 1;
+        min-width: 0;
+    }
+    .page-header {
+        margin-bottom: 25px;
+    }
+    .page-header h2 {
+        color: #2c3e50;
+        font-size: 2em;
+        font-weight: 700;
+        margin: 0;
+    }
+    .filter-card {
+        background: white;
+        border-radius: 16px;
+        padding: 25px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+        margin-bottom: 25px;
+    }
+    .filter-card h3 {
+        color: #2c3e50;
+        margin-bottom: 20px;
+        font-size: 1.3em;
+        font-weight: 700;
+    }
+    .filter-form {
+        display: grid;
+        grid-template-columns: 1fr 1fr auto;
+        gap: 15px;
+        align-items: end;
+    }
+    .form-group {
+        display: flex;
+        flex-direction: column;
+    }
+    .form-group label {
+        color: #2c3e50;
+        font-weight: 600;
+        margin-bottom: 8px;
+        font-size: 0.9em;
+    }
+    .form-group input {
+        padding: 12px;
+        border: 2px solid #e1e8ed;
+        border-radius: 8px;
+        font-size: 1em;
+        transition: all 0.3s ease;
+    }
+    .form-group input:focus {
+        outline: none;
+        border-color: #11998e;
+        box-shadow: 0 0 0 3px rgba(17, 153, 142, 0.1);
+    }
+    .btn-generate {
+        background: linear-gradient(135deg, #2d1b69 0%, #11998e 100%);
+        color: white;
+        border: none;
+        padding: 12px 25px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 1em;
+    }
+    .btn-generate:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(17, 153, 142, 0.4);
+    }
+    .btn-export {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        border: none;
+        padding: 12px 25px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 1em;
+        margin-left: 10px;
+    }
+    .btn-export:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+    }
+    .btn-export:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+    .results-container {
+        display: none;
+    }
+    .results-container.active {
+        display: block;
+    }
+    .agence-section {
+        background: white;
+        border-radius: 16px;
+        padding: 25px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+        margin-bottom: 25px;
+    }
+    .agence-header {
+        background: linear-gradient(135deg, #2d1b69 0%, #11998e 100%);
+        color: white;
+        padding: 15px 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+    }
+    .agence-header h3 {
+        margin: 0;
+        font-size: 1.4em;
+    }
+    .inventaire-item {
+        margin-bottom: 25px;
+        border-left: 4px solid #11998e;
+        padding-left: 15px;
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+    }
+    .inventaire-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+    .inventaire-title {
+        font-weight: 700;
+        color: #2c3e50;
+        font-size: 1.1em;
+    }
+    .inventaire-info {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        margin-bottom: 15px;
+        font-size: 0.9em;
+        color: #6c757d;
+    }
+    .inventaire-info span {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .badge {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.85em;
+        font-weight: 600;
+        color: white;
+    }
+    .badge-en_cours {
+        background: #ffc107;
+        color: #212529;
+    }
+    .badge-termine {
+        background: #28a745;
+    }
+    .badge-annule {
+        background: #dc3545;
+    }
+    .inventaire-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+    }
+    .inventaire-table th {
+        background: #2c3e50;
+        color: white;
+        padding: 12px;
+        text-align: left;
+        font-weight: 600;
+        border-bottom: 2px solid #dee2e6;
+    }
+    .inventaire-table td {
+        padding: 12px;
+        border-bottom: 1px solid #dee2e6;
+        color: #5a6c7d;
+    }
+    .inventaire-table tr:hover {
+        background: #f8f9fa;
+    }
+    .total-row {
+        background: #e8f5e9;
+        font-weight: 700;
+        font-size: 1.05em;
+    }
+    .loading {
+        text-align: center;
+        padding: 40px;
+        color: #5a6c7d;
+    }
+    .loading i {
+        font-size: 3em;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+    .alert {
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    .alert-info {
+        background: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+    }
+    .alert-success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    .alert-error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #6c757d;
+    }
+    .empty-state i {
+        font-size: 4em;
+        margin-bottom: 15px;
+        color: #bdc3c7;
+    }
+    .empty-state p {
+        font-size: 1.2em;
+    }
+    @media (max-width: 900px) {
+        .container {
+            flex-direction: column;
+        }
+        .menu-bar {
+            width: 100%;
+        }
+        .filter-form {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+</head>
+<body>
+
+<!-- Messages Django -->
+{% if messages %}
+    {% for message in messages %}
+        <div style="margin: 10px 0; padding: 15px; border-radius: 8px; background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <i class="fas fa-info-circle"></i> {{ message }}
+        </div>
+    {% endfor %}
+{% endif %}
+
+<header>
+    <div style="width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; margin-right: 15px;">
+        <img src="{% url 'serve_logo' %}" alt="Logo" style="max-width: 50px; max-height: 50px; object-fit: contain;">
+    </div>
+    <div class="super-market-title">Gestion Achats - {{ agence.nom_agence|default:"ERP" }}</div>
+    <div class="header-info">
+        <i class="fas fa-user-circle" style="font-size: 24px; color: white;"></i>
+        <div class="username">{{ compte.nom_complet|default:user.username }}</div>
+        <a href="{% url 'logout_achats' %}" class="logout-button">
+            <i class="fas fa-sign-out-alt"></i> Déconnexion
+        </a>
+    </div>
+</header>
+
+<div class="container">
+    <div class="menu-bar">
+        <h2><i class="fas fa-bars"></i> MENU</h2>
+        
+        <a href="{% url 'dashboard_achats' %}" class="menu-item {% if request.resolver_match.url_name == 'dashboard_achats' %}active{% endif %}">
+            <i class="fas fa-home icon"></i>
+            <span>Dashboard</span>
+        </a>
+        
+        <a href="{% url 'generer_bon_commande' %}" class="menu-item {% if request.resolver_match.url_name == 'generer_bon_commande' %}active{% endif %}">
+            <i class="fas fa-file-invoice icon"></i>
+            <span>Générer Bon de Commande</span>
+        </a>
+        
+        <a href="{% url 'consulter_bons_commande' %}" class="menu-item {% if request.resolver_match.url_name == 'consulter_bons_commande' %}active{% endif %}">
+            <i class="fas fa-clipboard-list icon"></i>
+            <span>Consulter Bons de Commande</span>
+        </a>
+        
+        <a href="#" class="menu-item">
+            <i class="fas fa-clipboard-list icon"></i>
+            <span>Suivi Commande Fournisseur</span>
+        </a>
+        
+        <a href="{% url 'etat_livraison' %}" class="menu-item {% if request.resolver_match.url_name == 'etat_livraison' %}active{% endif %}">
+            <i class="fas fa-truck icon"></i>
+            <span>État Livraison</span>
+        </a>
+        
+        <a href="{% url 'etat_inventaire' %}" class="menu-item {% if request.resolver_match.url_name == 'etat_inventaire' %}active{% endif %}">
+            <i class="fas fa-boxes icon"></i>
+            <span>État Inventaire</span>
+        </a>
+    </div>
+    
+    <div class="content">
+        <div class="page-header">
+            <h2><i class="fas fa-boxes" style="color: #11998e;"></i> État Inventaire - Toutes Agences</h2>
+        </div>
+        
+        <div class="filter-card">
+            <h3><i class="fas fa-filter" style="color: #11998e;"></i> Sélection de la Période</h3>
+            <form id="formInventaire" class="filter-form">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="date_debut">Date de début</label>
+                    <input type="date" id="date_debut" name="date_debut" required>
+                </div>
+                <div class="form-group">
+                    <label for="date_fin">Date de fin</label>
+                    <input type="date" id="date_fin" name="date_fin" required>
+                </div>
+                <div>
+                    <button type="submit" class="btn-generate">
+                        <i class="fas fa-chart-line"></i> Générer État
+                    </button>
+                    <button type="button" id="btnExport" class="btn-export" style="display: none;">
+                        <i class="fas fa-file-excel"></i> Exporter Excel
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        <div id="loading" class="loading" style="display: none;">
+            <i class="fas fa-spinner"></i>
+            <p>Génération de l'état en cours...</p>
+        </div>
+        
+        <div id="alertContainer"></div>
+        
+        <div id="resultsContainer" class="results-container"></div>
+    </div>
+</div>
+
+<script>
+document.getElementById('formInventaire').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const dateDebut = document.getElementById('date_debut').value;
+    const dateFin = document.getElementById('date_fin').value;
+    
+    if (!dateDebut || !dateFin) {
+        showAlert('Veuillez sélectionner les dates', 'error');
+        return;
+    }
+    
+    if (new Date(dateDebut) > new Date(dateFin)) {
+        showAlert('La date de début doit être antérieure à la date de fin', 'error');
+        return;
+    }
+    
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('resultsContainer').classList.remove('active');
+    document.getElementById('btnExport').style.display = 'none';
+    
+    const formData = new FormData();
+    formData.append('date_debut', dateDebut);
+    formData.append('date_fin', dateFin);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    
+    fetch('{% url "generer_etat_inventaire" %}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('loading').style.display = 'none';
+        
+        if (data.success) {
+            displayResults(data);
+            document.getElementById('btnExport').style.display = 'inline-block';
+        } else {
+            showAlert(data.error || 'Erreur lors de la génération de l\'état', 'error');
+        }
+    })
+    .catch(error => {
+        document.getElementById('loading').style.display = 'none';
+        showAlert('Erreur de connexion: ' + error.message, 'error');
+    });
+});
+
+function displayResults(data) {
+    const container = document.getElementById('resultsContainer');
+    container.innerHTML = '';
+    
+    if (!data.data || Object.keys(data.data).length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-box-open"></i>
+                <p>Aucune donnée trouvée pour la période sélectionnée</p>
+            </div>
+        `;
+        container.classList.add('active');
+        return;
+    }
+    
+    let html = '';
+    
+    for (const agenceId in data.data) {
+        const agenceData = data.data[agenceId];
+        
+        html += `
+            <div class="agence-section">
+                <div class="agence-header">
+                    <h3><i class="fas fa-store"></i> ${agenceData.nom_agence}</h3>
+                </div>
+        `;
+        
+        if (agenceData.jours && Object.keys(agenceData.jours).length > 0) {
+            // Trier les jours par date (du plus récent au plus ancien)
+            const joursSorted = Object.keys(agenceData.jours).sort().reverse();
+            
+            for (const jourKey of joursSorted) {
+                const jourData = agenceData.jours[jourKey];
+                
+                html += `
+                    <div class="inventaire-item">
+                        <div class="inventaire-header">
+                            <div class="inventaire-title">
+                                <i class="fas fa-calendar-day"></i> État du Stock - ${jourData.date}
+                            </div>
+                        </div>
+                        <div class="inventaire-info">
+                            <span><i class="fas fa-list"></i> Articles: ${jourData.total_lignes}</span>
+                            <span><i class="fas fa-money-bill-wave"></i> Valeur totale: ${formatMoney(jourData.valeur_totale)} FCFA</span>
+                        </div>
+                        <table class="inventaire-table">
+                            <thead>
+                                <tr>
+                                    <th>Référence</th>
+                                    <th>Désignation</th>
+                                    <th>Catégorie</th>
+                                    <th>Quantité</th>
+                                    <th>Prix Unitaire</th>
+                                    <th>Valeur</th>
+                                    <th>Conditionnement</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                for (const ligne of jourData.lignes) {
+                    html += `
+                        <tr>
+                            <td>${ligne.reference}</td>
+                            <td>${ligne.designation}</td>
+                            <td>${ligne.categorie}</td>
+                            <td>${formatNumber(ligne.quantite)}</td>
+                            <td>${formatMoney(ligne.prix_unitaire)} FCFA</td>
+                            <td>${formatMoney(ligne.valeur)} FCFA</td>
+                            <td>${ligne.conditionnement}</td>
+                        </tr>
+                    `;
+                }
+                
+                html += `
+                                <tr class="total-row">
+                                    <td colspan="5"><strong>Total</strong></td>
+                                    <td><strong>${formatMoney(jourData.valeur_totale)} FCFA</strong></td>
+                                    <td></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+        } else {
+            html += `<p style="color: #6c757d; text-align: center; padding: 20px;">Aucun article en stock pour cette agence</p>`;
+        }
+        
+        html += `</div>`;
+    }
+    
+    container.innerHTML = html;
+    container.classList.add('active');
+}
+
+function showAlert(message, type) {
+    const container = document.getElementById('alertContainer');
+    const alertClass = type === 'error' ? 'alert-error' : type === 'success' ? 'alert-success' : 'alert-info';
+    container.innerHTML = `<div class="alert ${alertClass}">${message}</div>`;
+    setTimeout(() => {
+        container.innerHTML = '';
+    }, 5000);
+}
+
+function formatMoney(value) {
+    return parseFloat(value).toLocaleString('fr-FR', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+}
+
+function formatNumber(value) {
+    return parseFloat(value).toLocaleString('fr-FR', {minimumFractionDigits: 3, maximumFractionDigits: 3});
+}
+
+// Bouton export Excel
+document.getElementById('btnExport').addEventListener('click', function() {
+    window.location.href = '{% url "export_etat_inventaire_excel" %}';
+});
+</script>
+
+</body>
+</html>
