@@ -5726,8 +5726,8 @@ def detail_commande(request, commande_id):
         commandes_groupe_final.sort(key=lambda x: x.article.id)
         
         # Calculer les totaux du groupe
-        quantite_totale = sum(cmd['quantite'] for cmd in commandes_groupe_final)
-        prix_total = sum(cmd['prix_total'] for cmd in commandes_groupe_final)
+        quantite_totale = sum(cmd.quantite for cmd in commandes_groupe_final)
+        prix_total = sum(cmd.prix_total for cmd in commandes_groupe_final)
         
         # Vérifier s'il y a une facture associée (prendre la première commande du groupe)
         facture = None
@@ -5746,11 +5746,12 @@ def detail_commande(request, commande_id):
         context = {
             'commande': commande,  # Commande principale pour les infos générales
             'commandes_groupe': commandes_groupe,  # Tous les articles de la commande
+            'commandes_groupe_final': commandes_groupe_final,  # Commandes groupées par article
             'facture': facture,
             'livraison': livraison,
             'agence': agence,
-            'quantite_totale': totaux['quantite_totale'] or 0,
-            'prix_total': totaux['prix_total'] or 0,
+            'quantite_totale': quantite_totale or 0,
+            'prix_total': prix_total or 0,
             'readonly': readonly or from_livraison,  # Mode lecture seule si depuis consulter_livraisons
         }
         return render(request, 'supermarket/commandes/detail_commande.html', context)
@@ -23446,3 +23447,4 @@ def serve_logo(request):
         return FileResponse(open(logo_path, 'rb'), content_type='image/png')
     else:
         raise Http404("Logo non trouvé")
+
