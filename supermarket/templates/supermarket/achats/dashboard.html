@@ -362,9 +362,26 @@
 <!-- Messages Django -->
 {% if messages %}
     {% for message in messages %}
-        <div style="margin: 10px 0; padding: 15px; border-radius: 8px; background-color: rgba(212, 237, 218, 0.95); color: #155724; border: 1px solid #c3e6cb; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <i class="fas fa-info-circle"></i> {{ message }}
-        </div>
+        {% if message.tags == 'error' %}
+            {% comment %}Afficher les erreurs critiques en rouge, les autres en bleu{% endcomment %}
+            {% if 'compte' in message|lower or 'configuré' in message|lower or 'erreur' in message|lower %}
+                <div style="margin: 10px 0; padding: 15px; border-radius: 8px; background-color: rgba(248, 215, 218, 0.95); color: #721c24; border: 1px solid #f5c6cb; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    <i class="fas fa-exclamation-circle"></i> {{ message }}
+                </div>
+            {% else %}
+                <div style="margin: 10px 0; padding: 15px; border-radius: 8px; background-color: rgba(207, 226, 255, 0.95); color: #0a58ca; border: 1px solid #b3d7ff; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    <i class="fas fa-info-circle"></i> {{ message }}
+                </div>
+            {% endif %}
+        {% elif message.tags == 'warning' %}
+            <div style="margin: 10px 0; padding: 15px; border-radius: 8px; background-color: rgba(255, 243, 205, 0.95); color: #856404; border: 1px solid #ffeaa7; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <i class="fas fa-exclamation-triangle"></i> {{ message }}
+            </div>
+        {% else %}
+            <div style="margin: 10px 0; padding: 15px; border-radius: 8px; background-color: rgba(212, 237, 218, 0.95); color: #155724; border: 1px solid #c3e6cb; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <i class="fas fa-check-circle"></i> {{ message }}
+            </div>
+        {% endif %}
     {% endfor %}
 {% endif %}
 
@@ -399,11 +416,6 @@
         <a href="{% url 'consulter_bons_commande' %}" class="menu-item {% if request.resolver_match.url_name == 'consulter_bons_commande' %}active{% endif %}">
             <i class="fas fa-clipboard-list icon"></i>
             <span>Consulter Bons de Commande</span>
-        </a>
-        
-        <a href="#" class="menu-item">
-            <i class="fas fa-clipboard-list icon"></i>
-            <span>Suivi Commande Fournisseur</span>
         </a>
         
         <a href="{% url 'etat_livraison' %}" class="menu-item {% if request.resolver_match.url_name == 'etat_livraison' %}active{% endif %}">
@@ -555,276 +567,353 @@
 </div>
 
 <script>
-// Graphique du nombre de commandes
-const ordersCtx = document.getElementById('ordersChart').getContext('2d');
-const ordersChart = new Chart(ordersCtx, {
-    type: 'bar',
-    data: {
-        labels: [{% for day in evolution_7j %}'{{ day.date }}'{% if not forloop.last %},{% endif %}{% endfor %}],
-        datasets: [{
-            label: 'Nombre de commandes',
-            data: [{% for day in evolution_7j %}{{ day.nb_commandes }}{% if not forloop.last %},{% endif %}{% endfor %}],
-            backgroundColor: 'rgba(17, 153, 142, 0.8)',
-            borderColor: '#11998e',
-            borderWidth: 2,
-            borderRadius: 8
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                display: true,
-                position: 'top',
-                labels: {
-                    font: { size: 12, weight: 'bold' },
-                    padding: 15
-                }
-            },
-            tooltip: {
-                backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                padding: 12,
-                callbacks: {
-                    label: function(context) {
-                        return context.parsed.y + ' commande(s)';
-                    }
-                }
-            }
-        },
-        scales: {
-            y: {
-                beginAtZero: true,
-                ticks: { 
-                    font: { size: 11 },
-                    stepSize: 1,
-                    precision: 0
-                },
-                grid: { color: 'rgba(0, 0, 0, 0.05)' },
-                title: {
-                    display: true,
-                    text: 'Nombre de commandes',
-                    font: { size: 12, weight: 'bold' }
-                }
-            },
-            x: {
-                grid: { display: false },
-                title: {
-                    display: true,
-                    text: 'Date',
-                    font: { size: 12, weight: 'bold' }
-                }
-            }
-        },
-        animation: {
-            duration: 2000,
-            easing: 'easeOutBounce'
-        }
-    }
-});
+// @ts-nocheck
+/* eslint-disable */
+/* jshint ignore:start */
+// Données pour les graphiques (générées par Django)
+// @ts-ignore
+const evolutionLabels = [{% if evolution_7j %}{% for day in evolution_7j %}'{{ day.date }}'{% if not forloop.last %},{% endif %}{% endfor %}{% else %}'Aucune donnée'{% endif %}];
+// @ts-ignore
+const evolutionNbCommandes = [{% if evolution_7j %}{% for day in evolution_7j %}{{ day.nb_commandes|default:0 }}{% if not forloop.last %},{% endif %}{% endfor %}{% else %}0{% endif %}];
+// @ts-ignore
+const evolutionMontants = [{% if evolution_7j %}{% for day in evolution_7j %}{{ day.montant|floatformat:0|default:0 }}{% if not forloop.last %},{% endif %}{% endfor %}{% else %}0{% endif %}];
+// @ts-ignore
+const topFournisseursLabels = [{% if top_fournisseurs %}{% for supplier in top_fournisseurs %}'{{ supplier.nom_fournisseur|truncatewords:3|default:"N/A" }}'{% if not forloop.last %},{% endif %}{% endfor %}{% else %}'Aucun fournisseur'{% endif %}];
+// @ts-ignore
+const topFournisseursMontants = [{% if top_fournisseurs %}{% for supplier in top_fournisseurs %}{{ supplier.total|floatformat:0|default:0 }}{% if not forloop.last %},{% endif %}{% endfor %}{% else %}0{% endif %}];
+/* jshint ignore:end */
+/* eslint-enable */
 
-// Graphique du montant des commandes
-const amountCtx = document.getElementById('amountChart').getContext('2d');
-const amountChart = new Chart(amountCtx, {
-    type: 'bar',
-    data: {
-        labels: [{% for day in evolution_7j %}'{{ day.date }}'{% if not forloop.last %},{% endif %}{% endfor %}],
-        datasets: [{
-            label: 'Montant total (FCFA)',
-            data: [{% for day in evolution_7j %}{{ day.montant|floatformat:0 }}{% if not forloop.last %},{% endif %}{% endfor %}],
-            backgroundColor: 'rgba(45, 27, 105, 0.8)',
-            borderColor: '#2d1b69',
-            borderWidth: 2,
-            borderRadius: 8
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                display: true,
-                position: 'top',
-                labels: {
-                    font: { size: 12, weight: 'bold' },
-                    padding: 15
-                }
+// Vérification et initialisation des graphiques avec gestion d'erreurs
+try {
+    // Graphique du nombre de commandes
+    const ordersChartEl = document.getElementById('ordersChart');
+    if (!ordersChartEl) {
+        console.warn('Élément ordersChart non trouvé');
+    } else {
+        const ordersCtx = ordersChartEl.getContext('2d');
+        const ordersChart = new Chart(ordersCtx, {
+            type: 'bar',
+            data: {
+                labels: Array.isArray(evolutionLabels) && evolutionLabels.length > 0 ? evolutionLabels : ['Aucune donnée'],
+                datasets: [{
+                    label: 'Nombre de commandes',
+                    data: Array.isArray(evolutionNbCommandes) && evolutionNbCommandes.length > 0 ? evolutionNbCommandes : [0],
+                    backgroundColor: 'rgba(17, 153, 142, 0.8)',
+                    borderColor: '#11998e',
+                    borderWidth: 2,
+                    borderRadius: 8
+                }]
             },
-            tooltip: {
-                backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                padding: 12,
-                callbacks: {
-                    label: function(context) {
-                        const value = context.parsed.y;
-                        if (value >= 1000000) {
-                            return (value / 1000000).toFixed(2) + ' M FCFA';
-                        } else if (value >= 1000) {
-                            return (value / 1000).toFixed(1) + ' K FCFA';
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            font: { size: 12, weight: 'bold' },
+                            padding: 15
                         }
-                        return value.toLocaleString('fr-FR') + ' FCFA';
-                    }
-                }
-            }
-        },
-        scales: {
-            y: {
-                beginAtZero: true,
-                ticks: { 
-                    font: { size: 11 },
-                    callback: function(value) {
-                        if (value >= 1000000) {
-                            return (value / 1000000).toFixed(1) + 'M';
-                        } else if (value >= 1000) {
-                            return (value / 1000).toFixed(0) + 'K';
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        callbacks: {
+                            label: function(context) {
+                                return context.parsed.y + ' commande(s)';
+                            }
                         }
-                        return value;
                     }
                 },
-                grid: { color: 'rgba(0, 0, 0, 0.05)' },
-                title: {
-                    display: true,
-                    text: 'Montant (FCFA)',
-                    font: { size: 12, weight: 'bold' }
-                }
-            },
-            x: {
-                grid: { display: false },
-                title: {
-                    display: true,
-                    text: 'Date',
-                    font: { size: 12, weight: 'bold' }
-                }
-            }
-        },
-        animation: {
-            duration: 2000,
-            easing: 'easeOutBounce'
-        }
-    }
-});
-
-// Graphique de répartition par statut
-const statusCtx = document.getElementById('statusChart').getContext('2d');
-const statusChart = new Chart(statusCtx, {
-    type: 'doughnut',
-    data: {
-        labels: ['Brouillon', 'Envoyée', 'En cours', 'Livrée', 'Annulée'],
-        datasets: [{
-            data: [
-                {{ commandes_brouillon }},
-                {{ commandes_envoyees }},
-                {{ commandes_en_cours }},
-                {{ commandes_livrees }},
-                0
-            ],
-            backgroundColor: [
-                'rgba(108, 117, 125, 0.8)',
-                'rgba(13, 110, 253, 0.8)',
-                'rgba(255, 193, 7, 0.8)',
-                'rgba(40, 167, 69, 0.8)',
-                'rgba(220, 53, 69, 0.8)'
-            ],
-            borderColor: [
-                '#6c757d',
-                '#0d6efd',
-                '#ffc107',
-                '#28a745',
-                '#dc3545'
-            ],
-            borderWidth: 3,
-            hoverOffset: 10
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                position: 'bottom',
-                labels: {
-                    font: { size: 11, weight: 'bold' },
-                    padding: 12
-                }
-            },
-            tooltip: {
-                backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                padding: 12,
-                callbacks: {
-                    label: function(context) {
-                        let label = context.label || '';
-                        if (label) {
-                            label += ': ';
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { 
+                            font: { size: 11 },
+                            stepSize: 1,
+                            precision: 0
+                        },
+                        grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                        title: {
+                            display: true,
+                            text: 'Nombre de commandes',
+                            font: { size: 12, weight: 'bold' }
                         }
-                        label += context.parsed + ' commande(s)';
-                        return label;
-                    }
-                }
-            }
-        },
-        animation: {
-            animateRotate: true,
-            animateScale: true,
-            duration: 2000
-        }
-    }
-});
-
-// Graphique Top Fournisseurs
-const suppliersCtx = document.getElementById('suppliersChart').getContext('2d');
-const suppliersChart = new Chart(suppliersCtx, {
-    type: 'bar',
-    data: {
-        labels: [{% for supplier in top_fournisseurs %}'{{ supplier.nom_fournisseur|truncatewords:3 }}'{% if not forloop.last %},{% endif %}{% endfor %}],
-        datasets: [{
-            label: 'Montant Total (FCFA)',
-            data: [{% for supplier in top_fournisseurs %}{{ supplier.total|floatformat:0 }}{% if not forloop.last %},{% endif %}{% endfor %}],
-            backgroundColor: 'rgba(17, 153, 142, 0.8)',
-            borderColor: '#11998e',
-            borderWidth: 2,
-            borderRadius: 8,
-            borderSkipped: false
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        indexAxis: 'y',
-        plugins: {
-            legend: {
-                display: false
-            },
-            tooltip: {
-                backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                padding: 12,
-                callbacks: {
-                    label: function(context) {
-                        return 'Montant: ' + context.parsed.x.toLocaleString('fr-FR') + ' FCFA';
-                    }
-                }
-            }
-        },
-        scales: {
-            x: {
-                beginAtZero: true,
-                ticks: {
-                    font: { size: 11 },
-                    callback: function(value) {
-                        return (value / 1000).toFixed(0) + 'k';
+                    },
+                    x: {
+                        grid: { display: false },
+                        title: {
+                            display: true,
+                            text: 'Date',
+                            font: { size: 12, weight: 'bold' }
+                        }
                     }
                 },
-                grid: { color: 'rgba(0, 0, 0, 0.05)' }
-            },
-            y: {
-                ticks: { font: { size: 10 } },
-                grid: { display: false }
+                animation: {
+                    duration: 2000,
+                    easing: 'easeOutBounce'
+                }
             }
-        },
-        animation: {
-            duration: 2000,
-            easing: 'easeOutBounce'
-        }
+        });
     }
-});
+
+    // Graphique du montant des commandes
+    const amountChartEl = document.getElementById('amountChart');
+    if (!amountChartEl) {
+        console.warn('Élément amountChart non trouvé');
+    } else {
+        const amountCtx = amountChartEl.getContext('2d');
+        const amountChart = new Chart(amountCtx, {
+            type: 'bar',
+            data: {
+                labels: Array.isArray(evolutionLabels) && evolutionLabels.length > 0 ? evolutionLabels : ['Aucune donnée'],
+                datasets: [{
+                    label: 'Montant total (FCFA)',
+                    data: Array.isArray(evolutionMontants) && evolutionMontants.length > 0 ? evolutionMontants : [0],
+                    backgroundColor: 'rgba(45, 27, 105, 0.8)',
+                    borderColor: '#2d1b69',
+                    borderWidth: 2,
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            font: { size: 12, weight: 'bold' },
+                            padding: 15
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.parsed.y || 0;
+                                if (value >= 1000000) {
+                                    return (value / 1000000).toFixed(2) + ' M FCFA';
+                                } else if (value >= 1000) {
+                                    return (value / 1000).toFixed(1) + ' K FCFA';
+                                }
+                                return value.toLocaleString('fr-FR') + ' FCFA';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { 
+                            font: { size: 11 },
+                            callback: function(value) {
+                                if (value >= 1000000) {
+                                    return (value / 1000000).toFixed(1) + 'M';
+                                } else if (value >= 1000) {
+                                    return (value / 1000).toFixed(0) + 'K';
+                                }
+                                return value;
+                            }
+                        },
+                        grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                        title: {
+                            display: true,
+                            text: 'Montant (FCFA)',
+                            font: { size: 12, weight: 'bold' }
+                        }
+                    },
+                    x: {
+                        grid: { display: false },
+                        title: {
+                            display: true,
+                            text: 'Date',
+                            font: { size: 12, weight: 'bold' }
+                        }
+                    }
+                },
+                animation: {
+                    duration: 2000,
+                    easing: 'easeOutBounce'
+                }
+            }
+        });
+    }
+
+    // Graphique de répartition par statut
+    const statusChartEl = document.getElementById('statusChart');
+    if (!statusChartEl) {
+        console.warn('Élément statusChart non trouvé');
+    } else {
+        const statusCtx = statusChartEl.getContext('2d');
+        const statusData = [
+            {{ commandes_brouillon|default:0 }},
+            {{ commandes_envoyees|default:0 }},
+            {{ commandes_en_cours|default:0 }},
+            {{ commandes_livrees|default:0 }}
+        ];
+        // Filtrer les labels et données pour ne pas afficher les statuts avec 0 commande
+        // Note: On exclut complètement "Annulée" car elle n'est jamais utilisée
+        const statusLabels = ['Brouillon', 'Envoyée', 'En cours', 'Livrée'];
+        const filteredLabels = [];
+        const filteredData = [];
+        const filteredBgColors = [];
+        const filteredBorderColors = [];
+        const bgColors = [
+            'rgba(108, 117, 125, 0.8)',
+            'rgba(13, 110, 253, 0.8)',
+            'rgba(255, 193, 7, 0.8)',
+            'rgba(40, 167, 69, 0.8)'
+        ];
+        const borderColors = [
+            '#6c757d',
+            '#0d6efd',
+            '#ffc107',
+            '#28a745'
+        ];
+        
+        for (let i = 0; i < statusData.length; i++) {
+            if (statusData[i] > 0) {
+                filteredLabels.push(statusLabels[i]);
+                filteredData.push(statusData[i]);
+                filteredBgColors.push(bgColors[i]);
+                filteredBorderColors.push(borderColors[i]);
+            }
+        }
+        
+        // Si aucune donnée, afficher un message
+        if (filteredData.length === 0) {
+            filteredLabels.push('Aucune commande');
+            filteredData.push(1);
+            filteredBgColors.push('rgba(200, 200, 200, 0.8)');
+            filteredBorderColors.push('#c8c8c8');
+        }
+        
+        const statusChart = new Chart(statusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: filteredLabels,
+                datasets: [{
+                    data: filteredData,
+                    backgroundColor: filteredBgColors,
+                    borderColor: filteredBorderColors,
+                    borderWidth: 3,
+                    hoverOffset: 10
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            font: { size: 11, weight: 'bold' },
+                            padding: 12
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                label += context.parsed + ' commande(s)';
+                                return label;
+                            }
+                        }
+                    }
+                },
+                animation: {
+                    animateRotate: true,
+                    animateScale: true,
+                    duration: 2000
+                }
+            }
+        });
+    }
+
+    // Graphique Top Fournisseurs
+    const suppliersChartEl = document.getElementById('suppliersChart');
+    if (!suppliersChartEl) {
+        console.warn('Élément suppliersChart non trouvé');
+    } else {
+        const suppliersCtx = suppliersChartEl.getContext('2d');
+        const suppliersLabels = Array.isArray(topFournisseursLabels) && topFournisseursLabels.length > 0 ? topFournisseursLabels : ['Aucun fournisseur'];
+        const suppliersMontants = Array.isArray(topFournisseursMontants) && topFournisseursMontants.length > 0 ? topFournisseursMontants : [0];
+        
+        const suppliersChart = new Chart(suppliersCtx, {
+            type: 'bar',
+            data: {
+                labels: suppliersLabels,
+                datasets: [{
+                    label: 'Montant Total (FCFA)',
+                    data: suppliersMontants,
+                    backgroundColor: 'rgba(17, 153, 142, 0.8)',
+                    borderColor: '#11998e',
+                    borderWidth: 2,
+                    borderRadius: 8,
+                    borderSkipped: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.parsed.x || 0;
+                                return 'Montant: ' + value.toLocaleString('fr-FR') + ' FCFA';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: {
+                            font: { size: 11 },
+                            callback: function(value) {
+                                if (value >= 1000000) {
+                                    return (value / 1000000).toFixed(1) + 'M';
+                                } else if (value >= 1000) {
+                                    return (value / 1000).toFixed(0) + 'k';
+                                }
+                                return value;
+                            }
+                        },
+                        grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                    },
+                    y: {
+                        ticks: { font: { size: 10 } },
+                        grid: { display: false }
+                    }
+                },
+                animation: {
+                    duration: 2000,
+                    easing: 'easeOutBounce'
+                }
+            }
+        });
+    }
+} catch (error) {
+    console.error('Erreur lors de l\'initialisation des graphiques:', error);
+    // Les erreurs sont loggées dans la console, pas besoin d'afficher un message visible
+}
 </script>
 
 </body>

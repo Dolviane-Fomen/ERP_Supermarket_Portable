@@ -8418,8 +8418,8 @@ def suivi_client(request):
         date=date_selectionnee
     ).select_related('client', 'article').order_by('client', 'heure', 'article').distinct()
     
-    # Utiliser un set pour éviter de compter deux fois la même commande
-    commandes_deja_comptees = set()
+    # Dictionnaire temporaire pour regrouper les commandes par (client_id, date, heure)
+    commandes_groupes = {}
     
     for cmd in commandes:
         client_id = cmd.client.id
@@ -8433,23 +8433,44 @@ def suivi_client(request):
         if plage_code not in commandes_dict[client_id]:
             commandes_dict[client_id][plage_code] = []
         
-        # Créer une clé unique pour éviter les doublons : (client_id, date, heure, article_id)
-        cmd_key = (client_id, str(cmd.date), str(cmd.heure) if cmd.heure else '', cmd.article.id if cmd.article else None)
+        # Créer une clé unique pour regrouper les articles d'une même commande : (client_id, date, heure)
+        cmd_group_key = (client_id, str(cmd.date), str(cmd.heure) if cmd.heure else '')
         
-        # Ne compter qu'une seule fois chaque commande unique
-        if cmd_key not in commandes_deja_comptees:
-            commandes_totaux[client_id] += float(cmd.prix_total)
-            commandes_deja_comptees.add(cmd_key)
+        # Initialiser le groupe si nécessaire
+        if cmd_group_key not in commandes_groupes:
+            commandes_groupes[cmd_group_key] = {
+                'plage_code': plage_code,
+                'heure': cmd.heure.strftime('%H:%M') if cmd.heure else '',
+                'date': cmd.date.strftime('%d/%m/%Y'),
+                'articles': [],
+                'prix_total': 0.0,
+                'deja_compte': False
+            }
         
-        # Formater les informations de la commande
+        # Ajouter l'article au groupe
         quantite_int = int(cmd.quantite) if cmd.quantite else 0
-        article_str = f"{cmd.article.designation if cmd.article else 'N/A'}*{quantite_int}PCS (Qté: {float(cmd.quantite)}) ({cmd.date.strftime('%d/%m/%Y')} {cmd.heure.strftime('%H:%M') if cmd.heure else ''})"
+        article_str = f"{cmd.article.designation if cmd.article else 'N/A'}*{quantite_int}PCS (Qté: {float(cmd.quantite)})"
+        commandes_groupes[cmd_group_key]['articles'].append(article_str)
+        
+        # Ajouter le prix total (une seule fois par groupe)
+        if not commandes_groupes[cmd_group_key]['deja_compte']:
+            commandes_totaux[client_id] += float(cmd.prix_total)
+            commandes_groupes[cmd_group_key]['prix_total'] += float(cmd.prix_total)
+            commandes_groupes[cmd_group_key]['deja_compte'] = True
+    
+    # Convertir les groupes en format final pour commandes_dict
+    for cmd_group_key, groupe_data in commandes_groupes.items():
+        client_id = cmd_group_key[0]
+        plage_code = groupe_data['plage_code']
+        
+        # Créer une seule entrée avec tous les articles regroupés
+        articles_str = ' | '.join(groupe_data['articles'])
         
         commandes_dict[client_id][plage_code].append({
-            'article': article_str,
-            'heure': cmd.heure.strftime('%H:%M') if cmd.heure else '',
-            'quantite': float(cmd.quantite),
-            'prix_total': float(cmd.prix_total),
+            'article': articles_str,
+            'heure': groupe_data['heure'],
+            'quantite': sum(1 for _ in groupe_data['articles']),  # Nombre d'articles
+            'prix_total': groupe_data['prix_total'],
         })
     
     context = {
@@ -9140,31 +9161,31 @@ def export_rapport_acm_excel(request):
         row = start_row + 1
         for client in clients_export:
             try:
-                # Colonnes fixes
+                # Colonnes fixes - Alignement vertical 'top' pour rester compactes même si la ligne est haute
                 ws.cell(row=row, column=1, value=client['detail']).border = border
                 ws.cell(row=row, column=1).fill = fill_blanc
                 ws.cell(row=row, column=1).font = data_font
-                ws.cell(row=row, column=1).alignment = Alignment(horizontal='left', vertical='center')
+                ws.cell(row=row, column=1).alignment = Alignment(horizontal='left', vertical='top')
                 
                 ws.cell(row=row, column=2, value=client['ref']).border = border
                 ws.cell(row=row, column=2).fill = fill_blanc
                 ws.cell(row=row, column=2).font = data_font
-                ws.cell(row=row, column=2).alignment = Alignment(horizontal='left', vertical='center')
+                ws.cell(row=row, column=2).alignment = Alignment(horizontal='left', vertical='top')
                 
                 ws.cell(row=row, column=3, value=client['potentiel']).border = border
                 ws.cell(row=row, column=3).fill = fill_blanc
                 ws.cell(row=row, column=3).font = data_font
-                ws.cell(row=row, column=3).alignment = Alignment(horizontal='left', vertical='center')
+                ws.cell(row=row, column=3).alignment = Alignment(horizontal='left', vertical='top')
                 
                 ws.cell(row=row, column=4, value=client['nom']).border = border
                 ws.cell(row=row, column=4).fill = fill_blanc
                 ws.cell(row=row, column=4).font = Font(bold=True, size=10, name='Calibri')
-                ws.cell(row=row, column=4).alignment = Alignment(horizontal='left', vertical='center')
+                ws.cell(row=row, column=4).alignment = Alignment(horizontal='left', vertical='top')
                 
                 ws.cell(row=row, column=5, value=client['telephone']).border = border
                 ws.cell(row=row, column=5).fill = fill_blanc
                 ws.cell(row=row, column=5).font = data_font
-                ws.cell(row=row, column=5).alignment = Alignment(horizontal='left', vertical='center')
+                ws.cell(row=row, column=5).alignment = Alignment(horizontal='left', vertical='top')
                 
                 # Pour chaque plage horaire, créer 3 colonnes : Heure, Commandes, Total
                 col = 6
@@ -9172,30 +9193,86 @@ def export_rapport_acm_excel(request):
                 commandes_par_plage = client.get('commandes_par_plage', {})
                 totaux_par_plage = client.get('totaux_par_plage', {})
                 
+                # CALCULER LA HAUTEUR TOTALE NÉCESSAIRE AVANT DE REMPLIR LES CELLULES
+                # Compter tous les articles de toutes les plages horaires pour cette ligne
+                total_lignes_articles = 0
+                max_lignes_par_plage = 0
+                
+                for plage_code, plage_label in PLAGES_HORAIRES:
+                    commandes_list = commandes_par_plage.get(plage_code, [])
+                    lignes_plage = 0
+                    
+                    for cmd in commandes_list:
+                        if cmd.get('articles'):
+                            articles_str = cmd['articles']
+                            # Compter les retours à la ligne explicites (\n)
+                            lignes_explicites = articles_str.count('\n')
+                            # Compter les doubles retours à la ligne (\n\n) qui séparent les articles
+                            lignes_doubles = articles_str.count('\n\n')
+                            # Compter les virgules suivies d'espaces (séparateurs d'articles)
+                            articles_separes_par_virgule = len([a for a in articles_str.split(', ') if a.strip()])
+                            
+                            # Prendre le maximum de toutes ces méthodes de comptage
+                            lignes_article = max(
+                                lignes_explicites + 1,  # Au moins 1 ligne même sans \n
+                                lignes_doubles + 1,      # Articles séparés par \n\n
+                                articles_separes_par_virgule  # Articles séparés par virgule
+                            )
+                            lignes_plage += lignes_article
+                    
+                    # Garder le maximum de lignes par plage (car chaque plage est dans une colonne séparée)
+                    if lignes_plage > max_lignes_par_plage:
+                        max_lignes_par_plage = lignes_plage
+                    total_lignes_articles += lignes_plage
+                
+                # Calculer la hauteur nécessaire :
+                # - Minimum 20px (hauteur normale) pour une ligne vide ou avec peu de contenu
+                # - 18px par ligne d'article pour un affichage compact mais lisible
+                # - Utiliser le maximum entre toutes les plages (car c'est la colonne la plus haute qui détermine la hauteur)
+                # - Ne commencer à augmenter la hauteur qu'à partir de 2 lignes d'articles
+                if max_lignes_par_plage <= 1:
+                    hauteur_ligne_totale = 20  # Hauteur normale pour les lignes avec peu ou pas d'articles
+                else:
+                    # Augmenter la hauteur seulement si nécessaire (2 lignes ou plus)
+                    hauteur_ligne_totale = 20 + ((max_lignes_par_plage - 1) * 18)
+                # Limiter à un maximum raisonnable (400px pour éviter des lignes trop hautes)
+                hauteur_ligne_totale = min(400, hauteur_ligne_totale)
+                
                 for plage_code, plage_label in PLAGES_HORAIRES:
                     # Récupérer les actions et commandes pour cette plage
                     actions_list = actions_par_plage.get(plage_code, [])
                     commandes_list = commandes_par_plage.get(plage_code, [])
                     
-                    # Colonne Heure : concaténer toutes les heures (actions + commandes)
-                    heures_set = set()
-                    for action in actions_list:
-                        if action.get('heure_appel'):
-                            heures_set.add(action['heure_appel'])
-                    for cmd in commandes_list:
-                        if cmd.get('heure'):
-                            heures_set.add(cmd['heure'])
-                    heures_str = ', '.join(sorted(heures_set)) if heures_set else ''
+                    # Colonne Heure : prendre une seule heure (la première commande ou la première action)
+                    heure_unique = ''
+                    if commandes_list:
+                        # Prendre l'heure de la première commande
+                        heure_unique = commandes_list[0].get('heure', '')
+                    elif actions_list:
+                        # Sinon, prendre l'heure de la première action
+                        heure_unique = actions_list[0].get('heure_appel', '')
                     
-                    # Colonne Commandes : concaténer toutes les actions et commandes
+                    # Colonne Commandes : afficher les actions et commandes de manière organisée
                     commandes_str_parts = []
-                    for action in actions_list:
-                        if action.get('action'):
-                            commandes_str_parts.append(action['action'])
+                    
+                    # PRIORITÉ : Ajouter d'abord les commandes avec leurs articles (plus important)
                     for cmd in commandes_list:
                         if cmd.get('articles'):
-                            commandes_str_parts.append(cmd['articles'])
-                    commandes_str = ' | '.join(commandes_str_parts) if commandes_str_parts else ''
+                            # Séparer les articles par des retours à la ligne pour meilleure lisibilité
+                            articles_str = cmd['articles'].replace(', ', '\n')
+                            commandes_str_parts.append(articles_str)
+                    
+                    # Ensuite, ajouter les actions (si pas de commandes ou en complément)
+                    for action in actions_list:
+                        if action.get('action'):
+                            # Ne pas ajouter les actions si on a déjà des commandes (pour éviter la confusion)
+                            # Sauf si l'action est importante (pas juste "rappeler plus tard")
+                            action_text = action['action'].lower().strip()
+                            if not commandes_str_parts or action_text not in ['rappeler plus tard', 'rappel plus tard']:
+                                commandes_str_parts.append(action['action'])
+                    
+                    # Joindre avec des retours à la ligne pour séparer clairement chaque élément
+                    commandes_str = '\n\n'.join(commandes_str_parts) if commandes_str_parts else ''
                     
                     # Déterminer la couleur selon les actions
                     row_fill = fill_blanc
@@ -9206,34 +9283,43 @@ def export_rapport_acm_excel(request):
                                 row_fill = action_fill
                                 break
                     
-                    # Colonne Heure
-                    ws.cell(row=row, column=col, value=heures_str).border = border
+                    # Colonne Heure - Alignement 'top' pour rester compacte
+                    ws.cell(row=row, column=col, value=heure_unique).border = border
                     ws.cell(row=row, column=col).fill = row_fill
                     ws.cell(row=row, column=col).font = data_font
-                    ws.cell(row=row, column=col).alignment = Alignment(horizontal='center', vertical='center')
+                    ws.cell(row=row, column=col).alignment = Alignment(horizontal='center', vertical='top')
                     col += 1
                     
                     # Colonne Commandes
-                    ws.cell(row=row, column=col, value=commandes_str).border = border
-                    ws.cell(row=row, column=col).fill = row_fill
-                    ws.cell(row=row, column=col).font = data_font
-                    ws.cell(row=row, column=col).alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
+                    cell_commandes = ws.cell(row=row, column=col, value=commandes_str)
+                    cell_commandes.border = border
+                    cell_commandes.fill = row_fill
+                    cell_commandes.font = data_font
+                    cell_commandes.alignment = Alignment(horizontal='left', vertical='top', wrap_text=True)
                     col += 1
                     
-                    # Colonne Total pour cette plage
+                    # Colonne Total pour cette plage - Alignement 'top' pour rester compacte
                     total_plage = totaux_par_plage.get(plage_code, 0)
                     ws.cell(row=row, column=col, value=float(total_plage) if total_plage > 0 else '').border = border
                     ws.cell(row=row, column=col).fill = row_fill
                     ws.cell(row=row, column=col).font = data_font
-                    ws.cell(row=row, column=col).alignment = Alignment(horizontal='right', vertical='center')
+                    ws.cell(row=row, column=col).alignment = Alignment(horizontal='right', vertical='top')
                     col += 1
                 
-                # Colonne Total général
+                # Colonne Total général - Alignement 'top' pour rester compacte
                 total_client = client.get('total', 0)
                 ws.cell(row=row, column=col, value=float(total_client) if total_client > 0 else '').border = border
                 ws.cell(row=row, column=col).fill = fill_blanc
                 ws.cell(row=row, column=col).font = Font(bold=True, size=10, name='Calibri')
-                ws.cell(row=row, column=col).alignment = Alignment(horizontal='right', vertical='center')
+                ws.cell(row=row, column=col).alignment = Alignment(horizontal='right', vertical='top')
+                
+                # APPLIQUER LA HAUTEUR CALCULÉE UNE SEULE FOIS POUR TOUTE LA LIGNE
+                # Utiliser la hauteur normale (20px) si pas d'articles, sinon utiliser la hauteur calculée
+                if max_lignes_par_plage == 0:
+                    ws.row_dimensions[row].height = 20  # Hauteur normale Excel
+                else:
+                    ws.row_dimensions[row].height = hauteur_ligne_totale
+                print(f"[DEBUG] Ligne {row} - Hauteur définie à {ws.row_dimensions[row].height}px pour {max_lignes_par_plage} lignes max par plage")
                 
                 row += 1
                 
@@ -9480,21 +9566,83 @@ def export_rapport_acm_excel(request):
             
             stats_data_row += 1
         
-        # Ajuster les largeurs de colonnes pour un meilleur affichage
+        # Note: Les hauteurs de lignes sont calculées dynamiquement pour chaque ligne selon le nombre d'articles
+        # Note: Les largeurs de colonnes seront définies juste avant la sauvegarde pour garantir leur application
+        
+        # FORCER les largeurs de colonnes juste avant la sauvegarde
+        # Calculer la largeur maximale nécessaire pour les colonnes Commandes
+        from openpyxl.utils import column_index_from_string
+        
+        max_commandes_width = 15  # Largeur minimale
+        
+        # Parcourir toutes les cellules de commandes pour trouver la longueur maximale
+        commandes_columns = ['G', 'J', 'M', 'P', 'S']  # Colonnes Commandes pour chaque plage
+        for col_letter in commandes_columns:
+            col_idx = column_index_from_string(col_letter)
+            for row_idx in range(start_row + 2, row + 1):  # +2 car start_row est après les en-têtes
+                cell = ws.cell(row=row_idx, column=col_idx)
+                if cell.value:
+                    cell_text = str(cell.value)
+                    # Estimer la largeur nécessaire : environ 1 caractère = 1 unité de largeur
+                    # Mais tenir compte des retours à la ligne
+                    lines = cell_text.split('\n')
+                    max_line_length = max(len(line) for line in lines) if lines else 0
+                    # Ajouter un peu de marge (environ 1.2x pour la police)
+                    estimated_width = max_line_length * 1.2
+                    if estimated_width > max_commandes_width:
+                        max_commandes_width = estimated_width
+        
+        # Réduire la largeur de la colonne Commandes - utiliser une valeur plus raisonnable
+        # Minimum 60 pour afficher les articles, maximum 100 pour ne pas prendre trop de place
+        commandes_width = max(60, min(100, int(max_commandes_width * 0.8)) if max_commandes_width > 15 else 70)
+        
         # Colonnes fixes : DETAIL, REF, POTENTIEL, NOMS, TELEPHONES
-        column_widths = [30, 18, 15, 25, 18]
-        # Pour chaque plage horaire : Heure, Commandes, Total
-        for _ in PLAGES_HORAIRES:
-            column_widths.extend([15, 40, 15])
+        ws.column_dimensions['A'].width = 30
+        ws.column_dimensions['B'].width = 18
+        ws.column_dimensions['C'].width = 15
+        ws.column_dimensions['D'].width = 25
+        ws.column_dimensions['E'].width = 18
+        
+        # Colonnes pour chaque plage horaire (5 plages)
+        # Plage 1: F=Heure(12), G=Commandes(70), H=Total(12)
+        ws.column_dimensions['F'].width = 12
+        col_g = ws.column_dimensions['G']
+        col_g.width = commandes_width
+        col_g.bestFit = False
+        ws.column_dimensions['H'].width = 12
+        
+        # Plage 2: I=Heure(12), J=Commandes(70), K=Total(12)
+        ws.column_dimensions['I'].width = 12
+        col_j = ws.column_dimensions['J']
+        col_j.width = commandes_width
+        col_j.bestFit = False
+        ws.column_dimensions['K'].width = 12
+        
+        # Plage 3: L=Heure(12), M=Commandes(70), N=Total(12)
+        ws.column_dimensions['L'].width = 12
+        col_m = ws.column_dimensions['M']
+        col_m.width = commandes_width
+        col_m.bestFit = False
+        ws.column_dimensions['N'].width = 12
+        
+        # Plage 4: O=Heure(12), P=Commandes(70), Q=Total(12)
+        ws.column_dimensions['O'].width = 12
+        col_p = ws.column_dimensions['P']
+        col_p.width = commandes_width
+        col_p.bestFit = False
+        ws.column_dimensions['Q'].width = 12
+        
+        # Plage 5: R=Heure(12), S=Commandes(70), T=Total(12)
+        ws.column_dimensions['R'].width = 12
+        col_s = ws.column_dimensions['S']
+        col_s.width = commandes_width
+        col_s.bestFit = False
+        ws.column_dimensions['T'].width = 12
+        
         # Colonne Total général
-        column_widths.append(18)
+        ws.column_dimensions['U'].width = 18
         
-        for col_idx, width in enumerate(column_widths, 1):
-            ws.column_dimensions[get_column_letter(col_idx)].width = width
-        
-        # Ajuster la hauteur des lignes de données
-        for r in range(start_row + 1, row + 1):
-            ws.row_dimensions[r].height = 20
+        print(f"[DEBUG] Largeurs de colonnes FORCÉES - Colonnes Commandes (G, J, M, P, S) définies à {commandes_width} (calculé dynamiquement)")
         
         # Réponse HTTP avec le fichier Excel
         from django.http import HttpResponse

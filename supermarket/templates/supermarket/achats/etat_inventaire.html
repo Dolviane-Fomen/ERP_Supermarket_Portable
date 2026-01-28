@@ -400,11 +400,6 @@
             <span>Consulter Bons de Commande</span>
         </a>
         
-        <a href="#" class="menu-item">
-            <i class="fas fa-clipboard-list icon"></i>
-            <span>Suivi Commande Fournisseur</span>
-        </a>
-        
         <a href="{% url 'etat_livraison' %}" class="menu-item {% if request.resolver_match.url_name == 'etat_livraison' %}active{% endif %}">
             <i class="fas fa-truck icon"></i>
             <span>État Livraison</span>

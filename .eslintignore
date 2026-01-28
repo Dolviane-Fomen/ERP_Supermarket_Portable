@@ -1,0 +1,2 @@
+# Ignorer les templates Django avec du JavaScript
+supermarket/templates/**/*.html
