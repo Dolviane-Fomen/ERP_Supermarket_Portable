@@ -1182,7 +1182,7 @@ class CommandeFournisseur(models.Model):
         ('livree', 'Livrée'),
         ('annulee', 'Annulée'),
     ]
-    
+    delai_paiement = models.DateField(null=True, blank=True, verbose_name="Échéance de paiement")
     numero_commande = models.CharField(max_length=50, unique=True, verbose_name="Numéro de commande")
     date_commande = models.DateField(verbose_name="Date de commande")
     date_livraison_prevue = models.DateField(verbose_name="Date de livraison prévue")
@@ -1234,6 +1234,8 @@ class CommandeFournisseur(models.Model):
 
 class LigneCommandeFournisseur(models.Model):
     """Modèle pour les lignes d'un bon de commande fournisseur"""
+
+    delai_paiement = models.DateField(null=True, blank=True, verbose_name="Échéance de paiement")
     commande = models.ForeignKey(CommandeFournisseur, on_delete=models.CASCADE, related_name='lignes', verbose_name="Commande")
     article = models.ForeignKey('Article', on_delete=models.CASCADE, verbose_name="Article")
     quantite = models.DecimalField(max_digits=10, decimal_places=3, verbose_name="Quantité")

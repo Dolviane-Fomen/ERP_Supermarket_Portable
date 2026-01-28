@@ -269,6 +269,7 @@ urlpatterns = [
     path('achats/bon-commande/<int:commande_id>/modifier/', views.modifier_bon_commande, name='modifier_bon_commande'),
     path('achats/bon-commande/<int:commande_id>/supprimer/', views.supprimer_bon_commande, name='supprimer_bon_commande'),
     path('achats/bon-commande/<int:commande_id>/pdf/', views.generer_bon_commande_pdf, name='generer_bon_commande_pdf'),
+    path('achats/export-commandes-excel/', views.export_commandes_achats_excel, name='export_commandes_achats_excel'),
     path('achats/get-fournisseur/<int:fournisseur_id>/', views.get_fournisseur_ajax, name='get_fournisseur_ajax'),
     path('achats/etat-livraison/', views.etat_livraison, name='etat_livraison'),
     path('achats/etat-inventaire/', views.etat_inventaire, name='etat_inventaire'),
