@@ -18,9 +18,37 @@ jobs:
         username: ${{ secrets.OVH_USER }}
         key: ${{ secrets.OVH_SSH_KEY }}
         port: 22
+        timeout: 300s
         script: |
+          set -e  # Arrêter en cas d'erreur
+          set -x  # Afficher les commandes exécutées
+          
+          echo "🚀 Début du déploiement..."
+          echo "📂 Chemin du projet: ${{ secrets.OVH_PROJECT_PATH }}"
+          
+          # Vérifier que le répertoire existe
+          if [ ! -d "${{ secrets.OVH_PROJECT_PATH }}" ]; then
+            echo "❌ ERREUR: Le répertoire ${{ secrets.OVH_PROJECT_PATH }} n'existe pas!"
+            exit 1
+          fi
+          
           cd ${{ secrets.OVH_PROJECT_PATH }}
+          echo "✅ Répertoire changé vers: $(pwd)"
+          
+          # Vérifier que venv existe
+          if [ ! -d "venv" ]; then
+            echo "❌ ERREUR: L'environnement virtuel 'venv' n'existe pas!"
+            exit 1
+          fi
+          
           source venv/bin/activate
+          echo "✅ Environnement virtuel activé"
+          
+          # Vérifier Git
+          if ! command -v git &> /dev/null; then
+            echo "❌ ERREUR: Git n'est pas installé!"
+            exit 1
+          fi
           
           # Sauvegarder les modifications locales si elles existent
           if ! git diff-index --quiet HEAD -- 2>/dev/null; then
@@ -29,42 +57,83 @@ jobs:
           fi
           
           # Récupérer et forcer la mise à jour depuis GitHub
-          git fetch origin main
-          git reset --hard origin/main
+          echo "📥 Récupération depuis GitHub..."
+          git fetch origin main || {
+            echo "❌ ERREUR: Impossible de récupérer depuis GitHub"
+            exit 1
+          }
+          
+          git reset --hard origin/main || {
+            echo "❌ ERREUR: Impossible de mettre à jour le code"
+            exit 1
+          }
           echo "✅ Code à jour avec GitHub"
           
           # Installer les dépendances
-          pip install --upgrade pip
-          pip install -r requirements.txt
+          echo "📦 Installation des dépendances..."
+          pip install --upgrade pip || {
+            echo "❌ ERREUR: Impossible de mettre à jour pip"
+            exit 1
+          }
+          
+          pip install -r requirements.txt || {
+            echo "❌ ERREUR: Impossible d'installer les dépendances"
+            exit 1
+          }
+          echo "✅ Dépendances installées"
           
           # Migrations et fichiers statiques
-          DJANGO_SETTINGS_MODULE=erp_project.settings_production python manage.py migrate --noinput
-          DJANGO_SETTINGS_MODULE=erp_project.settings_production python manage.py collectstatic --noinput
+          echo "🗄️  Exécution des migrations..."
+          DJANGO_SETTINGS_MODULE=erp_project.settings_production python manage.py migrate --noinput || {
+            echo "❌ ERREUR: Les migrations ont échoué"
+            exit 1
+          }
+          echo "✅ Migrations terminées"
+          
+          echo "📁 Collecte des fichiers statiques..."
+          DJANGO_SETTINGS_MODULE=erp_project.settings_production python manage.py collectstatic --noinput || {
+            echo "❌ ERREUR: La collecte des fichiers statiques a échoué"
+            exit 1
+          }
+          echo "✅ Fichiers statiques collectés"
           
           # Redémarrer Gunicorn (plusieurs méthodes pour être sûr)
           echo "🔄 Redémarrage de Gunicorn..."
           
           # Méthode 1: systemd service erp
-          sudo systemctl restart erp 2>/dev/null && echo "✅ Service 'erp' redémarré" || true
+          if sudo systemctl list-unit-files | grep -q "erp.service"; then
+            echo "📦 Tentative de redémarrage via systemd (service erp)..."
+            sudo systemctl restart erp && echo "✅ Service 'erp' redémarré" || echo "⚠️  Service 'erp' non disponible"
+          fi
           
           # Méthode 2: systemd service gunicorn
-          sudo systemctl restart gunicorn 2>/dev/null && echo "✅ Service 'gunicorn' redémarré" || true
+          if sudo systemctl list-unit-files | grep -q "gunicorn.service"; then
+            echo "📦 Tentative de redémarrage via systemd (service gunicorn)..."
+            sudo systemctl restart gunicorn && echo "✅ Service 'gunicorn' redémarré" || echo "⚠️  Service 'gunicorn' non disponible"
+          fi
           
           # Méthode 3: Redémarrer via processus si systemd n'est pas disponible
           if ! sudo systemctl is-active --quiet erp 2>/dev/null && ! sudo systemctl is-active --quiet gunicorn 2>/dev/null; then
-            echo "⚠️  Aucun service systemd, redémarrage via processus..."
+            echo "⚠️  Aucun service systemd actif, redémarrage via processus..."
             pkill -f "gunicorn.*erp_project.wsgi:application" 2>/dev/null || true
-            sleep 1
+            sleep 2
             cd ${{ secrets.OVH_PROJECT_PATH }}
             source venv/bin/activate
-            nohup gunicorn --config gunicorn_config.py --daemon erp_project.wsgi:application > /dev/null 2>&1 || true
+            nohup gunicorn --config gunicorn_config.py --daemon erp_project.wsgi:application > /tmp/gunicorn.log 2>&1 || {
+              echo "❌ ERREUR: Impossible de démarrer Gunicorn"
+              echo "📋 Logs:"
+              cat /tmp/gunicorn.log || true
+              exit 1
+            }
+            echo "✅ Gunicorn démarré via processus"
           fi
           
-          sleep 2
+          sleep 3
           if pgrep -f "gunicorn.*erp_project.wsgi:application" > /dev/null; then
             echo "✅ Gunicorn est en cours d'exécution!"
           else
-            echo "⚠️  Vérifiez manuellement que Gunicorn est démarré"
+            echo "⚠️  ATTENTION: Gunicorn ne semble pas être en cours d'exécution"
+            echo "💡 Vérifiez manuellement avec: ps aux | grep gunicorn"
           fi
           
           echo "✅ Déploiement terminé avec succès!"

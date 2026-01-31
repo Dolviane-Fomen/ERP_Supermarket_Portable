@@ -244,12 +244,16 @@
                             <th colspan="3">06h30-08h30</th>
                             <th colspan="3">08h30-10h00</th>
                             <th colspan="3">10h00-11h30</th>
+                            <th colspan="3">11h30-12h00</th>
                             <th colspan="3">14h30-16h00</th>
                             <th colspan="3">16h00-17h30</th>
                             <th rowspan="2">TOTAL</th>
                         </tr>
                         {% comment %} Deuxième ligne d'en-têtes avec les sous-colonnes pour chaque plage horaire {% endcomment %}
                         <tr>
+                            <th>Heure</th>
+                            <th>Commandes</th>
+                            <th>Total</th>
                             <th>Heure</th>
                             <th>Commandes</th>
                             <th>Total</th>
@@ -314,11 +318,12 @@
                 if (data.clients && data.clients.length > 0) {
                     rapportBody.innerHTML = '';
                     
-                    // Plages horaires dans l'ordre
+                    // Plages horaires dans l'ordre (doit correspondre au modèle)
                     const plagesHoraires = [
                         '06h30-08h30',
                         '08h30-10h00',
                         '10h00-11h30',
+                        '11h30-12h00',
                         '14h30-16h00',
                         '16h00-17h30'
                     ];
@@ -326,6 +331,7 @@
                     // Afficher chaque client avec toutes ses plages horaires
                     data.clients.forEach(client => {
                         console.log('Client:', client.id, 'Actions par plage:', client.actions_par_plage); // Debug
+                        console.log('Client:', client.id, 'Commandes par plage:', client.commandes_par_plage); // Debug commandes
                         
                         // Déterminer la classe de ligne selon les actions
                         let rowClass = '';
@@ -384,6 +390,7 @@
                                 commandesList = Array.isArray(client.commandes_par_plage[plageCode]) 
                                     ? client.commandes_par_plage[plageCode] 
                                     : [];
+                                console.log(`[DEBUG] Client ${client.id}, Plage ${plageCode}, Commandes:`, commandesList); // Debug
                             }
                             
                             // Colonne 1: Heure (actions + commandes)
@@ -425,11 +432,19 @@
                             }
                             // Ajouter les commandes pour cette plage horaire
                             if (commandesList && commandesList.length > 0) {
-                                commandesList.forEach(cmd => {
+                                console.log(`[DEBUG AFFICHAGE] Plage ${plageCode}, ${commandesList.length} commande(s) trouvée(s)`); // Debug
+                                commandesList.forEach((cmd, idx) => {
+                                    console.log(`[DEBUG AFFICHAGE] Commande ${idx}:`, cmd); // Debug
                                     if (cmd && cmd.articles) {
-                                        actionsHTML += `<div style="margin-bottom: 4px; padding: 6px; background-color: #e8f5e9; border-left: 3px solid #2e7d32; border-radius: 4px; font-size: 0.85em; color: #1b5e20; line-height: 1.4; font-weight: 600;">${cmd.articles} (${cmd.date} ${cmd.heure})</div>`;
+                                        // Remplacer les retours à la ligne par <br> pour l'affichage HTML
+                                        const articlesHTML = (cmd.articles || '').replace(/\n/g, '<br>');
+                                        actionsHTML += `<div style="margin-bottom: 4px; padding: 6px; background-color: #e8f5e9; border-left: 3px solid #2e7d32; border-radius: 4px; font-size: 0.85em; color: #1b5e20; line-height: 1.4; font-weight: 600;">${articlesHTML}</div>`;
+                                    } else {
+                                        console.warn(`[DEBUG AFFICHAGE] Commande ${idx} sans articles:`, cmd); // Debug
                                     }
                                 });
+                            } else {
+                                console.log(`[DEBUG AFFICHAGE] Plage ${plageCode}, aucune commande trouvée`); // Debug
                             }
                             rowHTML += `<td>${actionsHTML || ''}</td>`;
                             

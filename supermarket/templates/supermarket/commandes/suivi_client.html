@@ -463,8 +463,8 @@
                             {% if client.id in commandes_dict and plage_code in commandes_dict|get_item:client.id %}
                                 {% for cmd_data in commandes_dict|get_item:client.id|get_item:plage_code %}
                                 <div style="margin-bottom: 6px; padding: 6px; background-color: #c8e6c9; border-left: 2px solid #4caf50; border-radius: 3px;">
-                                    <span style="font-size: 0.85em; color: #1b5e20; display: block; line-height: 1.4;">
-                                        {{ cmd_data.article }}
+                                    <span style="font-size: 0.85em; color: #1b5e20; display: block; line-height: 1.4; white-space: pre-line;">
+                                        {{ cmd_data.article|default:"" }}
                                     </span>
                                 </div>
                                 {% endfor %}

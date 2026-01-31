@@ -5109,8 +5109,54 @@ def sauvegarder_commande(request):
             
             client = Client.objects.get(id=client_id, agence=agence)
             date_commande = request.POST.get('date')
-            heure_commande = request.POST.get('heure')
+            heure_commande_str = request.POST.get('heure')
             etat_commande = request.POST.get('etat_commande', 'en_attente')
+            
+            print(f"[DEBUG SAUVEGARDER COMMANDE] date_commande: {date_commande}, heure_commande_str: {heure_commande_str}")
+            
+            # Convertir la date en objet date si c'est une chaîne
+            from datetime import datetime, date as date_class
+            if isinstance(date_commande, str):
+                try:
+                    date_commande_obj = datetime.strptime(date_commande, '%Y-%m-%d').date()
+                except ValueError:
+                    try:
+                        date_commande_obj = datetime.strptime(date_commande, '%d/%m/%Y').date()
+                    except ValueError:
+                        date_commande_obj = timezone.now().date()
+            elif isinstance(date_commande, datetime):
+                date_commande_obj = date_commande.date()
+            elif isinstance(date_commande, date_class):
+                date_commande_obj = date_commande
+            else:
+                date_commande_obj = timezone.now().date()
+            
+            # Convertir l'heure en objet time si c'est une chaîne
+            if heure_commande_str:
+                if isinstance(heure_commande_str, str):
+                    try:
+                        # Essayer différents formats
+                        heure_commande_obj = datetime.strptime(heure_commande_str, '%H:%M').time()
+                    except ValueError:
+                        try:
+                            heure_commande_obj = datetime.strptime(heure_commande_str, '%H:%M:%S').time()
+                        except ValueError:
+                            try:
+                                # Format avec h au lieu de :
+                                heure_commande_str_clean = heure_commande_str.replace('h', ':')
+                                heure_commande_obj = datetime.strptime(heure_commande_str_clean, '%H:%M').time()
+                            except ValueError:
+                                print(f"[WARNING] Impossible de parser l'heure '{heure_commande_str}', utilisation de l'heure actuelle")
+                                heure_commande_obj = timezone.now().time()
+                elif hasattr(heure_commande_str, 'time'):
+                    heure_commande_obj = heure_commande_str.time() if isinstance(heure_commande_str, datetime) else heure_commande_str
+                else:
+                    heure_commande_obj = heure_commande_str
+            else:
+                print(f"[WARNING] Aucune heure fournie, utilisation de l'heure actuelle")
+                heure_commande_obj = timezone.now().time()
+            
+            print(f"[DEBUG SAUVEGARDER COMMANDE] date_commande_obj: {date_commande_obj}, heure_commande_obj: {heure_commande_obj}")
             
             # Calculer les totaux globaux
             quantite_totale = sum(Decimal(str(ligne['quantite'])) for ligne in lignes)
@@ -5127,8 +5173,8 @@ def sauvegarder_commande(request):
                 
                 # Créer une Commande pour chaque article
                 commande = Commande.objects.create(
-                    date=date_commande,
-                    heure=heure_commande,
+                    date=date_commande_obj,
+                    heure=heure_commande_obj,
                     client=client,
                     article=article,
                     agence=agence,
@@ -8395,6 +8441,7 @@ def suivi_client(request):
         if not heure_obj:
             return ''
         from datetime import time
+        # Essayer d'abord de trouver une plage exacte
         for plage_code, plage_label in plages_horaires:
             debut_str, fin_str = plage_code.split('-')
             try:
@@ -8406,6 +8453,14 @@ def suivi_client(request):
                     return plage_code
             except:
                 continue
+        
+        # Si aucune plage exacte trouvée, utiliser la plage la plus proche
+        # Pour les heures entre 12h00 et 14h30, utiliser '11h30-12h00' (la plus proche)
+        if isinstance(heure_obj, time):
+            heure_minutes = heure_obj.hour * 60 + heure_obj.minute
+            if 12 * 60 <= heure_minutes < 14 * 60 + 30:
+                return '11h30-12h00'  # Utiliser la dernière plage du matin
+        
         return ''
     
     # Récupérer les commandes avec leurs détails (articles, quantités, heures)
@@ -8418,6 +8473,10 @@ def suivi_client(request):
         date=date_selectionnee
     ).select_related('client', 'article').order_by('client', 'heure', 'article').distinct()
     
+    print(f"[DEBUG SUIVI_CLIENT] Nombre de commandes trouvées: {commandes.count()}")
+    for cmd in commandes[:5]:  # Afficher les 5 premières pour debug
+        print(f"[DEBUG SUIVI_CLIENT] Commande ID={cmd.id}, Client={cmd.client.intitule}, Date={cmd.date}, Heure={cmd.heure}, Article={cmd.article.designation if cmd.article else 'N/A'}")
+    
     # Dictionnaire temporaire pour regrouper les commandes par (client_id, date, heure)
     commandes_groupes = {}
     
@@ -8429,6 +8488,8 @@ def suivi_client(request):
         
         # Déterminer la plage horaire de la commande
         plage_code = get_plage_from_heure(cmd.heure) if cmd.heure else ''
+        if not plage_code and cmd.heure:
+            print(f"[WARNING SUIVI_CLIENT] Aucune plage horaire trouvée pour l'heure {cmd.heure}")
         
         if plage_code not in commandes_dict[client_id]:
             commandes_dict[client_id][plage_code] = []
@@ -8447,9 +8508,9 @@ def suivi_client(request):
                 'deja_compte': False
             }
         
-        # Ajouter l'article au groupe
-        quantite_int = int(cmd.quantite) if cmd.quantite else 0
-        article_str = f"{cmd.article.designation if cmd.article else 'N/A'}*{quantite_int}PCS (Qté: {float(cmd.quantite)})"
+        # Ajouter l'article au groupe - Format: "DESIGNATION (Qté: X.XX)"
+        quantite_float = float(cmd.quantite) if cmd.quantite else 0.0
+        article_str = f"{cmd.article.designation if cmd.article else 'N/A'} (Qté: {quantite_float})"
         commandes_groupes[cmd_group_key]['articles'].append(article_str)
         
         # Ajouter le prix total (une seule fois par groupe)
@@ -8463,8 +8524,10 @@ def suivi_client(request):
         client_id = cmd_group_key[0]
         plage_code = groupe_data['plage_code']
         
-        # Créer une seule entrée avec tous les articles regroupés
-        articles_str = ' | '.join(groupe_data['articles'])
+        # Créer une seule entrée avec tous les articles regroupés - un article par ligne
+        articles_str = '\n'.join(groupe_data['articles'])
+        
+        print(f"[DEBUG SUIVI_CLIENT] Client ID={client_id}, Plage={plage_code}, Heure={groupe_data['heure']}, Articles={len(groupe_data['articles'])}")
         
         commandes_dict[client_id][plage_code].append({
             'article': articles_str,
@@ -8690,11 +8753,12 @@ def generer_rapport_acm(request):
             
             clients = clients_query.select_related('agence').order_by('ref', 'detail', 'intitule')
             
-            # Définir les plages horaires
+            # Définir les plages horaires (doit correspondre au modèle SuiviClientAction)
             PLAGES_HORAIRES = [
                 ('06h30-08h30', '06h30-08h30'),
                 ('08h30-10h00', '08h30-10h00'),
                 ('10h00-11h30', '10h00-11h30'),
+                ('11h30-12h00', '11h30-12h00'),
                 ('14h30-16h00', '14h30-16h00'),
                 ('16h00-17h30', '16h00-17h30'),
             ]
@@ -8740,6 +8804,10 @@ def generer_rapport_acm(request):
                 date__range=[date_debut_obj, date_fin_obj]
             ).select_related('client', 'article').order_by('client', 'date', 'heure')
             
+            print(f"[DEBUG GENERER_RAPPORT_ACM] Nombre de commandes trouvées: {commandes.count()}")
+            for cmd in commandes[:5]:  # Afficher les 5 premières pour debug
+                print(f"[DEBUG GENERER_RAPPORT_ACM] Commande ID={cmd.id}, Client={cmd.client.intitule}, Date={cmd.date}, Heure={cmd.heure}, Article={cmd.article.designation if cmd.article else 'N/A'}")
+            
             for cmd in commandes:
                 # Clé pour regrouper par client, date et heure
                 key = (cmd.client.id, cmd.date, cmd.heure)
@@ -8750,32 +8818,62 @@ def generer_rapport_acm(request):
                 })
             
             # Convertir en format final : liste de commandes groupées par client
+            from datetime import time as time_class
             commandes_grouped = {}
             for client_id, commandes_par_client in commandes_dict.items():
                 commandes_grouped[client_id] = []
                 for (client_id_key, date, heure), articles in commandes_par_client.items():
                     total_commande = sum(art['prix_total'] for art in articles)
+                    # Formater les articles : un article par ligne avec sa quantité
                     articles_list = [f"{art['article']} (Qté: {art['quantite']})" for art in articles]
+                    # Formater l'heure correctement (peut être un objet time ou une chaîne)
+                    if heure:
+                        if isinstance(heure, time_class):
+                            heure_str = heure.strftime('%H:%M')
+                        elif isinstance(heure, str):
+                            heure_str = heure
+                        else:
+                            heure_str = str(heure)
+                    else:
+                        heure_str = ''
+                    # Joindre les articles avec des retours à la ligne pour l'affichage
+                    articles_str = '\n'.join(articles_list)
                     commandes_grouped[client_id].append({
-                        'date': date.strftime('%d/%m/%Y'),
-                        'heure': heure.strftime('%H:%M') if heure else '',
-                        'articles': ', '.join(articles_list),
+                        'date': date.strftime('%d/%m/%Y') if hasattr(date, 'strftime') else str(date),
+                        'heure': heure_str,
+                        'articles': articles_str,
                         'total': total_commande,
                     })
             
             # Fonction pour déterminer la plage horaire à partir d'une heure
-            def get_plage_from_heure(heure_str):
-                if not heure_str:
+            def get_plage_from_heure(heure_input):
+                if not heure_input:
                     return ''
                 try:
-                    from datetime import time
-                    heure_obj = datetime.strptime(heure_str, '%H:%M').time()
+                    # Convertir en objet time si c'est une chaîne
+                    if isinstance(heure_input, str):
+                        heure_obj = datetime.strptime(heure_input, '%H:%M').time()
+                    elif isinstance(heure_input, time_class):
+                        heure_obj = heure_input
+                    elif hasattr(heure_input, 'time'):
+                        heure_obj = heure_input.time()
+                    else:
+                        return ''
+                    
+                    # Essayer d'abord de trouver une plage exacte
                     for plage_code, plage_label in PLAGES_HORAIRES:
                         debut_str, fin_str = plage_code.split('-')
                         debut = datetime.strptime(debut_str, '%Hh%M').time()
                         fin = datetime.strptime(fin_str, '%Hh%M').time()
                         if debut <= heure_obj <= fin:
                             return plage_code
+                    
+                    # Si aucune plage exacte trouvée, utiliser la plage la plus proche
+                    # Pour les heures entre 12h00 et 14h30, utiliser '11h30-12h00' (la plus proche)
+                    if isinstance(heure_obj, time_class):
+                        heure_minutes = heure_obj.hour * 60 + heure_obj.minute
+                        if 12 * 60 <= heure_minutes < 14 * 60 + 30:
+                            return '11h30-12h00'  # Utiliser la dernière plage du matin
                 except:
                     pass
                 return ''
@@ -8994,11 +9092,12 @@ def export_rapport_acm_excel(request):
         
         start_row = row_num + 1
         
-        # Définir les plages horaires
+        # Définir les plages horaires (doit correspondre au modèle SuiviClientAction)
         PLAGES_HORAIRES = [
             ('06h30-08h30', '06h30-08h30'),
             ('08h30-10h00', '08h30-10h00'),
             ('10h00-11h30', '10h00-11h30'),
+            ('11h30-12h00', '11h30-12h00'),
             ('14h30-16h00', '14h30-16h00'),
             ('16h00-17h30', '16h00-17h30'),
         ]
