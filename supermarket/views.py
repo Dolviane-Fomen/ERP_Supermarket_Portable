@@ -20,7 +20,7 @@ from .models import (
     FactureTemporaire, Famille, Fournisseur, MouvementStock, PlanComptable, PlanTiers, CodeJournaux,
     TauxTaxe, FactureAchat, LigneFactureAchat, FactureTransfert, LigneFactureTransfert,
     Commande, Livraison, FactureCommande, StatistiqueClient, DocumentCommande, LigneCommande, Notification,
-    Livreur, SuiviClientAction,Depense,ChiffreAffaire,Tresorerie,Beneficiaire,
+    Livreur, SuiviClientAction, SuiviCommercialAction, Depense, ChiffreAffaire, Tresorerie, Beneficiaire,
     CommandeFournisseur, LigneCommandeFournisseur
 )
 from .decorators import (
@@ -4891,6 +4891,21 @@ def enregistrer_commande(request):
         except Client.DoesNotExist:
             pass
     
+    # Stocker la source (d'où vient l'utilisateur) dans la session pour la redirection après sauvegarde
+    from_param = request.GET.get('from', '')
+    if from_param:
+        request.session['commande_source'] = from_param
+        # Si on vient du suivi commercial, stocker aussi la zone et la date pour la redirection
+        if from_param == 'commercial':
+            zone = request.GET.get('zone', '')
+            date_selectionnee = request.GET.get('date', '')
+            if zone:
+                request.session['suivi_commercial_zone'] = zone
+            if date_selectionnee:
+                request.session['suivi_commercial_date'] = date_selectionnee
+    elif 'commande_source' not in request.session:
+        request.session['commande_source'] = 'commandes'  # Par défaut, vient du module commandes
+    
     print(f"[ENREGISTRER COMMANDE] Session récupérée: {len(commande_temp.get('lignes', []))} lignes")
     if commande_temp.get('lignes'):
         print(f"[ENREGISTRER COMMANDE] Lignes: {commande_temp['lignes']}")
@@ -5319,8 +5334,27 @@ def sauvegarder_commande(request):
                 messages.success(request, 'Commande enregistrée avec succès et facture générée automatiquement!')
             else:
                 messages.success(request, 'Commande enregistrée avec succès!')
-            # Rediriger vers la page de suivi client
-            return redirect('suivi_client')
+            
+            # Rediriger vers la bonne page selon la source
+            commande_source = request.session.get('commande_source', 'commandes')
+            if commande_source == 'commercial':
+                # Récupérer les paramètres de filtre pour le suivi commercial
+                zone = request.session.get('suivi_commercial_zone', '')
+                date_selectionnee = request.session.get('suivi_commercial_date', '')
+                redirect_url = 'suivi_commercial'
+                if zone or date_selectionnee:
+                    redirect_url += '?'
+                    if zone:
+                        redirect_url += f'zone={zone}&'
+                    if date_selectionnee:
+                        redirect_url += f'date_selectionnee={date_selectionnee}'
+                # Nettoyer la session
+                if 'commande_source' in request.session:
+                    del request.session['commande_source']
+                return redirect(redirect_url)
+            else:
+                # Par défaut, rediriger vers suivi_client
+                return redirect('suivi_client')
             
         except Exception as e:
             messages.error(request, f'Erreur lors de l\'enregistrement: {str(e)}')
@@ -23853,3 +23887,698 @@ def serve_logo(request):
     else:
         raise Http404("Logo non trouvé")
 
+# ===== MODULE GESTION COMMERCIALE =====
+
+def login_commercial(request):
+    """Page de connexion pour le module Gestion Commerciale"""
+    # Toujours afficher la page de connexion, même si l'utilisateur est déjà connecté
+    if request.user.is_authenticated and request.method == 'GET':
+        logout(request)
+        request.session.flush()
+    
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        
+        if username and password:
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                try:
+                    compte = Compte.objects.get(user=user, actif=True)
+                    if compte.agence:
+                        # Pour l'instant, permettre l'accès à tous les utilisateurs
+                        login(request, user)
+                        # Stocker l'agence dans la session
+                        request.session['agence_id'] = compte.agence.id_agence
+                        request.session['agence_nom'] = compte.agence.nom_agence
+                        messages.success(request, f'Connexion réussie ! Bienvenue {compte.nom_complet}')
+                        return redirect('dashboard_commercial')
+                    else:
+                        messages.error(request, 'Votre compte n\'est pas lié à une agence.')
+                except Compte.DoesNotExist:
+                    messages.error(request, 'Compte non trouvé ou inactif.')
+            else:
+                messages.error(request, 'Nom d\'utilisateur ou mot de passe incorrect.')
+        else:
+            messages.error(request, 'Veuillez remplir tous les champs.')
+    
+    # Récupérer les agences disponibles pour affichage
+    agences = Agence.objects.all()
+    context = {
+        'agences': agences
+    }
+    return render(request, 'supermarket/commercial/login.html', context)
+
+def logout_commercial(request):
+    """Déconnexion du module Gestion Commerciale"""
+    if request.user.is_authenticated:
+        logout(request)
+        request.session.flush()
+        messages.success(request, 'Vous avez été déconnecté avec succès.')
+    return redirect('index')
+
+@login_required
+def dashboard_commercial(request):
+    """Dashboard principal du module Gestion Commerciale"""
+    try:
+        compte = Compte.objects.get(user=request.user, actif=True)
+        agence = get_user_agence(request)
+        if not agence:
+            messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+            return redirect('logout_commercial')
+        
+        context = {
+            'compte': compte,
+            'agence': agence,
+            'user': request.user,
+        }
+        return render(request, 'supermarket/commercial/dashboard.html', context)
+    except Compte.DoesNotExist:
+        messages.error(request, 'Compte non trouvé ou inactif.')
+        return redirect('logout_commercial')
+
+@login_required
+def suivi_commercial(request):
+    """Vue pour le suivi commercial des clients par zone - Version simplifiée sans plages horaires"""
+    agence = get_user_agence(request)
+    if not agence:
+        messages.error(request, 'Votre compte n\'est pas correctement lié à une agence.')
+        return redirect('logout_commercial')
+    
+    compte = get_user_compte(request)
+    if not compte:
+        messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+        return redirect('logout_commercial')
+    
+    # Récupérer toutes les zones distinctes des clients de l'agence
+    zones = Client.objects.filter(agence=agence).values_list('zone', flat=True).distinct().exclude(zone__isnull=True).exclude(zone='').order_by('zone')
+    
+    # Zone sélectionnée (depuis GET)
+    zone_selectionnee = request.GET.get('zone', '')
+    
+    # Date sélectionnée (depuis GET) - Par défaut, date du jour
+    from django.utils import timezone
+    date_selectionnee_str = request.GET.get('date_selectionnee', '')
+    
+    if date_selectionnee_str:
+        try:
+            date_selectionnee = datetime.strptime(date_selectionnee_str, '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            date_selectionnee = timezone.now().date()
+    else:
+        date_selectionnee = timezone.now().date()
+    
+    # Récupérer les clients de la zone sélectionnée
+    clients = Client.objects.filter(agence=agence)
+    if zone_selectionnee:
+        clients = clients.filter(zone=zone_selectionnee)
+    
+    clients = clients.order_by('intitule')
+    
+    # Récupérer les actions commerciales pour la date sélectionnée uniquement
+    actions_dict = {}
+    suivi_actions = SuiviCommercialAction.objects.filter(
+        agence=agence,
+        client__in=clients,
+        date_action__date=date_selectionnee
+    ).select_related('client').order_by('client', '-date_action', '-heure_visite')
+    
+    # Filtrer selon l'utilisateur si nécessaire
+    if compte.type_compte not in ['admin', 'gerant']:
+        suivi_actions = suivi_actions.filter(created_by=compte.user)
+    
+    for action in suivi_actions:
+        client_id = action.client.id
+        
+        if client_id not in actions_dict:
+            actions_dict[client_id] = []
+        
+        actions_dict[client_id].append({
+            'action': action.action or '',
+            'heure_visite': action.heure_visite,
+            'date_action': action.date_action,
+            'id': action.id
+        })
+    
+    # Récupérer les commandes avec leurs détails (articles, quantités, heures)
+    commandes_dict = {}
+    commandes_totaux = {}
+    commandes = Commande.objects.filter(
+        agence=agence,
+        client__in=clients,
+        date=date_selectionnee
+    ).select_related('client', 'article').order_by('client', 'heure', 'article').distinct()
+    
+    # Dictionnaire temporaire pour regrouper les commandes par (client_id, date, heure)
+    commandes_groupes = {}
+    
+    for cmd in commandes:
+        client_id = cmd.client.id
+        if client_id not in commandes_dict:
+            commandes_dict[client_id] = []
+            commandes_totaux[client_id] = 0
+        
+        # Créer une clé unique pour regrouper les articles d'une même commande : (client_id, date, heure)
+        cmd_group_key = (client_id, str(cmd.date), str(cmd.heure) if cmd.heure else '')
+        
+        # Initialiser le groupe si nécessaire
+        if cmd_group_key not in commandes_groupes:
+            commandes_groupes[cmd_group_key] = {
+                'heure': cmd.heure.strftime('%H:%M') if cmd.heure else '',
+                'date': cmd.date.strftime('%d/%m/%Y'),
+                'articles': [],
+                'prix_total': 0.0,
+                'deja_compte': False
+            }
+        
+        # Ajouter l'article au groupe - Format: "DESIGNATION (Qté: X.XX)"
+        quantite_float = float(cmd.quantite) if cmd.quantite else 0.0
+        article_str = f"{cmd.article.designation if cmd.article else 'N/A'} (Qté: {quantite_float})"
+        commandes_groupes[cmd_group_key]['articles'].append(article_str)
+        
+        # Ajouter le prix total (une seule fois par groupe)
+        if not commandes_groupes[cmd_group_key]['deja_compte']:
+            commandes_totaux[client_id] += float(cmd.prix_total)
+            commandes_groupes[cmd_group_key]['prix_total'] += float(cmd.prix_total)
+            commandes_groupes[cmd_group_key]['deja_compte'] = True
+    
+    # Convertir les groupes en format final pour commandes_dict
+    for cmd_group_key, groupe_data in commandes_groupes.items():
+        client_id = cmd_group_key[0]
+        
+        # Créer une seule entrée avec tous les articles regroupés
+        articles_str = '\n'.join(groupe_data['articles'])
+        
+        commandes_dict[client_id].append({
+            'article': articles_str,
+            'heure': groupe_data['heure'],
+            'quantite': sum(1 for _ in groupe_data['articles']),
+            'prix_total': groupe_data['prix_total'],
+        })
+    
+    context = {
+        'agence': agence,
+        'compte': compte,
+        'zones': zones,
+        'zone_selectionnee': zone_selectionnee,
+        'date_selectionnee': date_selectionnee.strftime('%Y-%m-%d'),
+        'clients': clients,
+        'actions_dict': actions_dict,
+        'commandes_dict': commandes_dict,
+        'commandes_totaux': commandes_totaux,
+    }
+    return render(request, 'supermarket/commercial/suivi_commercial.html', context)
+
+@login_required
+def sauvegarder_action_commerciale(request):
+    """Vue pour sauvegarder l'action commerciale d'un client"""
+    agence = get_user_agence(request)
+    if not agence:
+        return JsonResponse({'success': False, 'error': 'Aucune agence trouvée.'})
+    
+    if request.method == 'POST':
+        try:
+            client_id = request.POST.get('client_id')
+            action = request.POST.get('action', '').strip()
+            heure_visite_str = request.POST.get('heure_visite', '').strip()
+            
+            if not client_id:
+                return JsonResponse({'success': False, 'error': 'Client ID manquant.'})
+            
+            client = Client.objects.get(id=client_id, agence=agence)
+            
+            from django.utils import timezone
+            from datetime import datetime
+            
+            # Récupérer la date depuis le POST, sinon utiliser la date/heure actuelle
+            date_action_str = request.POST.get('date_action', '')
+            if date_action_str:
+                try:
+                    # Format attendu: YYYY-MM-DD
+                    date_action = datetime.strptime(date_action_str, '%Y-%m-%d').date()
+                    # Combiner avec l'heure actuelle pour avoir un datetime complet
+                    date_action = timezone.make_aware(datetime.combine(date_action, timezone.now().time()))
+                except (ValueError, TypeError):
+                    date_action = timezone.now()
+            else:
+                date_action = timezone.now()
+            
+            # Remplir automatiquement l'heure si un commentaire est saisi
+            heure_visite = None
+            if action:  # Si un commentaire/action est saisi
+                # Utiliser l'heure fournie par le navigateur (heure locale)
+                if heure_visite_str:
+                    try:
+                        # Format attendu: HH:MM (ex: 07:30) - heure locale du navigateur
+                        heure_visite = datetime.strptime(heure_visite_str, '%H:%M').time()
+                    except ValueError:
+                        # Si erreur, utiliser l'heure actuelle du serveur
+                        heure_visite = timezone.now().time()
+                else:
+                    # Si pas d'heure fournie, utiliser l'heure actuelle du serveur
+                    heure_visite = timezone.now().time()
+            elif heure_visite_str:  # Sinon, utiliser l'heure fournie manuellement (si nécessaire)
+                try:
+                    # Format attendu: HH:MM (ex: 07:30)
+                    heure_visite = datetime.strptime(heure_visite_str, '%H:%M').time()
+                except ValueError:
+                    pass
+            
+            # Créer une nouvelle action commerciale (plusieurs visites possibles par client)
+            suivi_action = SuiviCommercialAction.objects.create(
+                client=client,
+                agence=agence,
+                action=action,
+                heure_visite=heure_visite,
+                date_action=date_action,
+                created_by=request.user  # Enregistrer qui a créé l'action
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Action commerciale enregistrée avec succès.',
+                'date_action': suivi_action.date_action.strftime('%d/%m/%Y %H:%M'),
+                'heure_visite': suivi_action.heure_visite.strftime('%H:%M') if suivi_action.heure_visite else ''
+            })
+            
+        except Client.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Client non trouvé.'})
+        except Exception as e:
+            import traceback
+            return JsonResponse({
+                'success': False,
+                'error': f'Erreur: {str(e)}',
+                'traceback': traceback.format_exc()
+            })
+    
+    return JsonResponse({'success': False, 'error': 'Méthode non autorisée.'})
+
+@login_required
+def rapport_commercial(request):
+    """Vue pour afficher la page de génération de rapport commercial"""
+    agence = get_user_agence(request)
+    if not agence:
+        messages.error(request, 'Votre compte n\'est pas correctement lié à une agence.')
+        return redirect('logout_commercial')
+    
+    compte = get_user_compte(request)
+    if not compte:
+        messages.error(request, 'Votre compte n\'est pas configuré correctement.')
+        return redirect('logout_commercial')
+    
+    # Récupérer toutes les zones distinctes
+    zones = Client.objects.filter(agence=agence).values_list('zone', flat=True).distinct().exclude(zone__isnull=True).exclude(zone='').order_by('zone')
+    
+    context = {
+        'agence': agence,
+        'zones': zones,
+        'compte': compte,
+    }
+    return render(request, 'supermarket/commercial/rapport_commercial.html', context)
+
+@login_required
+def generer_rapport_commercial(request):
+    """Vue pour générer le rapport commercial"""
+    agence = get_user_agence(request)
+    if not agence:
+        return JsonResponse({'success': False, 'error': 'Aucune agence trouvée.'})
+    
+    if request.method == 'POST':
+        try:
+            date_debut = request.POST.get('date_debut')
+            date_fin = request.POST.get('date_fin')
+            zone = request.POST.get('zone', '')
+            
+            if not date_debut or not date_fin:
+                return JsonResponse({'success': False, 'error': 'Veuillez sélectionner une période.'})
+            
+            from datetime import datetime
+            date_debut_obj = datetime.strptime(date_debut, '%Y-%m-%d').date()
+            date_fin_obj = datetime.strptime(date_fin, '%Y-%m-%d').date()
+            
+            # Récupérer les clients avec leurs actions de suivi commercial
+            clients_query = Client.objects.filter(agence=agence)
+            if zone:
+                clients_query = clients_query.filter(zone=zone)
+            
+            clients = clients_query.select_related('agence').order_by('zone', 'intitule')
+            
+            # Récupérer toutes les actions de suivi commercial dans la période
+            suivi_actions = SuiviCommercialAction.objects.filter(
+                agence=agence,
+                client__in=clients,
+                date_action__date__range=[date_debut_obj, date_fin_obj]
+            ).select_related('client').order_by('client', '-date_action', '-heure_visite')
+            
+            # Filtrer selon l'utilisateur si nécessaire
+            compte = get_user_compte(request)
+            if compte and compte.type_compte not in ['admin', 'gerant']:
+                suivi_actions = suivi_actions.filter(created_by=compte.user)
+            
+            # Organiser les actions par client
+            actions_dict = {}
+            for action in suivi_actions:
+                client_id = action.client.id
+                if client_id not in actions_dict:
+                    actions_dict[client_id] = []
+                actions_dict[client_id].append({
+                    'action': action.action or '',
+                    'heure_visite': action.heure_visite.strftime('%H:%M') if action.heure_visite else '',
+                    'date_action': action.date_action
+                })
+            
+            # Récupérer les commandes pour chaque client dans la période
+            from collections import defaultdict
+            commandes_dict = defaultdict(list)
+            
+            commandes = Commande.objects.filter(
+                agence=agence,
+                client__in=clients,
+                date__range=[date_debut_obj, date_fin_obj]
+            ).select_related('client', 'article').order_by('client', 'date', 'heure')
+            
+            # Grouper les commandes par client
+            for cmd in commandes:
+                client_id = cmd.client.id
+                commandes_dict[client_id].append({
+                    'article': cmd.article.designation if cmd.article else 'N/A',
+                    'quantite': float(cmd.quantite),
+                    'prix_total': float(cmd.prix_total),
+                    'date': cmd.date.strftime('%d/%m/%Y'),
+                    'heure': cmd.heure.strftime('%H:%M') if cmd.heure else '',
+                })
+            
+            # Calculer les statistiques par zone
+            stats_par_zone = {}
+            clients_data = []
+            
+            for client in clients:
+                client_zone = client.zone or 'Non spécifiée'
+                if client_zone not in stats_par_zone:
+                    stats_par_zone[client_zone] = {
+                        'nb_clients_visites': 0,
+                        'nb_clients_avec_commandes': 0,
+                        'nb_commandes': 0,
+                        'total_commandes': 0.0,
+                    }
+                
+                # Vérifier si le client a été visité
+                nb_visites = len(actions_dict.get(client.id, []))
+                if nb_visites > 0:
+                    stats_par_zone[client_zone]['nb_clients_visites'] += 1
+                
+                # Vérifier les commandes
+                commandes_client = commandes_dict.get(client.id, [])
+                nb_commandes_client = len(commandes_client)
+                total_client = sum(cmd['prix_total'] for cmd in commandes_client)
+                
+                if nb_commandes_client > 0:
+                    stats_par_zone[client_zone]['nb_clients_avec_commandes'] += 1
+                    stats_par_zone[client_zone]['nb_commandes'] += nb_commandes_client
+                    stats_par_zone[client_zone]['total_commandes'] += total_client
+                
+                # Créer les données du client
+                client_json = {
+                    'id': client.id,
+                    'zone': client_zone,
+                    'detail': client.detail or '',
+                    'ref': client.ref or '',
+                    'potentiel': client.potentiel or '',
+                    'nom': client.intitule,
+                    'telephone': client.telephone,
+                    'nb_visites': nb_visites,
+                    'actions': actions_dict.get(client.id, []),
+                    'nb_commandes': nb_commandes_client,
+                    'total_commandes': float(total_client),
+                    'commandes': commandes_client,
+                }
+                clients_data.append(client_json)
+            
+            # Calculer les totaux généraux
+            total_general = {
+                'nb_clients_visites': sum(s['nb_clients_visites'] for s in stats_par_zone.values()),
+                'nb_clients_avec_commandes': sum(s['nb_clients_avec_commandes'] for s in stats_par_zone.values()),
+                'nb_commandes': sum(s['nb_commandes'] for s in stats_par_zone.values()),
+                'total_commandes': sum(s['total_commandes'] for s in stats_par_zone.values()),
+            }
+            
+            # Sérialiser pour la session
+            clients_data_json = []
+            for client_data in clients_data:
+                clients_data_json.append({
+                    'id': client_data['id'],
+                    'zone': client_data['zone'],
+                    'detail': client_data['detail'],
+                    'ref': client_data['ref'],
+                    'potentiel': client_data['potentiel'],
+                    'nom': client_data['nom'],
+                    'telephone': client_data['telephone'],
+                    'nb_visites': client_data['nb_visites'],
+                    'actions': [
+                        {
+                            'action': a['action'],
+                            'heure_visite': a['heure_visite'],
+                            'date_action': a['date_action'].strftime('%Y-%m-%d %H:%M:%S') if hasattr(a['date_action'], 'strftime') else str(a['date_action'])
+                        } for a in client_data['actions']
+                    ],
+                    'nb_commandes': client_data['nb_commandes'],
+                    'total_commandes': float(client_data['total_commandes']),
+                    'commandes': client_data['commandes'],
+                })
+            
+            # Stocker dans la session pour l'export Excel
+            request.session['rapport_commercial'] = {
+                'date_debut': date_debut,
+                'date_fin': date_fin,
+                'zone': zone,
+                'clients_data': clients_data_json,
+                'stats_par_zone': {k: {kk: float(vv) if isinstance(vv, (int, float)) else vv for kk, vv in v.items()} for k, v in stats_par_zone.items()},
+                'total_general': {k: float(v) if isinstance(v, (int, float)) else v for k, v in total_general.items()},
+            }
+            
+            return JsonResponse({
+                'success': True,
+                'clients': clients_data_json,
+                'stats_par_zone': stats_par_zone,
+                'total_general': total_general,
+            })
+            
+        except Exception as e:
+            import traceback
+            return JsonResponse({
+                'success': False,
+                'error': f'Erreur: {str(e)}',
+                'traceback': traceback.format_exc()
+            })
+    
+    return JsonResponse({'success': False, 'error': 'Méthode non autorisée.'})
+
+@login_required
+def export_rapport_commercial_excel(request):
+    """Vue pour exporter le rapport commercial en Excel"""
+    agence = get_user_agence(request)
+    if not agence:
+        messages.error(request, 'Aucune agence trouvée.')
+        return redirect('rapport_commercial')
+    
+    try:
+        rapport_data = request.session.get('rapport_commercial')
+        if not rapport_data:
+            messages.error(request, 'Aucun rapport à exporter. Veuillez générer un rapport d\'abord.')
+            return redirect('rapport_commercial')
+        
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from datetime import datetime
+        from django.http import HttpResponse
+        from io import BytesIO
+        
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Rapport Commercial"
+        
+        # Styles
+        header_fill = PatternFill(start_color="11998e", end_color="38ef7d", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=11)
+        title_font = Font(bold=True, size=14)
+        border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        
+        # En-tête
+        ws.merge_cells('A1:H1')
+        ws['A1'] = f"RAPPORT COMMERCIAL - {agence.nom_agence}"
+        ws['A1'].font = title_font
+        ws['A1'].alignment = Alignment(horizontal='center', vertical='center')
+        
+        ws.merge_cells('A2:H2')
+        ws['A2'] = f"Période : {datetime.strptime(rapport_data['date_debut'], '%Y-%m-%d').strftime('%d/%m/%Y')} au {datetime.strptime(rapport_data['date_fin'], '%Y-%m-%d').strftime('%d/%m/%Y')}"
+        ws['A2'].alignment = Alignment(horizontal='center')
+        
+        row_num = 3
+        if rapport_data.get('zone'):
+            ws.merge_cells(f'A{row_num}:H{row_num}')
+            ws[f'A{row_num}'] = f"Zone : {rapport_data['zone']}"
+            ws[f'A{row_num}'].alignment = Alignment(horizontal='center')
+            row_num += 1
+        
+        start_row = row_num + 1
+        
+        # En-têtes de colonnes : DETAIL, REF, POTENTIEL /5, NOMS, TELEPHONES, HEURE, COMMANDES, TOTAL
+        headers = ['DETAIL', 'REF', 'POTENTIEL /5', 'NOMS', 'TELEPHONES', 'HEURE', 'COMMANDES', 'TOTAL']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=start_row, column=col)
+            cell.value = header
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            cell.border = border
+        
+        row_num = start_row + 1
+        
+        # Données des clients
+        clients_data = rapport_data.get('clients_data', [])
+        clients_data_sorted = sorted(clients_data, key=lambda x: (
+            x.get('ref', ''),
+            x.get('detail', ''),
+            x.get('nom', '')
+        ))
+        
+        for client_data in clients_data_sorted:
+            actions = client_data.get('actions', [])
+            commandes = client_data.get('commandes', [])
+            
+            # Combiner actions et commandes
+            all_items = []
+            
+            # Ajouter les commandes
+            for cmd in commandes:
+                all_items.append({
+                    'heure': cmd.get('heure', ''),
+                    'texte': cmd.get('article', ''),
+                    'total': cmd.get('prix_total', 0)
+                })
+            
+            # Ajouter les actions (visites sans commande)
+            for action in actions:
+                heure_action = action.get('heure_visite', '')
+                has_commande = any(cmd.get('heure') == heure_action for cmd in commandes)
+                if not has_commande:
+                    all_items.append({
+                        'heure': heure_action,
+                        'texte': action.get('action', ''),
+                        'total': 0
+                    })
+            
+            # Trier par heure
+            all_items.sort(key=lambda x: x['heure'] or '')
+            
+            # Créer une ligne pour chaque item
+            if all_items:
+                for idx, item in enumerate(all_items):
+                    ws.cell(row=row_num, column=1, value=client_data.get('detail', '') if idx == 0 else '').border = border
+                    ws.cell(row=row_num, column=2, value=client_data.get('ref', '') if idx == 0 else '').border = border
+                    ws.cell(row=row_num, column=3, value=client_data.get('potentiel', '') if idx == 0 else '').border = border
+                    ws.cell(row=row_num, column=4, value=client_data.get('nom', '') if idx == 0 else '').border = border
+                    ws.cell(row=row_num, column=5, value=client_data.get('telephone', '') if idx == 0 else '').border = border
+                    ws.cell(row=row_num, column=6, value=item['heure']).border = border
+                    cell_cmd = ws.cell(row=row_num, column=7, value=item['texte'])
+                    cell_cmd.border = border
+                    cell_cmd.alignment = Alignment(wrap_text=True, vertical='top')
+                    cell_total = ws.cell(row=row_num, column=8, value=item['total'])
+                    if item['total'] > 0:
+                        cell_total.number_format = '#,##0 "FCFA"'
+                    cell_total.border = border
+                    row_num += 1
+            else:
+                # Client sans visite ni commande
+                ws.cell(row=row_num, column=1, value=client_data.get('detail', '')).border = border
+                ws.cell(row=row_num, column=2, value=client_data.get('ref', '')).border = border
+                ws.cell(row=row_num, column=3, value=client_data.get('potentiel', '')).border = border
+                ws.cell(row=row_num, column=4, value=client_data.get('nom', '')).border = border
+                ws.cell(row=row_num, column=5, value=client_data.get('telephone', '')).border = border
+                ws.cell(row=row_num, column=6, value='').border = border
+                ws.cell(row=row_num, column=7, value='').border = border
+                ws.cell(row=row_num, column=8, value='').border = border
+                row_num += 1
+        
+        # Ajouter les statistiques par zone après les données clients
+        row_num += 2
+        ws.merge_cells(f'A{row_num}:H{row_num}')
+        ws[f'A{row_num}'] = "STATISTIQUES PAR ZONE"
+        ws[f'A{row_num}'].font = Font(bold=True, size=12)
+        ws[f'A{row_num}'].fill = PatternFill(start_color="E8F5E9", end_color="E8F5E9", fill_type="solid")
+        row_num += 1
+        
+        # En-têtes statistiques
+        headers_stats = ['Zone', 'Clients visités', 'Clients avec commandes', 'Nombre de commandes', 'Total commandes (FCFA)']
+        for col, header in enumerate(headers_stats, 1):
+            cell = ws.cell(row=row_num, column=col)
+            cell.value = header
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.border = border
+        row_num += 1
+        
+        # Données statistiques par zone
+        stats_par_zone = rapport_data.get('stats_par_zone', {})
+        for zone, stats in sorted(stats_par_zone.items()):
+            ws.cell(row=row_num, column=1, value=zone).border = border
+            ws.cell(row=row_num, column=2, value=stats['nb_clients_visites']).border = border
+            ws.cell(row=row_num, column=3, value=stats['nb_clients_avec_commandes']).border = border
+            ws.cell(row=row_num, column=4, value=stats['nb_commandes']).border = border
+            cell_total = ws.cell(row=row_num, column=5, value=stats['total_commandes'])
+            cell_total.number_format = '#,##0 "FCFA"'
+            cell_total.border = border
+            row_num += 1
+        
+        # Ligne total général
+        total_general = rapport_data.get('total_general', {})
+        ws.cell(row=row_num, column=1, value='TOTAL GÉNÉRAL').font = Font(bold=True)
+        ws.cell(row=row_num, column=1).fill = PatternFill(start_color="C8E6C9", end_color="C8E6C9", fill_type="solid")
+        ws.cell(row=row_num, column=2, value=total_general.get('nb_clients_visites', 0)).font = Font(bold=True)
+        ws.cell(row=row_num, column=2).fill = PatternFill(start_color="C8E6C9", end_color="C8E6C9", fill_type="solid")
+        ws.cell(row=row_num, column=3, value=total_general.get('nb_clients_avec_commandes', 0)).font = Font(bold=True)
+        ws.cell(row=row_num, column=3).fill = PatternFill(start_color="C8E6C9", end_color="C8E6C9", fill_type="solid")
+        ws.cell(row=row_num, column=4, value=total_general.get('nb_commandes', 0)).font = Font(bold=True)
+        ws.cell(row=row_num, column=4).fill = PatternFill(start_color="C8E6C9", end_color="C8E6C9", fill_type="solid")
+        cell_total_gen = ws.cell(row=row_num, column=5, value=total_general.get('total_commandes', 0))
+        cell_total_gen.number_format = '#,##0 "FCFA"'
+        cell_total_gen.font = Font(bold=True)
+        cell_total_gen.fill = PatternFill(start_color="C8E6C9", end_color="C8E6C9", fill_type="solid")
+        for col in range(1, 6):
+            ws.cell(row=row_num, column=col).border = border
+        
+        # Ajuster les largeurs des colonnes
+        ws.column_dimensions['A'].width = 15  # DETAIL
+        ws.column_dimensions['B'].width = 15  # REF
+        ws.column_dimensions['C'].width = 15  # POTENTIEL /5
+        ws.column_dimensions['D'].width = 25  # NOMS
+        ws.column_dimensions['E'].width = 15  # TELEPHONES
+        ws.column_dimensions['F'].width = 12  # HEURE
+        ws.column_dimensions['G'].width = 40  # COMMANDES
+        ws.column_dimensions['H'].width = 18  # TOTAL
+        
+        # Créer la réponse HTTP
+        filename = f"Rapport_Commercial_{rapport_data['date_debut']}_{rapport_data['date_fin']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Sauvegarder dans un buffer
+        buffer = BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        response.write(buffer.getvalue())
+        
+        return response
+        
+    except Exception as e:
+        import traceback
+        messages.error(request, f'Erreur lors de l\'export: {str(e)}')
+        return redirect('rapport_commercial')

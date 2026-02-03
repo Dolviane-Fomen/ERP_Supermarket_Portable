@@ -303,5 +303,15 @@ urlpatterns = [
     path('comptabiliter/suivi-chiffre-affaire/', views.suivi_chiffre_affaire, name='suivi_chiffre_affaire'),
     path('comptabiliter/suivi_tresorerie/', views.suivi_tresorerie, name='suivi_tresorerie'),
     path('comptabiliter/consulter_tresorerie/', views.consulter_tresorerie, name='consulter_tresorerie'),
+    
+    # ===== MODULE GESTION COMMERCIALE =====
+    path('commercial/login/', views.login_commercial, name='login_commercial'),
+    path('commercial/logout/', views.logout_commercial, name='logout_commercial'),
+    path('commercial/', views.dashboard_commercial, name='dashboard_commercial'),
+    path('commercial/suivi/', views.suivi_commercial, name='suivi_commercial'),
+    path('commercial/sauvegarder-action/', views.sauvegarder_action_commerciale, name='sauvegarder_action_commerciale'),
+    path('commercial/rapport/', views.rapport_commercial, name='rapport_commercial'),
+    path('commercial/generer-rapport/', views.generer_rapport_commercial, name='generer_rapport_commercial'),
+    path('commercial/export-rapport-excel/', views.export_rapport_commercial_excel, name='export_rapport_commercial_excel'),
 ]
 

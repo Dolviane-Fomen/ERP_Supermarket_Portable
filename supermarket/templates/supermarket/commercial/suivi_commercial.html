@@ -1,0 +1,584 @@
+{% load dict_filters %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suivi Commercial</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            color: white;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 1.8em;
+        }
+        .filter-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .filter-section label {
+            font-weight: 600;
+            margin-right: 10px;
+            color: #2c3e50;
+        }
+        .filter-section select {
+            padding: 10px 15px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 1em;
+            min-width: 250px;
+        }
+        .filter-section select:focus {
+            outline: none;
+            border-color: #11998e;
+        }
+        .table-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow-x: auto;
+            margin-bottom: 20px;
+            border: 1px solid #e1e8ed;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1200px;
+            background: white;
+        }
+        th:nth-child(1), td:nth-child(1) { width: 250px; min-width: 200px; } /* NOMS */
+        th:nth-child(2), td:nth-child(2) { width: 150px; min-width: 130px; } /* TELEPHONES */
+        th:nth-child(3), td:nth-child(3) { width: 150px; min-width: 130px; } /* HEURE */
+        th:nth-child(4), td:nth-child(4) { width: 400px; min-width: 350px; } /* COMMANDES */
+        th:nth-child(5), td:nth-child(5) { width: 200px; min-width: 180px; } /* ACTIONS */
+        th:last-child, td:last-child { width: 150px; min-width: 130px; } /* TOTAL */
+        thead {
+            background: #11998e;
+            color: white;
+        }
+        th {
+            padding: 15px 12px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 0.95em;
+            border: 1px solid #0d7a6f;
+            white-space: nowrap;
+            background: #11998e;
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        td {
+            padding: 12px;
+            border: 1px solid #e1e8ed;
+            vertical-align: top;
+            background: white;
+            min-height: 80px;
+            box-sizing: border-box;
+        }
+        tbody tr:hover td {
+            background-color: #f8f9fa;
+        }
+        tbody tr:nth-child(even) td {
+            background-color: #fafbfc;
+        }
+        .action-input {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 0.9em;
+            min-height: 60px;
+            resize: vertical;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.5;
+            box-sizing: border-box;
+            background: #ffffff;
+            color: #2c3e50;
+        }
+        .action-input:focus {
+            outline: none;
+            border-color: #11998e;
+            background: white;
+        }
+        .action-input::placeholder {
+            color: #8b949e;
+            font-style: italic;
+        }
+        .heure-visite-input {
+            padding: 8px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            width: 100%;
+            font-size: 0.95em;
+            text-align: center;
+            background: white;
+            font-weight: 600;
+            box-sizing: border-box;
+            color: #2c3e50;
+        }
+        .heure-visite-input:focus {
+            outline: none;
+            border-color: #11998e;
+        }
+        .heure-visite-input::placeholder {
+            color: #8b949e;
+            font-weight: normal;
+        }
+        .btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-success {
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: 600;
+            box-sizing: border-box;
+            font-size: 0.9em;
+            padding: 8px 12px;
+            width: 100%;
+            margin-bottom: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .btn-success:hover {
+            background: #218838;
+        }
+        .btn-save {
+            background: #17a2b8;
+            color: white;
+            font-size: 0.9em;
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            width: 100%;
+            border: none;
+            border-radius: 4px;
+            font-weight: 600;
+            cursor: pointer;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .btn-save:hover {
+            background: #138496;
+        }
+        .no-clients {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #11998e;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 10000;
+            display: none;
+            animation: slideInRight 0.3s ease-out;
+            min-width: 300px;
+        }
+        .toast.error {
+            background: #dc3545;
+        }
+        .toast.show {
+            display: block;
+        }
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        .action-display {
+            color: #2c3e50;
+            background: #fff8e1;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border-left: 3px solid #ff9800;
+            margin-bottom: 8px;
+            line-height: 1.5;
+            font-size: 0.9em;
+        }
+        .heure-display {
+            color: #2e7d32;
+            font-weight: 600;
+            background: #e8f5e9;
+            padding: 6px 10px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-bottom: 6px;
+            font-size: 0.9em;
+            border: 1px solid #c8e6c9;
+        }
+        .total-cell {
+            background: #e8f5e9;
+            font-weight: 700;
+            font-size: 1em;
+            color: #1b5e20;
+            text-align: right;
+            padding: 12px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Toast de notification -->
+    <div id="toast" class="toast">
+        <i class="fas fa-check-circle"></i> <span id="toast-message">Action enregistrée avec succès !</span>
+    </div>
+    
+    <div class="container">
+        <a href="{% url 'dashboard_commercial' %}" class="back-link">
+            <i class="fas fa-arrow-left"></i> Retour au dashboard
+        </a>
+        
+        <div class="header">
+            <h1><i class="fas fa-handshake"></i> Suivi Commercial</h1>
+            <p>Gérez le suivi commercial des clients par zone - Enregistrez chaque visite avec son heure et sa commande</p>
+        </div>
+        
+        <div class="filter-section">
+            <form method="get" action="{% url 'suivi_commercial' %}" id="filterForm">
+                <div style="display: flex; gap: 20px; align-items: end; flex-wrap: wrap;">
+                    <div>
+                        <label for="zone-select" style="display: block; margin-bottom: 5px;">
+                            <i class="fas fa-map-marker-alt"></i> Zone :
+                        </label>
+                        <select id="zone-select" name="zone" style="padding: 10px 15px; border: 2px solid #e1e8ed; border-radius: 8px; font-size: 1em; min-width: 250px;">
+                            <option value="">-- Toutes les zones --</option>
+                            {% for zone in zones %}
+                                <option value="{{ zone }}" {% if zone_selectionnee == zone %}selected{% endif %}>
+                                    {{ zone }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="date-select" style="display: block; margin-bottom: 5px;">
+                            <i class="fas fa-calendar-alt"></i> Date de suivi :
+                        </label>
+                        <input 
+                            type="date" 
+                            id="date-select" 
+                            name="date_selectionnee" 
+                            value="{{ date_selectionnee }}"
+                            style="padding: 10px 15px; border: 2px solid #e1e8ed; border-radius: 8px; font-size: 1em;"
+                            onchange="document.getElementById('filterForm').submit()"
+                        />
+                    </div>
+                    <div>
+                        <button type="submit" class="btn btn-success" style="padding: 10px 20px;">
+                            <i class="fas fa-filter"></i> Filtrer
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        
+        <div class="table-container">
+            {% if clients %}
+            <table style="min-width: 100%;">
+                <thead>
+                    <tr>
+                        <th>NOMS</th>
+                        <th>TELEPHONES</th>
+                        <th>HEURE</th>
+                        <th>COMMANDES</th>
+                        <th>ACTIONS</th>
+                        <th>TOTAL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for client in clients %}
+                    <tr id="row_{{ client.id }}">
+                        <td style="font-weight: 700; color: #24292f; font-size: 1.05em; text-transform: uppercase; letter-spacing: 0.3px;"><strong>{{ client.intitule }}</strong></td>
+                        <td style="color: #57606a; font-family: 'Courier New', monospace; font-size: 1em; font-weight: 600; letter-spacing: 1px;">{{ client.telephone }}</td>
+                        
+                        <!-- Colonne Heure -->
+                        <td style="text-align: center;">
+                            {% if client.id in actions_dict %}
+                                {% for action_data in actions_dict|get_item:client.id %}
+                                <div style="margin-bottom: 6px;">
+                                    <span class="heure-display">
+                                        {% if action_data.heure_visite %}{{ action_data.heure_visite|time:'H:i' }}{% else %}--:--{% endif %}
+                                    </span>
+                                </div>
+                                {% endfor %}
+                            {% endif %}
+                            {% if client.id in commandes_dict %}
+                                {% for cmd_data in commandes_dict|get_item:client.id %}
+                                <div style="margin-bottom: 6px;">
+                                    <span style="color: #2e7d32; font-weight: 600; background: #c8e6c9; padding: 6px 10px; border-radius: 4px; display: inline-block; margin-bottom: 6px; font-size: 0.9em; border: 1px solid #a5d6a7;">
+                                        {{ cmd_data.heure }}
+                                    </span>
+                                </div>
+                                {% endfor %}
+                            {% endif %}
+                            <!-- Champ de saisie de l'heure -->
+                            <input 
+                                type="hidden" 
+                                id="heure_visite_{{ client.id }}" 
+                                class="heure-visite-input"
+                            />
+                            <span id="heure_display_{{ client.id }}" class="heure-display" style="display: block; font-weight: 600; color: #11998e;">
+                                --:--
+                            </span>
+                        </td>
+                        
+                        <!-- Colonne Commandes (textarea pour l'action et articles commandés) -->
+                        <td>
+                            {% if client.id in actions_dict %}
+                                {% for action_data in actions_dict|get_item:client.id %}
+                                <div style="margin-bottom: 6px; padding: 6px; background-color: #fff8e1; border-left: 2px solid #ff9800; border-radius: 3px;">
+                                    <span style="font-size: 0.85em; color: #e65100; display: block; margin-bottom: 4px; line-height: 1.4;">
+                                        {{ action_data.action }}
+                                    </span>
+                                </div>
+                                {% endfor %}
+                            {% endif %}
+                            {% if client.id in commandes_dict %}
+                                {% for cmd_data in commandes_dict|get_item:client.id %}
+                                <div style="margin-bottom: 6px; padding: 6px; background-color: #c8e6c9; border-left: 2px solid #4caf50; border-radius: 3px;">
+                                    <span style="font-size: 0.85em; color: #1b5e20; display: block; line-height: 1.4; white-space: pre-line;">
+                                        {{ cmd_data.article|default:"" }}
+                                    </span>
+                                </div>
+                                {% endfor %}
+                            {% endif %}
+                            <!-- Textarea pour saisir l'action/commande -->
+                            <textarea 
+                                class="action-input" 
+                                id="action_{{ client.id }}" 
+                                placeholder="Saisir les articles commandés avec leurs quantités (ex: Riz 5kg x2, Sucre 1kg x3...)"
+                                rows="3"
+                                oninput="updateHeureAuto('{{ client.id }}')"
+                            ></textarea>
+                        </td>
+                        
+                        <!-- Colonne Actions (boutons Enregistrer et Passer Commande) -->
+                        <td style="text-align: center;">
+                            <button 
+                                class="btn btn-save btn-sauvegarder-action" 
+                                data-client-id="{{ client.id }}"
+                                style="width: 100%; box-sizing: border-box;"
+                            >
+                                <i class="fas fa-save"></i> Enregistrer
+                            </button>
+                            <a 
+                                href="{% url 'enregistrer_commande' %}?client_id={{ client.id }}&from=commercial&zone={{ zone_selectionnee|default:'' }}&date={{ date_selectionnee }}" 
+                                class="btn btn-success"
+                                style="display: block; width: 100%; text-align: center; padding: 10px 16px; font-size: 0.95em; box-sizing: border-box; margin-top: 8px;"
+                            >
+                                <i class="fas fa-shopping-cart"></i> Passer Commande
+                            </a>
+                        </td>
+                        
+                        <!-- Colonne Total -->
+                        <td class="total-cell">
+                            {% if client.id in commandes_totaux %}
+                                <strong>{{ commandes_totaux|get_item:client.id|floatformat:0 }} FCFA</strong>
+                            {% else %}
+                                <strong>0 FCFA</strong>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="no-clients">
+                <i class="fas fa-info-circle" style="font-size: 3em; color: #6c757d; margin-bottom: 20px;"></i>
+                <p>Aucun client trouvé pour cette zone.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <script>
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+            toastMessage.textContent = message;
+            
+            if (isError) {
+                toast.classList.add('error');
+                toast.innerHTML = '<i class="fas fa-exclamation-circle"></i> <span id="toast-message">' + message + '</span>';
+            } else {
+                toast.classList.remove('error');
+                toast.innerHTML = '<i class="fas fa-check-circle"></i> <span id="toast-message">' + message + '</span>';
+            }
+            
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+        
+        // Fonction pour remplir automatiquement l'heure lors de la saisie d'un commentaire
+        function updateHeureAuto(clientId) {
+            const actionInput = document.getElementById('action_' + clientId);
+            const heureVisiteInput = document.getElementById('heure_visite_' + clientId);
+            const heureDisplay = document.getElementById('heure_display_' + clientId);
+            
+            const action = actionInput.value.trim();
+            
+            // Si un commentaire est saisi, remplir automatiquement l'heure actuelle
+            if (action) {
+                const now = new Date();
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const heureActuelle = hours + ':' + minutes;
+                
+                heureVisiteInput.value = heureActuelle;
+                heureDisplay.textContent = heureActuelle;
+                heureDisplay.style.color = '#11998e';
+            } else {
+                heureVisiteInput.value = '';
+                heureDisplay.textContent = '--:--';
+                heureDisplay.style.color = '#6c757d';
+            }
+        }
+        
+        function sauvegarderAction(clientId) {
+            const actionInput = document.getElementById('action_' + clientId);
+            const heureVisiteInput = document.getElementById('heure_visite_' + clientId);
+            
+            const action = actionInput.value.trim();
+            
+            // Vérifier qu'au moins l'action est remplie
+            if (!action) {
+                showToast('Veuillez saisir une commande ou un commentaire.', true);
+                return;
+            }
+            
+            // Toujours remplir automatiquement l'heure si un commentaire est saisi
+            updateHeureAuto(clientId);
+            
+            // Récupérer l'heure après la mise à jour automatique
+            const heureVisite = heureVisiteInput.value;
+            
+            // Récupérer la date sélectionnée dans le filtre
+            const dateSelectionnee = document.getElementById('date-select').value;
+            
+            const formData = new FormData();
+            formData.append('client_id', clientId);
+            formData.append('action', action);
+            formData.append('heure_visite', heureVisite);
+            formData.append('date_action', dateSelectionnee);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            
+            // Trouver le bouton qui a déclenché l'action
+            const saveButton = document.querySelector('[data-client-id="' + clientId + '"].btn-sauvegarder-action');
+            if (saveButton) {
+                saveButton.disabled = true;
+                saveButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enregistrement...';
+            }
+            
+            fetch('{% url "sauvegarder_action_commerciale" %}', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (saveButton) {
+                    saveButton.disabled = false;
+                    saveButton.innerHTML = '<i class="fas fa-save"></i> Enregistrer';
+                }
+                
+                if (data.success) {
+                    showToast('✓ Visite commerciale enregistrée avec succès !');
+                    // Réinitialiser les champs
+                    actionInput.value = '';
+                    heureVisiteInput.value = '';
+                    const heureDisplay = document.getElementById('heure_display_' + clientId);
+                    if (heureDisplay) {
+                        heureDisplay.textContent = '--:--';
+                        heureDisplay.style.color = '#6c757d';
+                    }
+                    // Recharger la page pour afficher la nouvelle action
+                    setTimeout(() => {
+                        const zone = document.getElementById('zone-select').value;
+                        const date = document.getElementById('date-select').value;
+                        let url = '{% url "suivi_commercial" %}?';
+                        if (zone) url += 'zone=' + encodeURIComponent(zone) + '&';
+                        if (date) url += 'date_selectionnee=' + encodeURIComponent(date);
+                        window.location.href = url;
+                    }, 500);
+                } else {
+                    showToast('Erreur : ' + data.error, true);
+                }
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                if (saveButton) {
+                    saveButton.disabled = false;
+                    saveButton.innerHTML = '<i class="fas fa-save"></i> Enregistrer';
+                }
+                showToast('Une erreur est survenue lors de l\'enregistrement.', true);
+            });
+        }
+        
+        // Écouteurs d'événements pour les boutons
+        document.addEventListener('DOMContentLoaded', function() {
+            // Boutons de sauvegarde
+            document.querySelectorAll('.btn-sauvegarder-action').forEach(function(button) {
+                button.addEventListener('click', function() {
+                    const clientId = this.getAttribute('data-client-id');
+                    sauvegarderAction(clientId);
+                });
+            });
+        });
+    </script>
+</body>
+</html>

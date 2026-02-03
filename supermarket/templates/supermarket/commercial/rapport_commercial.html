@@ -1,0 +1,370 @@
+{% load dict_filters %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rapport Commercial</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        .header {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            color: white;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 1.8em;
+        }
+        .filter-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .filter-section .form-row {
+            display: flex;
+            gap: 20px;
+            align-items: end;
+            flex-wrap: wrap;
+        }
+        .filter-section .form-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        .filter-section label {
+            font-weight: 600;
+            margin-bottom: 5px;
+            display: block;
+            color: #2c3e50;
+        }
+        .filter-section input,
+        .filter-section select {
+            padding: 10px 15px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 1em;
+            width: 100%;
+        }
+        .filter-section input:focus,
+        .filter-section select:focus {
+            outline: none;
+            border-color: #11998e;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(17, 153, 142, 0.3);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+        }
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(40, 167, 69, 0.3);
+        }
+        .table-container {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            overflow-x: auto;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1000px;
+        }
+        th {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border: 1px solid #0d7a6f;
+        }
+        td {
+            padding: 10px;
+            border: 1px solid #e1e8ed;
+        }
+        tbody tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        tbody tr:hover {
+            background-color: #e8f5e9;
+        }
+        .stats-section {
+            margin-bottom: 30px;
+        }
+        .stats-title {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #11998e;
+        }
+        .total-row {
+            background-color: #c8e6c9 !important;
+            font-weight: 700;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #11998e;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        #loading {
+            text-align: center;
+            padding: 40px;
+            color: #11998e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="{% url 'dashboard_commercial' %}" class="back-link">
+            <i class="fas fa-arrow-left"></i> Retour au dashboard
+        </a>
+        
+        <div class="header">
+            <h1><i class="fas fa-file-alt"></i> Rapport Commercial</h1>
+            <p>Générez et exportez les rapports d'activité commerciale</p>
+        </div>
+        
+        <div class="filter-section">
+            <form id="rapportForm" method="post" action="{% url 'generer_rapport_commercial' %}">
+                {% csrf_token %}
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="date_debut">Date de début :</label>
+                        <input type="date" id="date_debut" name="date_debut" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="date_fin">Date de fin :</label>
+                        <input type="date" id="date_fin" name="date_fin" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="zone">Zone (optionnel) :</label>
+                        <select id="zone" name="zone">
+                            <option value="">-- Toutes les zones --</option>
+                            {% for zone in zones %}
+                                <option value="{{ zone }}">{{ zone }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i> Générer
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        
+        <div class="table-container">
+            <div id="loading" style="display: none;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 2em;"></i>
+                <p>Génération du rapport en cours...</p>
+            </div>
+            
+            <div id="no-data" class="no-data" style="display: none;">
+                <i class="fas fa-info-circle" style="font-size: 3em; margin-bottom: 20px;"></i>
+                <p>Aucune donnée trouvée pour cette période.</p>
+            </div>
+            
+            <div id="results" style="display: none;">
+                <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0; color: #2c3e50;">Résultats du rapport</h3>
+                    <a href="{% url 'export_rapport_commercial_excel' %}" class="btn btn-success" id="exportBtn">
+                        <i class="fas fa-file-excel"></i> Exporter en Excel
+                    </a>
+                </div>
+                
+                <!-- Tableau principal comme dans l'image -->
+                <table id="rapportTable" style="border-collapse: collapse; width: 100%; min-width: 1200px;">
+                    <thead>
+                        <tr>
+                            <th>DETAIL</th>
+                            <th>REF</th>
+                            <th>POTENTIEL /5</th>
+                            <th>NOMS</th>
+                            <th>TELEPHONES</th>
+                            <th>HEURE</th>
+                            <th>COMMANDES</th>
+                            <th>TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rapportBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.getElementById('rapportForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            const noData = document.getElementById('no-data');
+            const rapportBody = document.getElementById('rapportBody');
+            
+            loading.style.display = 'block';
+            results.style.display = 'none';
+            noData.style.display = 'none';
+            
+            const formData = new FormData(this);
+            
+            fetch('{% url "generer_rapport_commercial" %}', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Erreur HTTP: ' + response.status);
+                }
+                return response.json();
+            })
+            .then(data => {
+                loading.style.display = 'none';
+                
+                if (!data.success) {
+                    alert('Erreur: ' + data.error);
+                    return;
+                }
+                
+                if (!data.clients || data.clients.length === 0) {
+                    noData.style.display = 'block';
+                    return;
+                }
+                
+                results.style.display = 'block';
+                
+                // Afficher le tableau principal
+                rapportBody.innerHTML = '';
+                const clients = data.clients || [];
+                clients.sort((a, b) => {
+                    // Trier par ref, puis detail, puis nom
+                    const refA = (a.ref || '').localeCompare(b.ref || '');
+                    if (refA !== 0) return refA;
+                    const detailA = (a.detail || '').localeCompare(b.detail || '');
+                    if (detailA !== 0) return detailA;
+                    return (a.nom || '').localeCompare(b.nom || '');
+                });
+                
+                clients.forEach(client => {
+                    // Récupérer les actions et commandes du client
+                    const actions = client.actions || [];
+                    const commandes = client.commandes || [];
+                    
+                    // Combiner actions et commandes pour créer les lignes
+                    const allItems = [];
+                    
+                    // Ajouter les commandes
+                    commandes.forEach(cmd => {
+                        allItems.push({
+                            type: 'commande',
+                            heure: cmd.heure || '',
+                            texte: cmd.article || '',
+                            total: cmd.prix_total || 0
+                        });
+                    });
+                    
+                    // Ajouter les actions (visites sans commande)
+                    actions.forEach(action => {
+                        // Vérifier si cette action a déjà une commande à la même heure
+                        const hasCommande = commandes.some(cmd => cmd.heure === action.heure_visite);
+                        if (!hasCommande) {
+                            allItems.push({
+                                type: 'action',
+                                heure: action.heure_visite || '',
+                                texte: action.action || '',
+                                total: 0
+                            });
+                        }
+                    });
+                    
+                    // Trier par heure
+                    allItems.sort((a, b) => (a.heure || '').localeCompare(b.heure || ''));
+                    
+                    // Créer une ligne pour chaque item
+                    if (allItems.length > 0) {
+                        allItems.forEach((item, index) => {
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${index === 0 ? (client.detail || '') : ''}</td>
+                                <td>${index === 0 ? (client.ref || '') : ''}</td>
+                                <td>${index === 0 ? (client.potentiel || '') : ''}</td>
+                                <td>${index === 0 ? (client.nom || '') : ''}</td>
+                                <td>${index === 0 ? (client.telephone || '') : ''}</td>
+                                <td>${item.heure}</td>
+                                <td style="white-space: pre-line;">${item.texte}</td>
+                                <td>${item.total > 0 ? item.total.toLocaleString('fr-FR') + ' FCFA' : ''}</td>
+                            `;
+                            rapportBody.appendChild(row);
+                        });
+                    } else {
+                        // Client sans visite ni commande
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${client.detail || ''}</td>
+                            <td>${client.ref || ''}</td>
+                            <td>${client.potentiel || ''}</td>
+                            <td>${client.nom || ''}</td>
+                            <td>${client.telephone || ''}</td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                        `;
+                        rapportBody.appendChild(row);
+                    }
+                });
+            })
+            .catch(error => {
+                loading.style.display = 'none';
+                console.error('Erreur:', error);
+                alert('Une erreur est survenue lors de la génération du rapport.');
+            });
+        });
+    </script>
+</body>
+</html>

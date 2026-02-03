@@ -1007,6 +1007,27 @@ class SuiviClientAction(models.Model):
         return f"Appel {heure_str} ({plage}) - {self.client.intitule} - {self.date_action.strftime('%d/%m/%Y')}"
 
 
+class SuiviCommercialAction(models.Model):
+    """Modèle pour suivre les actions commerciales sur les clients - Visites commerciales"""
+    
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, verbose_name="Client", related_name='actions_suivi_commercial')
+    agence = models.ForeignKey(Agence, on_delete=models.CASCADE, verbose_name="Agence")
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Créé par", related_name='actions_suivi_commercial_creees')
+    heure_visite = models.TimeField(blank=True, null=True, verbose_name="Heure de visite")
+    action = models.TextField(verbose_name="Action/Commande", blank=True, null=True)
+    date_action = models.DateTimeField(auto_now_add=True, verbose_name="Date de l'action")
+    date_creation = models.DateTimeField(auto_now_add=True, verbose_name="Date de création")
+    
+    class Meta:
+        verbose_name = "Action de suivi commercial"
+        verbose_name_plural = "Actions de suivi commercial"
+        ordering = ['-date_action', '-heure_visite']
+    
+    def __str__(self):
+        heure_str = self.heure_visite.strftime('%H:%M') if self.heure_visite else 'N/A'
+        return f"Visite {heure_str} - {self.client.intitule} - {self.date_action.strftime('%d/%m/%Y')}"
+
+
 class Livraison(models.Model):
     """Modèle pour les livraisons"""
     ETAT_CHOICES = [
