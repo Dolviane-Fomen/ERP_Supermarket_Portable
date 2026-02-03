@@ -66,6 +66,7 @@ class Compte(models.Model):
             ('magasinier', 'Magasinier'),
             ('comptable', 'Comptable'),
             ('acm', 'ACM'),
+            ('commercial', 'Commercial'),
             ('livreur', 'Livreur'),
             ('responsable_logistique', 'Responsable Logistique'),
             ('responsable_rh', 'Responsable Ressource Humaine'),

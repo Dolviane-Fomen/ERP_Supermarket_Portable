@@ -23947,6 +23947,10 @@ def dashboard_commercial(request):
             messages.error(request, 'Votre compte n\'est pas configuré correctement.')
             return redirect('logout_commercial')
         
+        # Si c'est un commercial, rediriger vers sa page personnalisée
+        if compte.type_compte == 'commercial':
+            return redirect('travail_commercial')
+        
         context = {
             'compte': compte,
             'agence': agence,
@@ -23956,6 +23960,61 @@ def dashboard_commercial(request):
     except Compte.DoesNotExist:
         messages.error(request, 'Compte non trouvé ou inactif.')
         return redirect('logout_commercial')
+
+@login_required
+def travail_commercial(request):
+    """Page de travail personnalisée pour les commerciaux - Affiche seulement leurs données"""
+    agence = get_user_agence(request)
+    if not agence:
+        messages.error(request, 'Votre compte n\'est pas correctement lié à une agence.')
+        return redirect('logout_commercial')
+    
+    compte = get_user_compte(request)
+    if not compte or compte.type_compte != 'commercial':
+        messages.error(request, 'Accès réservé aux commerciaux.')
+        return redirect('logout_commercial')
+    
+    # Filtrer les données pour ce commercial uniquement
+    suivi_actions_queryset = SuiviCommercialAction.objects.filter(agence=agence, created_by=compte.user)
+    commandes_queryset = Commande.objects.filter(agence=agence, created_by=compte.user)
+    
+    # Statistiques des actions commerciales
+    total_visites = suivi_actions_queryset.count()
+    visites_aujourdhui = suivi_actions_queryset.filter(date_action__date=timezone.now().date()).count()
+    
+    # Statistiques des commandes
+    total_commandes = commandes_queryset.count()
+    commandes_aujourdhui = commandes_queryset.filter(date=timezone.now().date()).count()
+    total_ventes = commandes_queryset.aggregate(total=Sum('prix_total'))['total'] or 0
+    
+    # Actions récentes (10 dernières)
+    actions_recents = suivi_actions_queryset.select_related('client').order_by('-date_action', '-heure_visite')[:10]
+    
+    # Commandes récentes (10 dernières)
+    commandes_recents = commandes_queryset.select_related('client', 'article').order_by('-date', '-heure')[:10]
+    
+    # Zones des clients visités par ce commercial
+    zones = Client.objects.filter(
+        agence=agence,
+        actions_commerciales__created_by=compte.user
+    ).values_list('zone', flat=True).distinct().exclude(zone__isnull=True).exclude(zone='').order_by('zone')
+    
+    context = {
+        'agence': agence,
+        'compte': compte,
+        'user': request.user,
+        'nom_utilisateur': compte.nom_complet,
+        'total_visites': total_visites,
+        'visites_aujourdhui': visites_aujourdhui,
+        'total_commandes': total_commandes,
+        'commandes_aujourdhui': commandes_aujourdhui,
+        'total_ventes': total_ventes,
+        'actions_recents': actions_recents,
+        'commandes_recents': commandes_recents,
+        'zones': zones,
+        'is_commercial_view': True,  # Flag pour identifier la vue commercial
+    }
+    return render(request, 'supermarket/commercial/dashboard.html', context)
 
 @login_required
 def suivi_commercial(request):

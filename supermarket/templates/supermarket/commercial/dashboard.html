@@ -677,37 +677,91 @@
             <div class="welcome-section">
                 <h3>
                     <i class="fas fa-hand-sparkles"></i>
-                    Bienvenue dans le module de Gestion Commerciale
+                    {% if is_commercial_view %}
+                        Bienvenue {{ nom_utilisateur|default:user.username }}
+                    {% else %}
+                        Bienvenue dans le module de Gestion Commerciale
+                    {% endif %}
                 </h3>
                 <p>
-                    Ce module vous permet de suivre l'activité commerciale, enregistrer les visites clients, 
-                    gérer les commandes et générer des rapports détaillés pour analyser les performances de votre équipe commerciale.
+                    {% if is_commercial_view %}
+                        Suivez votre activité commerciale, consultez vos visites clients et vos commandes. 
+                        Gérez efficacement votre portefeuille clients et améliorez vos performances.
+                    {% else %}
+                        Ce module vous permet de suivre l'activité commerciale, enregistrer les visites clients, 
+                        gérer les commandes et générer des rapports détaillés pour analyser les performances de votre équipe commerciale.
+                    {% endif %}
                 </p>
             </div>
 
             <!-- Stats Cards -->
             <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <i class="fas fa-users"></i>
+                {% if is_commercial_view %}
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-calendar-check"></i>
+                        </div>
+                        <div class="stat-label">Visites Total</div>
+                        <div class="stat-value">{{ total_visites|default:0 }}</div>
                     </div>
-                    <div class="stat-label">Clients Actifs</div>
-                    <div class="stat-value">--</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <i class="fas fa-shopping-cart"></i>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-calendar-day"></i>
+                        </div>
+                        <div class="stat-label">Visites Aujourd'hui</div>
+                        <div class="stat-value">{{ visites_aujourdhui|default:0 }}</div>
                     </div>
-                    <div class="stat-label">Commandes Aujourd'hui</div>
-                    <div class="stat-value">--</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <i class="fas fa-map-marker-alt"></i>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-shopping-cart"></i>
+                        </div>
+                        <div class="stat-label">Commandes Total</div>
+                        <div class="stat-value">{{ total_commandes|default:0 }}</div>
                     </div>
-                    <div class="stat-label">Zones Couvertes</div>
-                    <div class="stat-value">--</div>
-                </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-shopping-bag"></i>
+                        </div>
+                        <div class="stat-label">Commandes Aujourd'hui</div>
+                        <div class="stat-value">{{ commandes_aujourdhui|default:0 }}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-money-bill-wave"></i>
+                        </div>
+                        <div class="stat-label">Total Ventes</div>
+                        <div class="stat-value">{{ total_ventes|floatformat:0|default:0 }} FCFA</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </div>
+                        <div class="stat-label">Zones Couvertes</div>
+                        <div class="stat-value">{{ zones|length|default:0 }}</div>
+                    </div>
+                {% else %}
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-label">Clients Actifs</div>
+                        <div class="stat-value">--</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-shopping-cart"></i>
+                        </div>
+                        <div class="stat-label">Commandes Aujourd'hui</div>
+                        <div class="stat-value">--</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </div>
+                        <div class="stat-label">Zones Couvertes</div>
+                        <div class="stat-value">--</div>
+                    </div>
+                {% endif %}
             </div>
 
             <!-- Feature Cards -->
@@ -734,6 +788,74 @@
                     </p>
                 </a>
             </div>
+
+            {% if is_commercial_view %}
+            <!-- Section Actions Récentes -->
+            {% if actions_recents %}
+            <div style="background: white; border-radius: 20px; padding: 30px; box-shadow: var(--card-shadow); margin-bottom: 30px;">
+                <h3 style="color: var(--dark-bg); font-size: 1.5em; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-history"></i> Visites Récentes
+                </h3>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%); color: white;">
+                                <th style="padding: 12px; text-align: left;">Date</th>
+                                <th style="padding: 12px; text-align: left;">Heure</th>
+                                <th style="padding: 12px; text-align: left;">Client</th>
+                                <th style="padding: 12px; text-align: left;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for action in actions_recents %}
+                            <tr style="border-bottom: 1px solid #e1e8ed;">
+                                <td style="padding: 12px;">{{ action.date_action|date:"d/m/Y" }}</td>
+                                <td style="padding: 12px;">{{ action.heure_visite|time:"H:i"|default:"--:--" }}</td>
+                                <td style="padding: 12px;">{{ action.client.intitule }}</td>
+                                <td style="padding: 12px;">{{ action.action|truncatewords:10|default:"-" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Section Commandes Récentes -->
+            {% if commandes_recents %}
+            <div style="background: white; border-radius: 20px; padding: 30px; box-shadow: var(--card-shadow); margin-bottom: 30px;">
+                <h3 style="color: var(--dark-bg); font-size: 1.5em; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-shopping-cart"></i> Commandes Récentes
+                </h3>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%); color: white;">
+                                <th style="padding: 12px; text-align: left;">Date</th>
+                                <th style="padding: 12px; text-align: left;">Heure</th>
+                                <th style="padding: 12px; text-align: left;">Client</th>
+                                <th style="padding: 12px; text-align: left;">Article</th>
+                                <th style="padding: 12px; text-align: right;">Quantité</th>
+                                <th style="padding: 12px; text-align: right;">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cmd in commandes_recents %}
+                            <tr style="border-bottom: 1px solid #e1e8ed;">
+                                <td style="padding: 12px;">{{ cmd.date|date:"d/m/Y" }}</td>
+                                <td style="padding: 12px;">{{ cmd.heure|time:"H:i"|default:"--:--" }}</td>
+                                <td style="padding: 12px;">{{ cmd.client.intitule }}</td>
+                                <td style="padding: 12px;">{{ cmd.article.designation|default:"-" }}</td>
+                                <td style="padding: 12px; text-align: right;">{{ cmd.quantite }}</td>
+                                <td style="padding: 12px; text-align: right;">{{ cmd.prix_total|floatformat:0 }} FCFA</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+            {% endif %}
         </div>
     </div>
 

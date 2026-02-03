@@ -308,6 +308,7 @@ urlpatterns = [
     path('commercial/login/', views.login_commercial, name='login_commercial'),
     path('commercial/logout/', views.logout_commercial, name='logout_commercial'),
     path('commercial/', views.dashboard_commercial, name='dashboard_commercial'),
+    path('commercial/travail-commercial/', views.travail_commercial, name='travail_commercial'),
     path('commercial/suivi/', views.suivi_commercial, name='suivi_commercial'),
     path('commercial/sauvegarder-action/', views.sauvegarder_action_commerciale, name='sauvegarder_action_commerciale'),
     path('commercial/rapport/', views.rapport_commercial, name='rapport_commercial'),
