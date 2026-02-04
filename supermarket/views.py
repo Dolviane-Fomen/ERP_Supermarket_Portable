@@ -24076,7 +24076,8 @@ def suivi_commercial(request):
             'action': action.action or '',
             'heure_visite': action.heure_visite,
             'date_action': action.date_action,
-            'id': action.id
+            'id': action.id,
+            'photo': action.photo
         })
     
     # Récupérer les commandes avec leurs détails (articles, quantités, heures)
@@ -24203,12 +24204,18 @@ def sauvegarder_action_commerciale(request):
                 except ValueError:
                     pass
             
+            # Gérer l'upload de photo si présente
+            photo = None
+            if 'photo' in request.FILES:
+                photo = request.FILES['photo']
+            
             # Créer une nouvelle action commerciale (plusieurs visites possibles par client)
             suivi_action = SuiviCommercialAction.objects.create(
                 client=client,
                 agence=agence,
                 action=action,
                 heure_visite=heure_visite,
+                photo=photo,
                 date_action=date_action,
                 created_by=request.user  # Enregistrer qui a créé l'action
             )
@@ -24300,10 +24307,18 @@ def generer_rapport_commercial(request):
                 client_id = action.client.id
                 if client_id not in actions_dict:
                     actions_dict[client_id] = []
+                photo_url = None
+                if action.photo:
+                    try:
+                        photo_url = action.photo.url
+                    except:
+                        photo_url = None
+                
                 actions_dict[client_id].append({
                     'action': action.action or '',
                     'heure_visite': action.heure_visite.strftime('%H:%M') if action.heure_visite else '',
-                    'date_action': action.date_action
+                    'date_action': action.date_action,
+                    'photo': photo_url
                 })
             
             # Récupérer les commandes pour chaque client dans la période
@@ -24397,7 +24412,8 @@ def generer_rapport_commercial(request):
                         {
                             'action': a['action'],
                             'heure_visite': a['heure_visite'],
-                            'date_action': a['date_action'].strftime('%Y-%m-%d %H:%M:%S') if hasattr(a['date_action'], 'strftime') else str(a['date_action'])
+                            'date_action': a['date_action'].strftime('%Y-%m-%d %H:%M:%S') if hasattr(a['date_action'], 'strftime') else str(a['date_action']),
+                            'photo': a.get('photo')
                         } for a in client_data['actions']
                     ],
                     'nb_commandes': client_data['nb_commandes'],
@@ -24468,26 +24484,26 @@ def export_rapport_commercial_excel(request):
         )
         
         # En-tête
-        ws.merge_cells('A1:H1')
+        ws.merge_cells('A1:I1')
         ws['A1'] = f"RAPPORT COMMERCIAL - {agence.nom_agence}"
         ws['A1'].font = title_font
         ws['A1'].alignment = Alignment(horizontal='center', vertical='center')
         
-        ws.merge_cells('A2:H2')
+        ws.merge_cells('A2:I2')
         ws['A2'] = f"Période : {datetime.strptime(rapport_data['date_debut'], '%Y-%m-%d').strftime('%d/%m/%Y')} au {datetime.strptime(rapport_data['date_fin'], '%Y-%m-%d').strftime('%d/%m/%Y')}"
         ws['A2'].alignment = Alignment(horizontal='center')
         
         row_num = 3
         if rapport_data.get('zone'):
-            ws.merge_cells(f'A{row_num}:H{row_num}')
+            ws.merge_cells(f'A{row_num}:I{row_num}')
             ws[f'A{row_num}'] = f"Zone : {rapport_data['zone']}"
             ws[f'A{row_num}'].alignment = Alignment(horizontal='center')
             row_num += 1
         
         start_row = row_num + 1
         
-        # En-têtes de colonnes : DETAIL, REF, POTENTIEL /5, NOMS, TELEPHONES, HEURE, COMMANDES, TOTAL
-        headers = ['DETAIL', 'REF', 'POTENTIEL /5', 'NOMS', 'TELEPHONES', 'HEURE', 'COMMANDES', 'TOTAL']
+        # En-têtes de colonnes : DETAIL, REF, POTENTIEL /5, NOMS, TELEPHONES, HEURE, COMMANDES, PHOTO, TOTAL
+        headers = ['DETAIL', 'REF', 'POTENTIEL /5', 'NOMS', 'TELEPHONES', 'HEURE', 'COMMANDES', 'PHOTO', 'TOTAL']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=start_row, column=col)
             cell.value = header
@@ -24513,12 +24529,22 @@ def export_rapport_commercial_excel(request):
             # Combiner actions et commandes
             all_items = []
             
-            # Ajouter les commandes
+            # Ajouter les commandes avec leurs photos associées
             for cmd in commandes:
+                # Chercher si une action avec photo correspond à cette commande
+                photo_associee = None
+                heure_cmd = cmd.get('heure', '')
+                for action in actions:
+                    heure_action = action.get('heure_visite', '')
+                    if heure_action == heure_cmd and action.get('photo'):
+                        photo_associee = action.get('photo')
+                        break
+                
                 all_items.append({
-                    'heure': cmd.get('heure', ''),
+                    'heure': heure_cmd,
                     'texte': cmd.get('article', ''),
-                    'total': cmd.get('prix_total', 0)
+                    'total': cmd.get('prix_total', 0),
+                    'photo': photo_associee
                 })
             
             # Ajouter les actions (visites sans commande)
@@ -24529,7 +24555,8 @@ def export_rapport_commercial_excel(request):
                     all_items.append({
                         'heure': heure_action,
                         'texte': action.get('action', ''),
-                        'total': 0
+                        'total': 0,
+                        'photo': action.get('photo')
                     })
             
             # Trier par heure
@@ -24547,7 +24574,28 @@ def export_rapport_commercial_excel(request):
                     cell_cmd = ws.cell(row=row_num, column=7, value=item['texte'])
                     cell_cmd.border = border
                     cell_cmd.alignment = Alignment(wrap_text=True, vertical='top')
-                    cell_total = ws.cell(row=row_num, column=8, value=item['total'])
+                    
+                    # Colonne photo
+                    photo_url = item.get('photo', '')
+                    cell_photo = ws.cell(row=row_num, column=8, value='')
+                    cell_photo.border = border
+                    if photo_url:
+                        # Construire l'URL absolue de la photo
+                        from django.conf import settings
+                        if photo_url.startswith('/'):
+                            # URL relative, construire l'URL absolue
+                            photo_absolute_url = request.build_absolute_uri(photo_url)
+                        else:
+                            photo_absolute_url = photo_url
+                        
+                        # Créer un lien hypertexte vers la photo
+                        cell_photo.hyperlink = photo_absolute_url
+                        cell_photo.value = 'Voir photo'
+                        cell_photo.font = Font(color="0000FF", underline="single")
+                    else:
+                        cell_photo.value = ''
+                    
+                    cell_total = ws.cell(row=row_num, column=9, value=item['total'])
                     if item['total'] > 0:
                         cell_total.number_format = '#,##0 "FCFA"'
                     cell_total.border = border
@@ -24562,11 +24610,12 @@ def export_rapport_commercial_excel(request):
                 ws.cell(row=row_num, column=6, value='').border = border
                 ws.cell(row=row_num, column=7, value='').border = border
                 ws.cell(row=row_num, column=8, value='').border = border
+                ws.cell(row=row_num, column=9, value='').border = border
                 row_num += 1
         
         # Ajouter les statistiques par zone après les données clients
         row_num += 2
-        ws.merge_cells(f'A{row_num}:H{row_num}')
+        ws.merge_cells(f'A{row_num}:I{row_num}')
         ws[f'A{row_num}'] = "STATISTIQUES PAR ZONE"
         ws[f'A{row_num}'].font = Font(bold=True, size=12)
         ws[f'A{row_num}'].fill = PatternFill(start_color="E8F5E9", end_color="E8F5E9", fill_type="solid")
@@ -24620,7 +24669,8 @@ def export_rapport_commercial_excel(request):
         ws.column_dimensions['E'].width = 15  # TELEPHONES
         ws.column_dimensions['F'].width = 12  # HEURE
         ws.column_dimensions['G'].width = 40  # COMMANDES
-        ws.column_dimensions['H'].width = 18  # TOTAL
+        ws.column_dimensions['H'].width = 20  # PHOTO
+        ws.column_dimensions['I'].width = 18  # TOTAL
         
         # Créer la réponse HTTP
         filename = f"Rapport_Commercial_{rapport_data['date_debut']}_{rapport_data['date_fin']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"

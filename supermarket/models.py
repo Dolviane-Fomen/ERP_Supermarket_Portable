@@ -1016,6 +1016,7 @@ class SuiviCommercialAction(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Créé par", related_name='actions_suivi_commercial_creees')
     heure_visite = models.TimeField(blank=True, null=True, verbose_name="Heure de visite")
     action = models.TextField(verbose_name="Action/Commande", blank=True, null=True)
+    photo = models.ImageField(upload_to='suivi_commercial/photos/', blank=True, null=True, verbose_name="Photo")
     date_action = models.DateTimeField(auto_now_add=True, verbose_name="Date de l'action")
     date_creation = models.DateTimeField(auto_now_add=True, verbose_name="Date de création")
     

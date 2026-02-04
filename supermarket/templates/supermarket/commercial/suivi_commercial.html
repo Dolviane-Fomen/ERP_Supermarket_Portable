@@ -70,7 +70,8 @@
         th:nth-child(2), td:nth-child(2) { width: 150px; min-width: 130px; } /* TELEPHONES */
         th:nth-child(3), td:nth-child(3) { width: 150px; min-width: 130px; } /* HEURE */
         th:nth-child(4), td:nth-child(4) { width: 400px; min-width: 350px; } /* COMMANDES */
-        th:nth-child(5), td:nth-child(5) { width: 200px; min-width: 180px; } /* ACTIONS */
+        th:nth-child(5), td:nth-child(5) { width: 200px; min-width: 180px; } /* PHOTO */
+        th:nth-child(6), td:nth-child(6) { width: 200px; min-width: 180px; } /* ACTIONS */
         th:last-child, td:last-child { width: 150px; min-width: 130px; } /* TOTAL */
         thead {
             background: #11998e;
@@ -269,6 +270,41 @@
             text-align: right;
             padding: 12px;
         }
+        .photo-upload-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: center;
+        }
+        .photo-input {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 0.85em;
+            cursor: pointer;
+        }
+        .photo-preview {
+            max-width: 100px;
+            max-height: 100px;
+            border-radius: 4px;
+            border: 1px solid #d1d5db;
+            object-fit: cover;
+            margin-top: 4px;
+        }
+        .photo-display {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            align-items: center;
+        }
+        .photo-display img {
+            max-width: 80px;
+            max-height: 80px;
+            border-radius: 4px;
+            border: 1px solid #d1d5db;
+            object-fit: cover;
+        }
     </style>
 </head>
 <body>
@@ -334,6 +370,7 @@
                         <th>TELEPHONES</th>
                         <th>HEURE</th>
                         <th>COMMANDES</th>
+                        <th>PHOTO</th>
                         <th>ACTIONS</th>
                         <th>TOTAL</th>
                     </tr>
@@ -403,6 +440,30 @@
                                 rows="3"
                                 oninput="updateHeureAuto('{{ client.id }}')"
                             ></textarea>
+                        </td>
+                        
+                        <!-- Colonne Photo -->
+                        <td style="text-align: center;">
+                            {% if client.id in actions_dict %}
+                                {% for action_data in actions_dict|get_item:client.id %}
+                                    {% if action_data.photo %}
+                                    <div class="photo-display" style="margin-bottom: 6px;">
+                                        <img src="{{ action_data.photo.url }}" alt="Photo visite" onclick="showPhotoModal('{{ action_data.photo.url }}')" style="cursor: pointer;">
+                                    </div>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+                            <div class="photo-upload-container">
+                                <input 
+                                    type="file" 
+                                    id="photo_{{ client.id }}" 
+                                    name="photo_{{ client.id }}"
+                                    accept="image/*"
+                                    class="photo-input"
+                                    onchange="previewPhoto('{{ client.id }}', this)"
+                                />
+                                <img id="photo_preview_{{ client.id }}" class="photo-preview" style="display: none;" alt="Aperçu photo">
+                            </div>
                         </td>
                         
                         <!-- Colonne Actions (boutons Enregistrer et Passer Commande) -->
@@ -490,15 +551,43 @@
             }
         }
         
+        function previewPhoto(clientId, input) {
+            const preview = document.getElementById('photo_preview_' + clientId);
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                };
+                reader.readAsDataURL(input.files[0]);
+            } else {
+                preview.style.display = 'none';
+            }
+        }
+        
+        function showPhotoModal(photoUrl) {
+            // Créer une modal simple pour afficher la photo en grand
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10001; display: flex; align-items: center; justify-content: center; cursor: pointer;';
+            modal.onclick = function() { document.body.removeChild(modal); };
+            
+            const img = document.createElement('img');
+            img.src = photoUrl;
+            img.style.cssText = 'max-width: 90%; max-height: 90%; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);';
+            modal.appendChild(img);
+            document.body.appendChild(modal);
+        }
+        
         function sauvegarderAction(clientId) {
             const actionInput = document.getElementById('action_' + clientId);
             const heureVisiteInput = document.getElementById('heure_visite_' + clientId);
+            const photoInput = document.getElementById('photo_' + clientId);
             
             const action = actionInput.value.trim();
             
-            // Vérifier qu'au moins l'action est remplie
-            if (!action) {
-                showToast('Veuillez saisir une commande ou un commentaire.', true);
+            // Vérifier qu'au moins l'action ou une photo est remplie
+            if (!action && (!photoInput.files || photoInput.files.length === 0)) {
+                showToast('Veuillez saisir une commande ou ajouter une photo.', true);
                 return;
             }
             
@@ -516,6 +605,12 @@
             formData.append('action', action);
             formData.append('heure_visite', heureVisite);
             formData.append('date_action', dateSelectionnee);
+            
+            // Ajouter la photo si elle existe
+            if (photoInput.files && photoInput.files[0]) {
+                formData.append('photo', photoInput.files[0]);
+            }
+            
             formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
             
             // Trouver le bouton qui a déclenché l'action
@@ -541,6 +636,11 @@
                     // Réinitialiser les champs
                     actionInput.value = '';
                     heureVisiteInput.value = '';
+                    photoInput.value = '';
+                    const photoPreview = document.getElementById('photo_preview_' + clientId);
+                    if (photoPreview) {
+                        photoPreview.style.display = 'none';
+                    }
                     const heureDisplay = document.getElementById('heure_display_' + clientId);
                     if (heureDisplay) {
                         heureDisplay.textContent = '--:--';

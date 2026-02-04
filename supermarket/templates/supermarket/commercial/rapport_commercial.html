@@ -229,6 +229,7 @@
                             <th>TELEPHONES</th>
                             <th>HEURE</th>
                             <th>COMMANDES</th>
+                            <th>PHOTO</th>
                             <th>TOTAL</th>
                         </tr>
                     </thead>
@@ -299,13 +300,24 @@
                     // Combiner actions et commandes pour créer les lignes
                     const allItems = [];
                     
-                    // Ajouter les commandes
+                    // Ajouter les commandes avec leurs photos associées
                     commandes.forEach(cmd => {
+                        // Chercher si une action avec photo correspond à cette commande
+                        let photo_associee = null;
+                        const heure_cmd = cmd.heure || '';
+                        const action_correspondante = actions.find(action => 
+                            (action.heure_visite || '') === heure_cmd && action.photo
+                        );
+                        if (action_correspondante) {
+                            photo_associee = action_correspondante.photo;
+                        }
+                        
                         allItems.push({
                             type: 'commande',
-                            heure: cmd.heure || '',
+                            heure: heure_cmd,
                             texte: cmd.article || '',
-                            total: cmd.prix_total || 0
+                            total: cmd.prix_total || 0,
+                            photo: photo_associee
                         });
                     });
                     
@@ -318,7 +330,8 @@
                                 type: 'action',
                                 heure: action.heure_visite || '',
                                 texte: action.action || '',
-                                total: 0
+                                total: 0,
+                                photo: action.photo || null
                             });
                         }
                     });
@@ -330,6 +343,10 @@
                     if (allItems.length > 0) {
                         allItems.forEach((item, index) => {
                             const row = document.createElement('tr');
+                            const photoCell = item.photo ? 
+                                `<td style="text-align: center;"><img src="${item.photo}" alt="Photo" style="max-width: 80px; max-height: 80px; border-radius: 4px; cursor: pointer;" onclick="window.open('${item.photo}', '_blank')"></td>` :
+                                `<td></td>`;
+                            
                             row.innerHTML = `
                                 <td>${index === 0 ? (client.detail || '') : ''}</td>
                                 <td>${index === 0 ? (client.ref || '') : ''}</td>
@@ -338,6 +355,7 @@
                                 <td>${index === 0 ? (client.telephone || '') : ''}</td>
                                 <td>${item.heure}</td>
                                 <td style="white-space: pre-line;">${item.texte}</td>
+                                ${photoCell}
                                 <td>${item.total > 0 ? item.total.toLocaleString('fr-FR') + ' FCFA' : ''}</td>
                             `;
                             rapportBody.appendChild(row);
@@ -351,6 +369,7 @@
                             <td>${client.potentiel || ''}</td>
                             <td>${client.nom || ''}</td>
                             <td>${client.telephone || ''}</td>
+                            <td></td>
                             <td></td>
                             <td></td>
                             <td></td>
